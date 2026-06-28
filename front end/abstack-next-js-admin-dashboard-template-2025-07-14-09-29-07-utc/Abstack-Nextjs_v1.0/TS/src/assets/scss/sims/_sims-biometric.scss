@@ -1,0 +1,71 @@
+// Biometric Guardian Release UI
+
+.biometric-scanner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+
+  .scanner-ring {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    border: 4px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: #f8f9fa;
+    transition: border-color 0.3s, background 0.3s;
+
+    &.scanning {
+      border-color: #0dcaf0;
+      background: #e8fafe;
+      animation: pulse 1.2s infinite;
+    }
+
+    &.verified {
+      border-color: #198754;
+      background: #d1e7dd;
+    }
+
+    &.failed {
+      border-color: #dc3545;
+      background: #f8d7da;
+    }
+
+    .scanner-icon {
+      font-size: 3rem;
+      color: #6c757d;
+    }
+  }
+
+  .verification-timer {
+    font-size: 2.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+
+    &.urgent {
+      color: #dc3545;
+      animation: blink 0.5s step-end infinite;
+    }
+  }
+
+  .verification-status-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+
+    &.verified { color: #198754; }
+    &.failed { color: #dc3545; }
+    &.scanning { color: #0dcaf0; }
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(13, 202, 240, 0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(13, 202, 240, 0); }
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}

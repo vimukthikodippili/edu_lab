@@ -1,0 +1,97 @@
+name: sims-production
+
+networks:
+  sims-network:
+    driver: bridge
+
+services:
+  # ─── NestJS API ─────────────────────────────────────────────────────
+  # Connects to a managed external database (e.g. DigitalOcean Managed PG,
+  # AWS RDS) via DATABASE_HOST — no postgres sidecar in production.
+  # Migrations are run as a discrete pre-deploy step in the workflow
+  # (docker run --rm) before this service starts — never at container startup.
+  api:
+    image: ${BACKEND_IMAGE}:${IMAGE_TAG}
+    restart: always
+    environment:
+      NODE_ENV: production
+      APP_PORT: "3000"
+      APP_NAME: "SIMS API"
+      API_PREFIX: api
+      APP_FALLBACK_LANGUAGE: en
+      APP_HEADER_LANGUAGE: x-custom-lang
+      DATABASE_TYPE: postgres
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE_PORT: "5432"
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_SYNCHRONIZE: "false"
+      DATABASE_MAX_CONNECTIONS: "100"
+      # SSL must be enabled for managed cloud databases
+      DATABASE_SSL_ENABLED: "true"
+      DATABASE_REJECT_UNAUTHORIZED: "true"
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      AUTH_JWT_TOKEN_EXPIRES_IN: 15m
+      AUTH_REFRESH_SECRET: ${AUTH_REFRESH_SECRET}
+      AUTH_REFRESH_TOKEN_EXPIRES_IN: 3650d
+      AUTH_FORGOT_SECRET: ${AUTH_FORGOT_SECRET}
+      AUTH_FORGOT_TOKEN_EXPIRES_IN: 30m
+      AUTH_CONFIRM_EMAIL_SECRET: ${AUTH_CONFIRM_EMAIL_SECRET}
+      AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN: 1d
+      FILE_DRIVER: local
+      FRONTEND_DOMAIN: ${NEXTAUTH_URL}
+      BACKEND_DOMAIN: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "5000:3000"
+    networks:
+      - sims-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "2.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ─── Next.js 15 SSR Frontend ────────────────────────────────────────
+  frontend:
+    image: ${FRONTEND_IMAGE}:${IMAGE_TAG}
+    restart: always
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "5001:3000"
+    networks:
+      - sims-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"

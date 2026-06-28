@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Introduction | Abstack - Responsive Bootstrap Admin & Dashboard Template</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta content="A fully featured admin theme which can be used to build CRM, CMS, etc." name="description" />
+    <meta content="Coderthemes" name="author" />
+
+    <!-- App favicon -->
+    <link rel="shortcut icon" href="assets/images/favicon.ico">
+
+    <!-- Theme Config Js -->
+    <script src="assets/js/config.js"></script>
+
+    <!-- App css -->
+    <link href="assets/css/app.min.css" rel="stylesheet" type="text/css" id="app-style" />
+
+    <!-- Icons css -->
+    <link href="assets/css/icons.min.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+    <!-- Begin page -->
+    <div class="wrapper">
+
+        <!-- ========== Topbar Start ========== -->
+        <div class="navbar-custom">
+            <div class="topbar container-fluid">
+                <div class="d-flex align-items-center gap-lg-2 gap-1">
+
+                    <!-- Topbar Brand Logo -->
+                    <div class="logo-topbar">
+                        <!-- Logo light -->
+                        <a href="index.html" class="logo-light">
+                            <span class="logo-lg">
+                                <img src="assets/images/logo.png" alt="logo">
+                            </span>
+                            <span class="logo-sm">
+                                <img src="assets/images/logo-sm.png" alt="small logo">
+                            </span>
+                        </a>
+
+                        <!-- Logo Dark -->
+                        <a href="index.html" class="logo-dark">
+                            <span class="logo-lg">
+                                <img src="assets/images/logo-dark.png" alt="dark logo">
+                            </span>
+                            <span class="logo-sm">
+                                <img src="assets/images/logo-sm.png" alt="small logo">
+                            </span>
+                        </a>
+                    </div>
+
+                    <!-- Sidebar Menu Toggle Button -->
+                    <button class="button-toggle-menu">
+                        <i class="ri-menu-2-fill"></i>
+                    </button>
+                </div>
+
+                <ul class="topbar-menu d-flex align-items-center gap-3">
+
+                    <li class="d-none d-sm-inline-block">
+                        <div class="nav-link" id="light-dark-mode">
+                            <i class="ri-moon-line fs-22"></i>
+                        </div>
+                    </li>
+
+                    <li class="nav-link"><span class="badge bg-success fs-16">v1.0</span></li>
+                </ul>
+            </div>
+        </div>
+        <!-- ========== Topbar End ========== -->
+
+        <!-- ========== Left Sidebar Start ========== -->
+        <div class="leftside-menu">
+
+            <!-- Brand Logo Light -->
+            <a href="index.html" class="logo logo-light">
+                <span class="logo-lg">
+                    <img src="assets/images/logo.png" alt="logo">
+                </span>
+                <span class="logo-sm">
+                    <img src="assets/images/logo-sm.png" alt="small logo">
+                </span>
+            </a>
+
+            <!-- Brand Logo Dark -->
+            <a href="index.html" class="logo logo-dark">
+                <span class="logo-lg">
+                    <img src="assets/images/logo-dark.png" alt="dark logo">
+                </span>
+                <span class="logo-sm">
+                    <img src="assets/images/logo-sm.png" alt="small logo">
+                </span>
+            </a>
+
+            <!-- Sidebar Hover Menu Toggle Button -->
+            <div class="button-sm-hover" data-bs-toggle="tooltip" data-bs-placement="right" title="Show Full Sidebar">
+                <i class="ri-checkbox-blank-circle-line align-middle"></i>
+            </div>
+
+            <!-- Full Sidebar Menu Close Button -->
+            <div class="button-close-fullsidebar">
+                <i class="ri-close-fill align-middle"></i>
+            </div>
+
+            <!-- Sidebar -left -->
+            <div class="h-100" id="leftside-menu-container" data-simplebar>
+                <!-- Leftbar User -->
+                <div class="leftbar-user">
+                    <a href="pages-profile.html">
+                        <img src="assets/images/users/avatar-1.jpg" alt="user-image" height="42"
+                            class="rounded-circle shadow-sm">
+                        <span class="leftbar-user-name mt-2">Tosha Minner</span>
+                    </a>
+                </div>
+
+                <!--- Sidemenu -->
+                <ul class="side-nav">
+
+                    <li class="side-nav-title">Getting Started</li>
+
+                    <li class="side-nav-item">
+                        <a href="index.html" class="side-nav-link">
+                            <i class="ri-honour-line"></i>
+                            <span> Introduction </span>
+                        </a>
+                    </li>
+
+                    <li class="side-nav-item">
+                        <a href="installation.html" class="side-nav-link">
+                            <i class="ri-tools-fill"></i>
+                            <span> Installation </span>
+                        </a>
+                    </li>
+
+                    <li class="side-nav-title">Customization</li>
+
+                    <li class="side-nav-item">
+                        <a href="customization.html" class="side-nav-link">
+                            <i class="ri-paint-line"></i>
+                            <span> Customization </span>
+                        </a>
+                    </li>
+
+                    <li class="side-nav-title">Other</li>
+
+                    <li class="side-nav-item">
+                        <a href="changelog.html" class="side-nav-link">
+                            <i class="ri-book-open-line"></i>
+                            <span> Changelog </span>
+                        </a>
+                    </li>
+
+                </ul>
+                <!--- End Sidemenu -->
+
+                <div class="help-box text-white text-center d-none">
+                    <a href="javascript: void(0);" class="float-end close-btn text-white">
+                        <i class="mdi mdi-close"></i>
+                    </a>
+                    <img src="assets/images/svg/help-icon.svg" height="90" alt="Helper Icon Image">
+                    <h5 class="mt-3">Unlimited Access</h5>
+                    <p class="mb-3">Upgrade to plan to get access to unlimited reports</p>
+                    <a href="javascript: void(0);" class="btn btn-secondary btn-sm">Buy Now</a>
+                </div>
+
+                <div class="clearfix"></div>
+            </div>
+        </div>
+        <!-- ========== Left Sidebar End ========== -->
+
+        <!-- ============================================================== -->
+        <!-- Start Page Content here -->
+        <!-- ============================================================== -->
+
+        <div class="content-page">
+            <div class="content">
+
+                <!-- Start Content-->
+                <div class="container-fluid">
+
+                    <!-- start page title -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="page-title-box">
+                                <div class="page-title-right">
+                                    <ol class="breadcrumb m-0">
+                                        <li class="breadcrumb-item"><a href="javascript: void(0);">Abstack</a></li>
+                                        <li class="breadcrumb-item active">Introduction</li>
+                                    </ol>
+                                </div>
+                                <h4 class="page-title">Introduction</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- end page title -->
+
+                    <div class="card">
+                        <div class="card-body">
+                            <p>
+                                Abstack NextJs is a premium admin template built on Bootstrap
+                                v5.3.3 and utilizing cutting-edge web technologies
+                                like NextJs-15, CSS3. It offers a beautiful
+                                dashboard, pre-built components, widgets, and pages that are
+                                highly versatile and easily integrated into any webpage.
+                                With a fully responsive and highly customizable design,
+                                Abstack is a powerful and flexible choice for developing web
+                                applications like CRM, CMS, and dashboards. The
+                                documentation provides clear instructions for users of all
+                                skill levels to make the most of the template's features and
+                                functionalities.
+                            </p>
+
+                            <p class="mb-0">
+                                At Coderthemes, we take great pride in providing excellent
+                                customer service. If you have any questions or feedback,
+                                please don't hesitate to contact us. You can reach us by
+                                email at <code>support@coderthemes.com</code> or by filling
+                                out the contact form on our
+                                <a href="http://coderthemes.com/#contact" target="_blank">website</a>. Our team is
+                                dedicated to ensuring your satisfaction, and
+                                we will get back to you as soon as possible.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title">Structure</h4>
+                            <p>
+                                Once you have completed your purchase, you will receive a
+                                zip file containing all the necessary files and folders.
+                                When you extract the contents of the zip file, you will find
+                                the following files and folders:
+                            </p>
+                            <pre>
+├── src
+│   ├── app   
+│   ├── <strong>assets</strong>
+│   │   └── data
+│   │   └── image
+│   │   └── scss
+│   ├── components
+│   ├── context
+│   ├── helpers
+│   ├── hooks
+│   ├── types
+│   ├── utils
+│   ├── middleware.ts
+├── bun.lockb       
+├── next.config.ts       
+├── package.json       
+├── tsconfig.json  
+├── yarn.lock  
+</pre>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="mt-0 mb-2 font-weight-bold">Credits/Plugins</h4>
+                            <p>
+                                We are incredibly grateful to the creators of the following
+                                plugins, without which the development ofAbstack would not
+                                have been possible. Each of these plugins comes with its own
+                                official documentation, and we highly recommend that you
+                                refer to them while building your project withAbstack.
+                            </p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Plugins</th>
+                                                    <th>Url</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>Bootstrap</td>
+                                                    <td>
+                                                        <a href="http://getbootstrap.com/"
+                                                            target="_blank">http://getbootstrap.com/</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>React Bootstrap</td>
+                                                    <td><a target="_blank"
+                                                            href="https://react-bootstrap.netlify.app/">https://react-bootstrap.netlify.app/<i
+                                                                class="fas fa-external-link-square-alt ms-1"></i></a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>React Quill New</td>
+                                                    <td><a target="_blank"
+                                                            href="https://www.npmjs.com/package/react-quill-new">https://www.npmjs.com/package/react-quill-new<i
+                                                                class="fas fa-external-link-square-alt ms-1"></i></a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Simplebar React</td>
+                                                    <td>
+                                                        <a href="https://www.npmjs.com/package/simplebar-react"
+                                                            target="_blank">https://www.npmjs.com/package/simplebar-react</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Choices.js</td>
+                                                    <td><a target="_blank"
+                                                            href="https://www.npmjs.com/package/choices.js/v/1.1.4">https://www.npmjs.com/package/choices.js/v/1.1.4<i
+                                                                class="fas fa-external-link-square-alt ms-1"></i></a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Nouislider</td>
+                                                    <td><a target="_blank"
+                                                            href="https://www.npmjs.com/package/nouislider-react">https://www.npmjs.com/package/nouislider-react<i
+                                                                class="fas fa-external-link-square-alt ms-1"></i></a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Iconify React</td>
+                                                    <td>
+                                                        <a href="https://iconify.design/docs/icon-components/react/"
+                                                            target="_blank">https://iconify.design/docs/icon-components/react/</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Flatpickr</td>
+                                                    <td>
+                                                        <a href="https://www.npmjs.com/package/react-flatpickr"
+                                                            target="_blank">https://www.npmjs.com/package/react-flatpickr</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Calendar</td>
+                                                    <td>
+                                                        <a href="https://fullcalendar.io/"
+                                                            target="_blank">https://fullcalendar.io/</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Jvectormap</td>
+                                                    <td>
+                                                        <a href="http://jvectormap.com/"
+                                                            target="_blank">http://jvectormap.com/</a>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Plugins</th>
+                                                    <th>Url</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+
+                                                <tr>
+                                                    <td>React Google Map</td>
+                                                    <td>
+                                                        <a href="https://www.npmjs.com/package/@react-google-maps/api"
+                                                            target="_blank">https://www.npmjs.com/package/@react-google-maps/api</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Leaflet</td>
+                                                    <td>
+                                                        <a href="https://leafletjs.com/"
+                                                            target="_blank">https://leafletjs.com/</a>
+                                                    </td>
+                                                </tr>
+
+                                                <tr>
+                                                    <td>React Dropzone</td>
+                                                    <td>
+                                                        <a href="https://www.npmjs.com/package/react-dropzone"
+                                                            target="_blank">https://www.npmjs.com/package/react-dropzone</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Apexcharts</td>
+                                                    <td>
+                                                        <a href="https://apexcharts.com/docs/react-charts/"
+                                                            target="_blank">https://apexcharts.com/docs/react-charts/</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Apexcharts React</td>
+                                                    <td><a target="_blank"
+                                                            href="https://apexcharts.com/docs/react-charts/">https://apexcharts.com/docs/react-charts/<i
+                                                                class="fas fa-external-link-square-alt ms-1"></i></a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Sweetalert2</td>
+                                                    <td>
+                                                        <a href="https://www.npmjs.com/package/react-sweetalert2"
+                                                            target="_blank">https://www.npmjs.com/package/react-sweetalert2</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Gridjs</td>
+                                                    <td>
+                                                        <a href="https://gridjs.io/"
+                                                            target="_blank">https://gridjs.io/</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>React Toastify</td>
+                                                    <td>
+                                                        <a href="https://www.npmjs.com/package/react-toastify"
+                                                            target="_blank">https://www.npmjs.com/package/react-toastify</a>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Yup</td>
+                                                    <td><a target="_blank"
+                                                            href="https://github.com/jquense/yup#readme">https://github.com/jquense/yup#readme<i
+                                                                class="fas fa-external-link-square-alt ms-1"></i></a>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+                <!-- container -->
+
+            </div>
+            <!-- content -->
+
+            <!-- Footer Start -->
+            <footer class="footer">
+                <div class="container-fluid">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <script>document.write(new Date().getFullYear())</script> © Abstack - <a
+                                href="https://coderthemes.com/" target="_blank">Coderthemes.com</a>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-md-end footer-links d-none d-md-block">
+                                <a href="https://coderthemes.com/" target="_blank">About</a>
+                                <a href="https://coderthemes.com/" target="_blank">Support</a>
+                                <a href="https://coderthemes.com/" target="_blank">Contact Us</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+            <!-- end Footer -->
+
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- End Page content -->
+        <!-- ============================================================== -->
+
+    </div>
+    <!-- END wrapper -->
+
+    <!-- Vendor js -->
+    <script src="assets/js/vendor.min.js"></script>
+
+    <!-- App js -->
+    <script src="assets/js/app.min.js"></script>
+
+</body>
+
+</html>

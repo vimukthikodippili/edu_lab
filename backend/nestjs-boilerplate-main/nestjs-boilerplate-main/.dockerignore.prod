@@ -1,0 +1,21 @@
+# .dockerignore for relational.prod.Dockerfile
+# Excludes unnecessary files from the production build context.
+
+node_modules/
+dist/
+coverage/
+test-results/
+
+.env
+.env.local
+.env.*
+
+# Test files — not compiled or used in production
+**/*.spec.ts
+**/*.e2e-spec.ts
+test/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/

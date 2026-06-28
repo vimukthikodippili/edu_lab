@@ -1,0 +1,142 @@
+name: sims-staging
+
+networks:
+  sims-network:
+    driver: bridge
+
+volumes:
+  postgres-staging-data:
+    driver: local
+
+services:
+  # ─── PostgreSQL 17.6 ────────────────────────────────────────────────
+  # Matches the postgres version used in CI services: block (pr-checks.yml)
+  # and in the existing docker-compose.relational.yaml.
+  # For a cloud staging environment, replace this with a managed DB
+  # (DigitalOcean Managed PG, AWS RDS) and remove this service.
+  postgres:
+    image: postgres:17.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    volumes:
+      - postgres-staging-data:/var/lib/postgresql/data
+    networks:
+      - sims-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+
+  # ─── NestJS API ─────────────────────────────────────────────────────
+  # IMAGE_TAG is the exact sha-<SHA> tag written by the deploy workflow.
+  # Never references :latest — always a pinned immutable SHA.
+  api:
+    image: ${BACKEND_IMAGE}:${IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_PORT: "3000"
+      APP_NAME: "SIMS API (Staging)"
+      API_PREFIX: api
+      APP_FALLBACK_LANGUAGE: en
+      APP_HEADER_LANGUAGE: x-custom-lang
+      DATABASE_TYPE: postgres
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_SYNCHRONIZE: "false"
+      DATABASE_MAX_CONNECTIONS: "50"
+      DATABASE_SSL_ENABLED: "false"
+      DATABASE_REJECT_UNAUTHORIZED: "false"
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      AUTH_JWT_TOKEN_EXPIRES_IN: 15m
+      AUTH_REFRESH_SECRET: ${AUTH_REFRESH_SECRET}
+      AUTH_REFRESH_TOKEN_EXPIRES_IN: 3650d
+      AUTH_FORGOT_SECRET: ${AUTH_FORGOT_SECRET}
+      AUTH_FORGOT_TOKEN_EXPIRES_IN: 30m
+      AUTH_CONFIRM_EMAIL_SECRET: ${AUTH_CONFIRM_EMAIL_SECRET}
+      AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN: 1d
+      FILE_DRIVER: local
+      FRONTEND_DOMAIN: ${NEXTAUTH_URL}
+      BACKEND_DOMAIN: ${NEXT_PUBLIC_API_URL}
+      # Staging email — maildev catches all outgoing email (port 1080 web UI)
+      MAIL_HOST: maildev
+      MAIL_PORT: "1025"
+      MAIL_IGNORE_TLS: "true"
+      MAIL_SECURE: "false"
+      MAIL_REQUIRE_TLS: "false"
+      MAIL_DEFAULT_EMAIL: noreply@sims-staging.local
+      MAIL_DEFAULT_NAME: SIMS
+      MAIL_CLIENT_PORT: "1080"
+    ports:
+      - "5000:3000"
+    networks:
+      - sims-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+
+  # ─── Next.js 15 SSR Frontend ────────────────────────────────────────
+  # SSR mode (output: standalone) — requires Node.js runtime, not just nginx.
+  frontend:
+    image: ${FRONTEND_IMAGE}:${IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "5001:3000"
+    networks:
+      - sims-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+
+  # ─── Maildev ────────────────────────────────────────────────────────
+  # Catches all outgoing email in staging — never forwards to real addresses.
+  # Web UI at http://<staging-host>:1080 to inspect sent emails.
+  # NOT included in production compose file.
+  maildev:
+    image: maildev/maildev:latest
+    restart: unless-stopped
+    ports:
+      - "1080:1080"
+      - "1025:1025"
+    networks:
+      - sims-network

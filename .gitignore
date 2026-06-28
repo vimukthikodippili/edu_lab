@@ -1,0 +1,58 @@
+# ── Secrets — NEVER commit these ─────────────────────────────────────
+.env
+.env.local
+.env.staging
+.env.production
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ── Node.js ───────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm
+
+# ── NestJS build output ───────────────────────────────────────────────
+backend/nestjs-boilerplate-main/nestjs-boilerplate-main/dist/
+backend/nestjs-boilerplate-main/nestjs-boilerplate-main/coverage/
+backend/nestjs-boilerplate-main/nestjs-boilerplate-main/test-results/
+backend/nestjs-boilerplate-main/nestjs-boilerplate-main/prod.log
+backend/nestjs-boilerplate-main/nestjs-boilerplate-main/files/
+
+# ── Next.js build output ──────────────────────────────────────────────
+front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS/.next/
+front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS/out/
+front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS/.vercel/
+front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS/coverage/
+front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS/test-results/
+front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS/public/sw.js
+front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS/public/workbox-*.js
+
+# ── JS variant (not actively used) ───────────────────────────────────
+front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/JS/.next/
+front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/JS/node_modules/
+
+# ── OS files ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# ── IDE / Editor ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+.classpath
+.project
+
+# ── Zip archives / binaries (not source) ─────────────────────────────
+*.zip
+*.tar.gz
+*.tgz

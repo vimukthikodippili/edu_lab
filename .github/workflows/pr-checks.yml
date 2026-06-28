@@ -1,0 +1,204 @@
+name: PR Checks — Lint & Unit Tests
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+# Cancel in-flight runs for the same PR branch — saves minutes, prevents stale results
+concurrency:
+  group: pr-checks-${{ github.head_ref }}
+  cancel-in-progress: true
+
+env:
+  # Defined once here to avoid repeating the space-in-path string across every step.
+  # working-directory: ${{ env.FRONTEND_DIR }} is applied per-step on all run: blocks.
+  FRONTEND_DIR: "front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS"
+  BACKEND_DIR: "backend/nestjs-boilerplate-main/nestjs-boilerplate-main"
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 1: Backend — NestJS ESLint + Jest unit tests
+  # Node 22.21.1 pinned to match .nvmrc and all Dockerfiles
+  # PostgreSQL 17.6 via services: — no Docker Compose overhead for unit tests
+  # ───────────────────────────────────────────────────────────────────
+  backend-checks:
+    name: Backend — Lint & Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: api
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U root -d api"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      APP_PORT: "3000"
+      APP_NAME: "SIMS API"
+      API_PREFIX: api
+      APP_FALLBACK_LANGUAGE: en
+      APP_HEADER_LANGUAGE: x-custom-lang
+      FRONTEND_DOMAIN: http://localhost:5001
+      BACKEND_DOMAIN: http://localhost:5000
+      # Database — matches the postgres service above
+      DATABASE_TYPE: postgres
+      DATABASE_HOST: localhost
+      DATABASE_PORT: "5432"
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: secret
+      DATABASE_NAME: api
+      DATABASE_SYNCHRONIZE: "false"
+      DATABASE_MAX_CONNECTIONS: "10"
+      DATABASE_SSL_ENABLED: "false"
+      DATABASE_REJECT_UNAUTHORIZED: "false"
+      DATABASE_CA: ""
+      DATABASE_KEY: ""
+      DATABASE_CERT: ""
+      DATABASE_URL: ""
+      # Auth secrets — placeholder values safe for CI unit tests (no real data)
+      AUTH_JWT_SECRET: ci-jwt-secret-for-unit-tests-only-not-production
+      AUTH_JWT_TOKEN_EXPIRES_IN: 15m
+      AUTH_REFRESH_SECRET: ci-refresh-secret-for-unit-tests-only-not-production
+      AUTH_REFRESH_TOKEN_EXPIRES_IN: 3650d
+      AUTH_FORGOT_SECRET: ci-forgot-secret-for-unit-tests-only-not-production
+      AUTH_FORGOT_TOKEN_EXPIRES_IN: 30m
+      AUTH_CONFIRM_EMAIL_SECRET: ci-confirm-email-secret-for-unit-tests-only
+      AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN: 1d
+      # Mail — localhost, no maildev needed for unit tests
+      MAIL_HOST: localhost
+      MAIL_PORT: "1025"
+      MAIL_IGNORE_TLS: "true"
+      MAIL_SECURE: "false"
+      MAIL_REQUIRE_TLS: "false"
+      MAIL_DEFAULT_EMAIL: noreply@sims.edu.lk
+      MAIL_DEFAULT_NAME: SIMS
+      MAIL_CLIENT_PORT: "1080"
+      # File storage
+      FILE_DRIVER: local
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22.21.1
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.21.1"
+          cache: npm
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: npm ci
+
+      - name: Run ESLint (ESLint 9 flat config)
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: npm run lint
+
+      - name: Run Jest unit tests with coverage
+        id: unit-tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: npm run test:cov -- --forceExit --passWithNoTests
+        # --forceExit prevents Jest hanging on open handles (DB connections)
+        # --passWithNoTests avoids failure when test suite is empty during early sprints
+
+      - name: Upload coverage report on failure
+        if: failure() && steps.unit-tests.conclusion == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-${{ github.sha }}
+          path: ${{ env.BACKEND_DIR }}/coverage/
+          retention-days: 7
+
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 2: Frontend — Next.js ESLint + Vitest unit tests
+  # Node 20.x — matches @types/node ^20 in devDependencies
+  # No database service needed — Vitest + happy-dom, pure unit tests
+  # ───────────────────────────────────────────────────────────────────
+  frontend-checks:
+    name: Frontend — Lint & Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      # Minimum required for next lint and vitest to run without crashing
+      NEXTAUTH_SECRET: ci-nextauth-secret-placeholder-32chars!!
+      NEXTAUTH_URL: http://localhost:5001
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: npm
+          # Must use literal path string here — ${{ env.* }} not available in with: at this point
+          cache-dependency-path: "front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS/package-lock.json"
+
+      - name: Install frontend dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        # .npmrc already sets legacy-peer-deps=true; explicit flag is a safety net
+        run: npm ci --legacy-peer-deps
+
+      - name: Run Next.js ESLint
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run lint
+
+      - name: Run Vitest unit tests
+        id: vitest
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run test -- --reporter=verbose --passWithNoTests
+
+      - name: Upload test results on failure
+        if: failure() && steps.vitest.conclusion == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-results-${{ github.sha }}
+          path: "${{ env.FRONTEND_DIR }}/test-results/"
+          retention-days: 7
+
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 3: PR Gate — single status check name for branch protection
+  # Both jobs must succeed. This is the name configured in branch protection rules.
+  # Using if: always() ensures this runs even when upstream jobs are cancelled,
+  # and correctly distinguishes 'success' from 'skipped' for cancelled jobs.
+  # ───────────────────────────────────────────────────────────────────
+  pr-gate:
+    name: PR Gate — All Checks Passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [backend-checks, frontend-checks]
+    if: always()
+
+    steps:
+      - name: Evaluate all check results
+        run: |
+          backend="${{ needs.backend-checks.result }}"
+          frontend="${{ needs.frontend-checks.result }}"
+
+          echo "Backend checks:  $backend"
+          echo "Frontend checks: $frontend"
+
+          if [[ "$backend" != "success" || "$frontend" != "success" ]]; then
+            echo ""
+            echo "ERROR: One or more checks failed or were cancelled."
+            echo "Both 'backend-checks' and 'frontend-checks' must succeed before merging."
+            exit 1
+          fi
+
+          echo ""
+          echo "All checks passed. PR is ready to merge."

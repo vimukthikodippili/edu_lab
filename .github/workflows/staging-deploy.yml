@@ -1,0 +1,365 @@
+name: Staging Deploy — Build, Push & Deploy
+
+on:
+  push:
+    branches: [main]
+
+# Only one staging deploy runs at a time — queue the next, don't cancel in progress
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/sims-backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/sims-frontend
+  FRONTEND_DIR: "front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS"
+  BACKEND_DIR: "backend/nestjs-boilerplate-main/nestjs-boilerplate-main"
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 1: Build backend Docker image and push to ghcr.io
+  # Uses relational.prod.Dockerfile — clean 2-stage build, no seeds/E2E
+  # Tagged: sha-<40charSHA> (immutable) + staging (mutable) + latest (mutable)
+  # ───────────────────────────────────────────────────────────────────
+  build-backend:
+    name: Build & Push Backend Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: sha-${{ github.sha }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN is auto-injected — no extra secret needed for push during CI
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.BACKEND_IMAGE }}
+          tags: |
+            type=sha,format=long,prefix=sha-
+            type=raw,value=staging
+            type=raw,value=latest
+
+      - name: Build and push backend image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.BACKEND_DIR }}
+          file: ${{ env.BACKEND_DIR }}/relational.prod.Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Layer caching via ghcr.io — dramatically reduces build time on cache hits
+          cache-from: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache,mode=max
+          build-args: |
+            NODE_ENV=production
+            GIT_SHA=${{ github.sha }}
+
+      - name: Confirm image was pushed
+        run: |
+          echo "Backend image digest: ${{ steps.build.outputs.digest }}"
+          echo "Backend image tag:    sha-${{ github.sha }}"
+
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 2: Build frontend Docker image and push to ghcr.io
+  # next.config.ts must have output: 'standalone' for CMD ["node","server.js"] to work
+  # NEXT_PUBLIC_* vars are baked into the image at build time by Next.js
+  # ───────────────────────────────────────────────────────────────────
+  build-frontend:
+    name: Build & Push Frontend Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: sha-${{ github.sha }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.FRONTEND_IMAGE }}
+          tags: |
+            type=sha,format=long,prefix=sha-
+            type=raw,value=staging
+            type=raw,value=latest
+
+      - name: Build and push frontend image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          # build-push-action receives this as a string — handles the space correctly
+          context: "front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS"
+          file: "front end/abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc/Abstack-Nextjs_v1.0/TS/Dockerfile"
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.FRONTEND_IMAGE }}:buildcache,mode=max
+          build-args: |
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+            NEXTAUTH_URL=${{ secrets.STAGING_NEXTAUTH_URL }}
+            NEXT_PUBLIC_API_URL=${{ secrets.STAGING_API_URL }}
+            NODE_ENV=production
+
+      - name: Confirm image was pushed
+        run: |
+          echo "Frontend image digest: ${{ steps.build.outputs.digest }}"
+          echo "Frontend image tag:    sha-${{ github.sha }}"
+
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 3: Deploy both images to staging server via SSH + docker-compose
+  # Depends on both builds — if either build fails, deploy never runs
+  # ───────────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build-backend, build-frontend]
+    environment:
+      name: staging
+      url: ${{ secrets.STAGING_URL }}
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - name: Checkout repository (for docker-compose.staging.yml)
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Deployment record
+        id: deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: 'staging',
+              auto_merge: false,
+              required_contexts: [],
+              description: 'Deploying SIMS to staging',
+            });
+            core.setOutput('deployment_id', deployment.data.id);
+
+      - name: Mark deployment in_progress
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.deployment_id }},
+              state: 'in_progress',
+              description: 'Deploying to staging server...',
+            });
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Add staging host to known_hosts
+        run: ssh-keyscan -H "${{ secrets.STAGING_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy docker-compose.staging.yml to server
+        run: |
+          scp docker-compose.staging.yml \
+            "${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:~/sims/docker-compose.staging.yml"
+
+      - name: Deploy to staging via SSH
+        id: ssh-deploy
+        env:
+          DEPLOY_SHA: sha-${{ github.sha }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          DATABASE_USERNAME: ${{ secrets.STAGING_DB_USERNAME }}
+          DATABASE_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          DATABASE_NAME: ${{ secrets.STAGING_DB_NAME }}
+          AUTH_JWT_SECRET: ${{ secrets.AUTH_JWT_SECRET }}
+          AUTH_REFRESH_SECRET: ${{ secrets.AUTH_REFRESH_SECRET }}
+          AUTH_FORGOT_SECRET: ${{ secrets.AUTH_FORGOT_SECRET }}
+          AUTH_CONFIRM_EMAIL_SECRET: ${{ secrets.AUTH_CONFIRM_EMAIL_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.STAGING_NEXTAUTH_URL }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.STAGING_API_URL }}
+        run: |
+          ssh "${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}" \
+            DEPLOY_SHA="$DEPLOY_SHA" \
+            BACKEND_IMAGE="$BACKEND_IMAGE" \
+            FRONTEND_IMAGE="$FRONTEND_IMAGE" \
+            GHCR_TOKEN="$GHCR_TOKEN" \
+            GHCR_USER="$GHCR_USER" \
+            DATABASE_USERNAME="$DATABASE_USERNAME" \
+            DATABASE_PASSWORD="$DATABASE_PASSWORD" \
+            DATABASE_NAME="$DATABASE_NAME" \
+            AUTH_JWT_SECRET="$AUTH_JWT_SECRET" \
+            AUTH_REFRESH_SECRET="$AUTH_REFRESH_SECRET" \
+            AUTH_FORGOT_SECRET="$AUTH_FORGOT_SECRET" \
+            AUTH_CONFIRM_EMAIL_SECRET="$AUTH_CONFIRM_EMAIL_SECRET" \
+            NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
+            NEXTAUTH_URL="$NEXTAUTH_URL" \
+            NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
+            bash -s << 'ENDSSH'
+              set -euo pipefail
+
+              cd ~/sims
+
+              echo "Logging in to ghcr.io..."
+              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+              echo "Pulling images at tag: $DEPLOY_SHA"
+              docker pull "$BACKEND_IMAGE:$DEPLOY_SHA"
+              docker pull "$FRONTEND_IMAGE:$DEPLOY_SHA"
+
+              echo "Writing .env..."
+              cat > .env << EOF
+          BACKEND_IMAGE=$BACKEND_IMAGE
+          FRONTEND_IMAGE=$FRONTEND_IMAGE
+          IMAGE_TAG=$DEPLOY_SHA
+          DATABASE_USERNAME=$DATABASE_USERNAME
+          DATABASE_PASSWORD=$DATABASE_PASSWORD
+          DATABASE_NAME=$DATABASE_NAME
+          AUTH_JWT_SECRET=$AUTH_JWT_SECRET
+          AUTH_JWT_TOKEN_EXPIRES_IN=15m
+          AUTH_REFRESH_SECRET=$AUTH_REFRESH_SECRET
+          AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d
+          AUTH_FORGOT_SECRET=$AUTH_FORGOT_SECRET
+          AUTH_FORGOT_TOKEN_EXPIRES_IN=30m
+          AUTH_CONFIRM_EMAIL_SECRET=$AUTH_CONFIRM_EMAIL_SECRET
+          AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d
+          NEXTAUTH_SECRET=$NEXTAUTH_SECRET
+          NEXTAUTH_URL=$NEXTAUTH_URL
+          NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+          EOF
+
+              echo "Starting containers..."
+              docker compose -f docker-compose.staging.yml up -d --force-recreate --remove-orphans
+
+              echo "Deploy command completed."
+          ENDSSH
+
+      - name: Health check — backend API
+        id: health-backend
+        run: |
+          echo "Checking backend health..."
+          MAX_RETRIES=12
+          RETRY_INTERVAL=10
+          URL="${{ secrets.STAGING_BACKEND_HEALTH_URL }}"
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL" || echo "000")
+            echo "Attempt $i/$MAX_RETRIES — HTTP $HTTP_CODE from $URL"
+            if [[ "$HTTP_CODE" == "200" ]]; then
+              echo "Backend health check PASSED."
+              exit 0
+            fi
+            [[ $i -lt $MAX_RETRIES ]] && sleep $RETRY_INTERVAL
+          done
+
+          echo "ERROR: Backend did not return HTTP 200 after $((MAX_RETRIES * RETRY_INTERVAL))s."
+          exit 1
+
+      - name: Health check — frontend
+        id: health-frontend
+        run: |
+          echo "Checking frontend health..."
+          MAX_RETRIES=12
+          RETRY_INTERVAL=10
+          URL="${{ secrets.STAGING_FRONTEND_HEALTH_URL }}"
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL" || echo "000")
+            echo "Attempt $i/$MAX_RETRIES — HTTP $HTTP_CODE from $URL"
+            # Next.js may return 200 or 307 (redirect to login) — both mean it's up
+            if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "307" ]]; then
+              echo "Frontend health check PASSED."
+              exit 0
+            fi
+            [[ $i -lt $MAX_RETRIES ]] && sleep $RETRY_INTERVAL
+          done
+
+          echo "ERROR: Frontend did not respond after $((MAX_RETRIES * RETRY_INTERVAL))s."
+          exit 1
+
+      - name: Mark deployment success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.deployment_id }},
+              state: 'success',
+              environment_url: '${{ secrets.STAGING_URL }}',
+              description: 'Staging deploy successful — sha-${{ github.sha }}',
+            });
+
+      - name: Mark deployment failure and post commit comment
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.deployment_id }},
+              state: 'failure',
+              description: 'Staging deploy FAILED — check workflow logs',
+            });
+
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: [
+                '## Staging Deploy FAILED',
+                '',
+                `**SHA:** \`${{ github.sha }}\``,
+                `**Workflow:** [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+                '',
+                'Check the workflow logs for the root cause.',
+                'Use the rollback workflow if a previous working build is needed on staging.',
+              ].join('\n'),
+            });

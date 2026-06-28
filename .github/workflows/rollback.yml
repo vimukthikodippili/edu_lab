@@ -1,0 +1,273 @@
+name: Rollback — Redeploy Previous Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "Git SHA to roll back to (must exist as sha-<SHA> in ghcr.io)"
+        required: true
+        type: string
+      environment:
+        description: "Target environment to roll back"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      reason:
+        description: "Reason for rollback (logged as audit trail on the commit)"
+        required: true
+        type: string
+
+# One rollback at a time per environment
+concurrency:
+  group: rollback-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/sims-backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/sims-frontend
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 1: Pre-flight validation — verify the target image exists before
+  # touching any server. Fail fast and clearly if the SHA is wrong.
+  # ───────────────────────────────────────────────────────────────────
+  validate-rollback:
+    name: Validate Rollback Target
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Log rollback intent (audit trail)
+        run: |
+          echo "================================================"
+          echo "ROLLBACK INITIATED"
+          echo "Target SHA:    sha-${{ github.event.inputs.target_sha }}"
+          echo "Environment:   ${{ github.event.inputs.environment }}"
+          echo "Reason:        ${{ github.event.inputs.reason }}"
+          echo "Initiated by:  ${{ github.actor }}"
+          echo "Timestamp:     $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          echo "================================================"
+
+      - name: Validate SHA format
+        run: |
+          SHA="${{ github.event.inputs.target_sha }}"
+          if ! echo "$SHA" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "ERROR: '$SHA' is not a valid 40-character lowercase hex git SHA."
+            exit 1
+          fi
+          echo "SHA format valid."
+
+      - name: Verify backend image exists in ghcr.io
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${{ github.repository_owner }}/sims-backend/manifests/sha-${{ github.event.inputs.target_sha }}")
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "ERROR: Backend image sha-${{ github.event.inputs.target_sha }} not found in registry (HTTP $HTTP_CODE)."
+            exit 1
+          fi
+          echo "Backend image confirmed."
+
+      - name: Verify frontend image exists in ghcr.io
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${{ github.repository_owner }}/sims-frontend/manifests/sha-${{ github.event.inputs.target_sha }}")
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "ERROR: Frontend image sha-${{ github.event.inputs.target_sha }} not found in registry (HTTP $HTTP_CODE)."
+            exit 1
+          fi
+          echo "Frontend image confirmed."
+
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 2: Rollback staging
+  # ───────────────────────────────────────────────────────────────────
+  rollback-staging:
+    name: Rollback Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: validate-rollback
+    if: github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: ${{ secrets.STAGING_URL }}
+
+    steps:
+      - name: Checkout repository at rollback SHA (for docker-compose.staging.yml)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.target_sha }}
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Add staging host to known_hosts
+        run: ssh-keyscan -H "${{ secrets.STAGING_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy docker-compose.staging.yml at rollback SHA to server
+        run: |
+          scp docker-compose.staging.yml \
+            "${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:~/sims/docker-compose.staging.yml"
+
+      - name: Execute staging rollback
+        env:
+          TARGET_SHA: ${{ github.event.inputs.target_sha }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          ssh "${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}" \
+            TARGET_SHA="$TARGET_SHA" \
+            BACKEND_IMAGE="$BACKEND_IMAGE" \
+            FRONTEND_IMAGE="$FRONTEND_IMAGE" \
+            GHCR_TOKEN="$GHCR_TOKEN" \
+            GHCR_USER="$GHCR_USER" \
+            bash -s << 'ENDSSH'
+              set -euo pipefail
+
+              cd ~/sims
+
+              echo "Rolling back staging to sha-$TARGET_SHA..."
+              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+              docker pull "$BACKEND_IMAGE:sha-$TARGET_SHA"
+              docker pull "$FRONTEND_IMAGE:sha-$TARGET_SHA"
+
+              # Update IMAGE_TAG in the existing .env — preserve all other values
+              if grep -q '^IMAGE_TAG=' .env; then
+                sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=sha-$TARGET_SHA|" .env
+              else
+                echo "IMAGE_TAG=sha-$TARGET_SHA" >> .env
+              fi
+
+              docker compose -f docker-compose.staging.yml up -d --force-recreate --remove-orphans
+
+              echo "Rollback containers started."
+          ENDSSH
+
+      - name: Health check after staging rollback
+        run: |
+          URL="${{ secrets.STAGING_BACKEND_HEALTH_URL }}"
+          for i in $(seq 1 12); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL" || echo "000")
+            echo "Attempt $i/12 — HTTP $HTTP_CODE"
+            if [[ "$HTTP_CODE" == "200" ]]; then
+              echo "Staging rollback health check PASSED."
+              exit 0
+            fi
+            [[ $i -lt 12 ]] && sleep 10
+          done
+          echo "ERROR: Staging rollback health check failed after 120s."
+          exit 1
+
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 3: Rollback production — requires GitHub Environment approval
+  # Post-rollback audit comment is written regardless of success/failure
+  # ───────────────────────────────────────────────────────────────────
+  rollback-production:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: validate-rollback
+    if: github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: ${{ secrets.PROD_URL }}
+
+    steps:
+      - name: Checkout repository at rollback SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.target_sha }}
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add production host to known_hosts
+        run: ssh-keyscan -H "${{ secrets.PROD_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy docker-compose.production.yml at rollback SHA to server
+        run: |
+          scp docker-compose.production.yml \
+            "${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}:~/sims/docker-compose.production.yml"
+
+      - name: Execute production rollback
+        env:
+          TARGET_SHA: ${{ github.event.inputs.target_sha }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          ssh "${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}" \
+            TARGET_SHA="$TARGET_SHA" \
+            BACKEND_IMAGE="$BACKEND_IMAGE" \
+            FRONTEND_IMAGE="$FRONTEND_IMAGE" \
+            GHCR_TOKEN="$GHCR_TOKEN" \
+            GHCR_USER="$GHCR_USER" \
+            bash -s << 'ENDSSH'
+              set -euo pipefail
+
+              cd ~/sims
+
+              echo "Rolling back production to sha-$TARGET_SHA..."
+              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+              docker pull "$BACKEND_IMAGE:sha-$TARGET_SHA"
+              docker pull "$FRONTEND_IMAGE:sha-$TARGET_SHA"
+
+              if grep -q '^IMAGE_TAG=' .env; then
+                sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=sha-$TARGET_SHA|" .env
+              else
+                echo "IMAGE_TAG=sha-$TARGET_SHA" >> .env
+              fi
+
+              docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans
+
+              echo "Rollback containers started."
+          ENDSSH
+
+      - name: Health check after production rollback
+        run: |
+          URL="${{ secrets.PROD_BACKEND_HEALTH_URL }}"
+          for i in $(seq 1 15); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$URL" || echo "000")
+            echo "Attempt $i/15 — HTTP $HTTP_CODE"
+            if [[ "$HTTP_CODE" == "200" ]]; then
+              echo "Production rollback health check PASSED."
+              exit 0
+            fi
+            [[ $i -lt 15 ]] && sleep 15
+          done
+          echo "ERROR: Production rollback health check FAILED — CRITICAL."
+          exit 1
+
+      - name: Post audit comment on rolled-back commit
+        # if: always() ensures this runs whether rollback succeeded or failed
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}' === 'success' ? 'SUCCEEDED' : 'FAILED';
+            const emoji = status === 'SUCCEEDED' ? '' : '';
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: '${{ github.event.inputs.target_sha }}',
+              body: [
+                `## Production Rollback ${status}`,
+                '',
+                `**Rolled back to:** \`sha-${{ github.event.inputs.target_sha }}\``,
+                `**Reason:** ${{ github.event.inputs.reason }}`,
+                `**Initiated by:** @${{ github.actor }}`,
+                `**Workflow:** [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+              ].join('\n'),
+            });

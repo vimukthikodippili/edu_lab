@@ -1,0 +1,77 @@
+// Timetable Grid — CSS Grid layout (no extra library)
+
+.sims-timetable {
+  display: grid;
+  grid-template-columns: 80px repeat(5, 1fr);
+  gap: 2px;
+  font-size: 0.8rem;
+
+  .timetable-header {
+    background: #f8f9fa;
+    font-weight: 600;
+    padding: 8px;
+    text-align: center;
+    border-radius: 4px;
+  }
+
+  .timetable-period-label {
+    background: #f8f9fa;
+    font-weight: 500;
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 0.75rem;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .timetable-cell {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 8px;
+    min-height: 72px;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+
+    &:hover {
+      background: #e9f0fb;
+    }
+
+    &.conflict {
+      border-color: #dc3545;
+      background: #fff5f5;
+    }
+
+    &.free {
+      background: #f8fff8;
+    }
+
+    .subject-name {
+      font-weight: 600;
+      font-size: 0.78rem;
+      color: #212529;
+    }
+
+    .teacher-name {
+      font-size: 0.72rem;
+      color: #6c757d;
+    }
+
+    .room {
+      font-size: 0.7rem;
+      color: #adb5bd;
+    }
+  }
+}
+
+// Subject color coding
+.subject-badge {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+}

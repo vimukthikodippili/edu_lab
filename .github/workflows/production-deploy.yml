@@ -1,0 +1,349 @@
+name: Production Deploy — Manual Approval Required
+
+on:
+  # Only trigger manually — never auto-deploy to production
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Git SHA to deploy (must already exist in ghcr.io as sha-<SHA>)"
+        required: true
+        type: string
+      confirm:
+        description: "Type DEPLOY to confirm production deployment"
+        required: true
+        type: string
+
+# One production deploy at a time — never cancel in progress
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/sims-backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/sims-frontend
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 1: Validate inputs before touching any infrastructure
+  # Fail fast here — before approval prompt is shown — to avoid
+  # wasting a reviewer's approval on an invalid deploy request
+  # ───────────────────────────────────────────────────────────────────
+  validate-inputs:
+    name: Validate Deploy Inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify confirmation word
+        run: |
+          if [[ "${{ github.event.inputs.confirm }}" != "DEPLOY" ]]; then
+            echo "ERROR: Confirmation input must be exactly 'DEPLOY'."
+            echo "Got: '${{ github.event.inputs.confirm }}'"
+            exit 1
+          fi
+          echo "Confirmation accepted."
+
+      - name: Validate SHA format
+        run: |
+          SHA="${{ github.event.inputs.sha }}"
+          if ! echo "$SHA" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "ERROR: '$SHA' is not a valid 40-character lowercase hex git SHA."
+            exit 1
+          fi
+          echo "SHA format valid: $SHA"
+
+      - name: Verify backend image exists in ghcr.io
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${{ github.repository_owner }}/sims-backend/manifests/sha-${{ github.event.inputs.sha }}")
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "ERROR: Backend image sha-${{ github.event.inputs.sha }} not found in ghcr.io (HTTP $HTTP_CODE)."
+            echo "Ensure staging-deploy.yml completed successfully for this SHA first."
+            exit 1
+          fi
+          echo "Backend image confirmed in registry."
+
+      - name: Verify frontend image exists in ghcr.io
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${{ github.repository_owner }}/sims-frontend/manifests/sha-${{ github.event.inputs.sha }}")
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "ERROR: Frontend image sha-${{ github.event.inputs.sha }} not found in ghcr.io (HTTP $HTTP_CODE)."
+            exit 1
+          fi
+          echo "Frontend image confirmed in registry."
+
+  # ───────────────────────────────────────────────────────────────────
+  # JOB 2: Production deploy — approval gate is the GitHub Environment
+  # protection rule. Configure 'production' environment in:
+  # Repository Settings → Environments → production → Required reviewers
+  # The workflow pauses here until an approved reviewer clicks "Approve"
+  # ───────────────────────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: validate-inputs
+    environment:
+      name: production
+      url: ${{ secrets.PROD_URL }}
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - name: Checkout repository at deploy SHA (for docker-compose.production.yml)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.sha }}
+
+      - name: Create GitHub Deployment record
+        id: deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: '${{ github.event.inputs.sha }}',
+              environment: 'production',
+              auto_merge: false,
+              required_contexts: [],
+              description: 'Production deploy — approved by reviewer',
+            });
+            core.setOutput('deployment_id', deployment.data.id);
+
+      - name: Mark deployment in_progress
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.deployment_id }},
+              state: 'in_progress',
+              description: 'Running migrations then deploying...',
+            });
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add production host to known_hosts
+        run: ssh-keyscan -H "${{ secrets.PROD_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Run TypeORM migrations BEFORE swapping containers
+        # Migrations run first in an isolated --rm container.
+        # If migration fails, exit 1 fires before docker compose up — zero traffic impact.
+        id: migrations
+        env:
+          DEPLOY_SHA: sha-${{ github.event.inputs.sha }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          DATABASE_HOST: ${{ secrets.PROD_DB_HOST }}
+          DATABASE_USERNAME: ${{ secrets.PROD_DB_USERNAME }}
+          DATABASE_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+          DATABASE_NAME: ${{ secrets.PROD_DB_NAME }}
+          AUTH_JWT_SECRET: ${{ secrets.AUTH_JWT_SECRET }}
+          AUTH_REFRESH_SECRET: ${{ secrets.AUTH_REFRESH_SECRET }}
+        run: |
+          ssh "${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}" \
+            DEPLOY_SHA="$DEPLOY_SHA" \
+            BACKEND_IMAGE="$BACKEND_IMAGE" \
+            GHCR_TOKEN="$GHCR_TOKEN" \
+            GHCR_USER="$GHCR_USER" \
+            DATABASE_HOST="$DATABASE_HOST" \
+            DATABASE_USERNAME="$DATABASE_USERNAME" \
+            DATABASE_PASSWORD="$DATABASE_PASSWORD" \
+            DATABASE_NAME="$DATABASE_NAME" \
+            AUTH_JWT_SECRET="$AUTH_JWT_SECRET" \
+            AUTH_REFRESH_SECRET="$AUTH_REFRESH_SECRET" \
+            bash -s << 'ENDSSH'
+              set -euo pipefail
+
+              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+              docker pull "$BACKEND_IMAGE:$DEPLOY_SHA"
+
+              echo "Running TypeORM migrations..."
+              docker run --rm \
+                --network sims_sims-network \
+                -e DATABASE_TYPE=postgres \
+                -e DATABASE_HOST="$DATABASE_HOST" \
+                -e DATABASE_PORT=5432 \
+                -e DATABASE_USERNAME="$DATABASE_USERNAME" \
+                -e DATABASE_PASSWORD="$DATABASE_PASSWORD" \
+                -e DATABASE_NAME="$DATABASE_NAME" \
+                -e DATABASE_SYNCHRONIZE=false \
+                -e AUTH_JWT_SECRET="$AUTH_JWT_SECRET" \
+                -e AUTH_REFRESH_SECRET="$AUTH_REFRESH_SECRET" \
+                -e FILE_DRIVER=local \
+                -e NODE_ENV=production \
+                "$BACKEND_IMAGE:$DEPLOY_SHA" \
+                sh -c "node dist/main migration:run" || {
+                  echo ""
+                  echo "MIGRATION FAILED — aborting production deploy."
+                  echo "No containers were restarted. No traffic was switched."
+                  exit 1
+                }
+
+              echo "Migrations completed successfully."
+          ENDSSH
+
+      - name: Deploy to production via SSH
+        id: ssh-deploy
+        env:
+          DEPLOY_SHA: sha-${{ github.event.inputs.sha }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          DATABASE_HOST: ${{ secrets.PROD_DB_HOST }}
+          DATABASE_USERNAME: ${{ secrets.PROD_DB_USERNAME }}
+          DATABASE_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+          DATABASE_NAME: ${{ secrets.PROD_DB_NAME }}
+          AUTH_JWT_SECRET: ${{ secrets.AUTH_JWT_SECRET }}
+          AUTH_REFRESH_SECRET: ${{ secrets.AUTH_REFRESH_SECRET }}
+          AUTH_FORGOT_SECRET: ${{ secrets.AUTH_FORGOT_SECRET }}
+          AUTH_CONFIRM_EMAIL_SECRET: ${{ secrets.AUTH_CONFIRM_EMAIL_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.PROD_NEXTAUTH_URL }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.PROD_API_URL }}
+        run: |
+          scp docker-compose.production.yml \
+            "${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}:~/sims/docker-compose.production.yml"
+
+          ssh "${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}" \
+            DEPLOY_SHA="$DEPLOY_SHA" \
+            BACKEND_IMAGE="$BACKEND_IMAGE" \
+            FRONTEND_IMAGE="$FRONTEND_IMAGE" \
+            GHCR_TOKEN="$GHCR_TOKEN" \
+            GHCR_USER="$GHCR_USER" \
+            DATABASE_HOST="$DATABASE_HOST" \
+            DATABASE_USERNAME="$DATABASE_USERNAME" \
+            DATABASE_PASSWORD="$DATABASE_PASSWORD" \
+            DATABASE_NAME="$DATABASE_NAME" \
+            AUTH_JWT_SECRET="$AUTH_JWT_SECRET" \
+            AUTH_REFRESH_SECRET="$AUTH_REFRESH_SECRET" \
+            AUTH_FORGOT_SECRET="$AUTH_FORGOT_SECRET" \
+            AUTH_CONFIRM_EMAIL_SECRET="$AUTH_CONFIRM_EMAIL_SECRET" \
+            NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
+            NEXTAUTH_URL="$NEXTAUTH_URL" \
+            NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
+            bash -s << 'ENDSSH'
+              set -euo pipefail
+
+              cd ~/sims
+
+              docker pull "$FRONTEND_IMAGE:$DEPLOY_SHA"
+
+              cat > .env << EOF
+          BACKEND_IMAGE=$BACKEND_IMAGE
+          FRONTEND_IMAGE=$FRONTEND_IMAGE
+          IMAGE_TAG=$DEPLOY_SHA
+          DATABASE_HOST=$DATABASE_HOST
+          DATABASE_USERNAME=$DATABASE_USERNAME
+          DATABASE_PASSWORD=$DATABASE_PASSWORD
+          DATABASE_NAME=$DATABASE_NAME
+          AUTH_JWT_SECRET=$AUTH_JWT_SECRET
+          AUTH_JWT_TOKEN_EXPIRES_IN=15m
+          AUTH_REFRESH_SECRET=$AUTH_REFRESH_SECRET
+          AUTH_REFRESH_TOKEN_EXPIRES_IN=3650d
+          AUTH_FORGOT_SECRET=$AUTH_FORGOT_SECRET
+          AUTH_FORGOT_TOKEN_EXPIRES_IN=30m
+          AUTH_CONFIRM_EMAIL_SECRET=$AUTH_CONFIRM_EMAIL_SECRET
+          AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN=1d
+          NEXTAUTH_SECRET=$NEXTAUTH_SECRET
+          NEXTAUTH_URL=$NEXTAUTH_URL
+          NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+          EOF
+
+              docker compose -f docker-compose.production.yml up -d --force-recreate --remove-orphans
+              echo "Production containers started."
+          ENDSSH
+
+      - name: Health check — production backend
+        run: |
+          echo "Checking production backend health..."
+          MAX_RETRIES=15
+          RETRY_INTERVAL=15
+          URL="${{ secrets.PROD_BACKEND_HEALTH_URL }}"
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$URL" || echo "000")
+            echo "Attempt $i/$MAX_RETRIES — HTTP $HTTP_CODE"
+            if [[ "$HTTP_CODE" == "200" ]]; then
+              echo "Production backend healthy."
+              exit 0
+            fi
+            [[ $i -lt $MAX_RETRIES ]] && sleep $RETRY_INTERVAL
+          done
+
+          echo "ERROR: Production backend failed health check after $((MAX_RETRIES * RETRY_INTERVAL))s."
+          exit 1
+
+      - name: Health check — production frontend
+        run: |
+          echo "Checking production frontend health..."
+          MAX_RETRIES=15
+          RETRY_INTERVAL=15
+          URL="${{ secrets.PROD_FRONTEND_HEALTH_URL }}"
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$URL" || echo "000")
+            echo "Attempt $i/$MAX_RETRIES — HTTP $HTTP_CODE"
+            if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "307" ]]; then
+              echo "Production frontend healthy."
+              exit 0
+            fi
+            [[ $i -lt $MAX_RETRIES ]] && sleep $RETRY_INTERVAL
+          done
+
+          echo "ERROR: Production frontend failed health check."
+          exit 1
+
+      - name: Mark deployment success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.deployment_id }},
+              state: 'success',
+              environment_url: '${{ secrets.PROD_URL }}',
+              description: 'Production deploy successful — sha-${{ github.event.inputs.sha }}',
+            });
+
+      - name: Mark deployment failure and post CRITICAL alert
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.deployment_id }},
+              state: 'failure',
+              description: 'PRODUCTION DEPLOY FAILED — immediate action required',
+            });
+
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: '${{ github.event.inputs.sha }}',
+              body: [
+                '## PRODUCTION DEPLOY FAILED',
+                '',
+                `**SHA:** \`${{ github.event.inputs.sha }}\``,
+                `**Workflow:** [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+                '',
+                '**IMMEDIATE ACTION REQUIRED.**',
+                'Use the rollback workflow to revert to the last known good SHA.',
+              ].join('\n'),
+            });

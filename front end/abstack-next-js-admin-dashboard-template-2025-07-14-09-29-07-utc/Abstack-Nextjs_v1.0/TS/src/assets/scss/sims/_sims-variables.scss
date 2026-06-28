@@ -1,0 +1,42 @@
+// SIMS – Sri Lankan School Color Palette
+// Layered on top of Bootstrap variables via existing app.scss
+
+// Primary brand — deep education blue (matches existing $blue: #348cd4)
+$sims-primary: #1a6eb5;
+$sims-primary-hover: #155a96;
+
+// Accent — Sri Lankan flag-inspired amber/gold
+$sims-accent: #d4a017;
+
+// Success / attendance present
+$sims-present: #198754;
+
+// Danger / absent
+$sims-absent: #dc3545;
+
+// Warning / late
+$sims-late: #ffc107;
+
+// Grade stage colors
+$sims-primary-stage: #4aa8ff;      // Grades 1–5
+$sims-junior-stage: #6f42c1;       // Grades 6–9
+$sims-senior-stage: #fd7e14;       // Grades 10–11
+$sims-collegiate-stage: #198754;   // Grades 12–13
+
+// Text muted fix for WCAG 2.1 AA compliance
+// #a1a9b1 on white = ~3.2:1 (FAIL). Override to #6c757d = ~4.5:1 (PASS)
+$text-muted-sims: #6c757d;
+
+// Offline banner
+$sims-offline-bg: #fff3cd;
+$sims-offline-border: #ffc107;
+
+// Biometric status
+$sims-biometric-verified: #198754;
+$sims-biometric-failed: #dc3545;
+$sims-biometric-scanning: #0dcaf0;
+
+// Font variables
+$font-sinhala: var(--font-sinhala), 'Noto Sans Sinhala', serif;
+$font-tamil: var(--font-tamil), 'Noto Sans Tamil', serif;
+$font-latin: var(--font-nunito), 'Nunito Sans', sans-serif;
