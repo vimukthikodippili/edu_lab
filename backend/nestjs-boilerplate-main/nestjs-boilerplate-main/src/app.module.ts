@@ -24,6 +24,14 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { AllConfigType } from './config/config.type';
 import { SessionModule } from './session/session.module';
 import { StudentsModule } from './students/students.module';
+import { SubjectsModule } from './subjects/subjects.module';
+import { EnrollmentsModule } from './enrollments/enrollments.module';
+import { SchoolCalendarConfigModule } from './school-calendar-config/school-calendar-config.module';
+import { TeacherSubjectRequirementsModule } from './teacher-subject-requirements/teacher-subject-requirements.module';
+import { TimetableModule } from './timetable/timetable.module';
+import { StaffModule } from './staff/staff.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { NotificationModule } from './notification/notification.module';
 import { MailerModule } from './mailer/mailer.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MongooseConfigService } from './database/mongoose-config.service';
@@ -94,6 +102,14 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     MailerModule,
     HomeModule,
     StudentsModule,
+    SubjectsModule,
+    EnrollmentsModule,
+    SchoolCalendarConfigModule,
+    TeacherSubjectRequirementsModule,
+    TimetableModule,
+    StaffModule,
+    EventEmitterModule.forRoot(),
+    NotificationModule,
   ],
 })
 export class AppModule {}
