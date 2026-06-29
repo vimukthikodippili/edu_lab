@@ -4,11 +4,13 @@ import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import SimplebarReactClient from '@/components/wrappers/SimplebarReactClient'
 import { useLayoutContext } from '@/context/useLayoutContext'
 import { getMenuItems } from '@/helpers/Manu'
+import { useAuthStore } from '@/stores/authStore'
 import { Suspense } from 'react'
 import AppMenu from './components/AppMenu'
 
 const VerticalNavigationBar = () => {
-  const menuItems = getMenuItems()
+  const role = useAuthStore((s) => s.user?.role)
+  const menuItems = getMenuItems(role)
 
   const { toggleBackdrop } = useLayoutContext()
   return (

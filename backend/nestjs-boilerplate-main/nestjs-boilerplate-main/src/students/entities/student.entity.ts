@@ -1,20 +1,24 @@
 import {
+  AfterLoad,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
   Index,
-  JoinTable,
-  ManyToMany,
+  JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 import { EntityRelationalHelper } from '../../utils/relational-entity-helper';
 import { GradeEntity } from './grade.entity';
 import { ClassSectionEntity } from './class-section.entity';
 import { GuardianEntity } from './guardian.entity';
+import { StudentGuardianEntity } from './student-guardian.entity';
 import { FileEntity } from '../../files/infrastructure/persistence/relational/entities/file.entity';
+import { ALStreamEntity } from '../../enrollments/entities/al-stream.entity';
 
 export enum StudentGender {
   MALE = 'male',
@@ -68,7 +72,7 @@ export class StudentEntity extends EntityRelationalHelper {
   @Column({ type: 'enum', enum: StudentStatus, default: StudentStatus.ACTIVE })
   status: StudentStatus;
 
-  // QR code stored as base64 data URL — encodes student UUID for scanner
+  // QR code stored as base64 data URL — encodes admission number for scanner
   @Column({ type: 'text', nullable: true })
   qrCode: string | null;
 
@@ -84,19 +88,42 @@ export class StudentEntity extends EntityRelationalHelper {
   @Column({ type: 'int' })
   classSectionId: number;
 
-  @ManyToMany(() => GuardianEntity, { eager: true, cascade: true })
-  @JoinTable({
-    name: 'student_guardian',
-    joinColumn: { name: 'studentId', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'guardianId', referencedColumnName: 'id' },
-  })
-  guardians: GuardianEntity[];
+  // Junction entity carries isPrimaryContact per student-guardian pair.
+  // @Exclude() hides it from API responses; @AfterLoad populates the flat `guardians` array instead.
+  @Exclude()
+  @OneToMany(() => StudentGuardianEntity, (sg) => sg.student, { cascade: true })
+  studentGuardians: StudentGuardianEntity[];
+
+  // Flat guardian list enriched with `isPrimaryContact` — populated by @AfterLoad, not persisted.
+  // Consumers should read guardians from here (not studentGuardians) to get the primary flag inline.
+  guardians: (GuardianEntity & { isPrimaryContact: boolean })[] = [];
+
+  @AfterLoad()
+  private populateGuardians() {
+    if (this.studentGuardians?.length) {
+      this.guardians = this.studentGuardians
+        .filter((sg) => !!sg.guardian)
+        .map((sg) => {
+          // Set the transient isPrimaryContact flag directly on the GuardianEntity instance
+          // so class-transformer includes it when serializing.
+          sg.guardian.isPrimaryContact = sg.isPrimaryContact;
+          return sg.guardian as GuardianEntity & { isPrimaryContact: boolean };
+        });
+    }
+  }
 
   @ManyToOne(() => FileEntity, { eager: true, nullable: true })
   photo: FileEntity | null;
 
   @Column({ type: 'uuid', nullable: true })
   photoId: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  streamId: number | null;
+
+  @ManyToOne(() => ALStreamEntity, { nullable: true, eager: true })
+  @JoinColumn({ name: 'streamId' })
+  stream: ALStreamEntity | null;
 
   @CreateDateColumn()
   createdAt: Date;

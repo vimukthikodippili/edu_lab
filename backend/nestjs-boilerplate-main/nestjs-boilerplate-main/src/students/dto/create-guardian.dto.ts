@@ -1,10 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
 } from 'class-validator';
@@ -54,4 +56,22 @@ export class CreateGuardianDto {
   @IsString()
   @MaxLength(255)
   address?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether this guardian is the primary contact for this student. '
+      + 'Exactly one guardian per student must be primary. '
+      + 'During enrollment, defaults to true for the first guardian if omitted.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPrimaryContact?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'uuid-of-uploaded-id-scan',
+    description: 'UUID of a previously-uploaded file (NIC scan, birth certificate, etc.).',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'idProofFileId must be a valid UUID' })
+  idProofFileId?: string;
 }

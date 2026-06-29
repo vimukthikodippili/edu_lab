@@ -17,6 +17,8 @@ export const guardianSchema = yup.object({
     .matches(SL_PHONE, 'Enter a valid Sri Lankan number (e.g. 0771234567)'),
   email: yup.string().trim().email('Enter a valid email').optional(),
   address: yup.string().trim().max(255).optional(),
+  isPrimaryContact: yup.boolean().required().default(false),
+  idProofFileId: yup.string().uuid('Must be a valid file UUID').optional(),
 })
 
 export const step1Schema = yup.object({
@@ -40,15 +42,31 @@ export const step1Schema = yup.object({
 })
 
 export const step2Schema = yup.object({
-  gradeId: yup.number().required('Grade is required').min(1),
-  classSectionId: yup.number().required('Class section is required').min(1),
+  gradeId: yup
+    .number()
+    .transform((v) => (isNaN(v) ? undefined : v))
+    .required('Please select a grade')
+    .min(1, 'Please select a grade'),
+  classSectionId: yup
+    .number()
+    .transform((v) => (isNaN(v) ? undefined : v))
+    .required('Please select a class section')
+    .min(1, 'Please select a class section'),
 })
 
 export const step3Schema = yup.object({
   guardians: yup
     .array(guardianSchema)
     .min(1, 'At least one guardian must be added before enrollment is complete.')
-    .required(),
+    .required()
+    .test(
+      'exactly-one-primary',
+      'Exactly one guardian must be marked as the primary contact.',
+      (guardians) => {
+        if (!guardians || guardians.length === 0) return true // handled by .min(1)
+        return guardians.filter((g) => g?.isPrimaryContact === true).length === 1
+      },
+    ),
 })
 
 export const enrollmentSchema = step1Schema.concat(step2Schema).concat(step3Schema)

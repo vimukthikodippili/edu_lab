@@ -49,7 +49,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale}>
-      <body className={fontClass}>
+      <body className={fontClass} suppressHydrationWarning>
         <AppProvidersWrapper messages={messages as Record<string, unknown>} locale={locale}>
           {children}
         </AppProvidersWrapper>

@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next'
 import withSerwistInit from '@serwist/next'
+import createNextIntlPlugin from 'next-intl/plugin'
 
 const withSerwist = withSerwistInit({
   swSrc: 'src/lib/pwa/service-worker.ts',
@@ -7,9 +8,9 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV === 'development',
 })
 
+const withNextIntl = createNextIntlPlugin('./i18n.ts')
+
 const nextConfig: NextConfig = {
-  // Required for Docker standalone deployment: generates .next/standalone/
-  // CMD ["node", "server.js"] in the Dockerfile depends on this output mode.
   output: 'standalone',
   reactStrictMode: true,
   images: {
@@ -22,4 +23,4 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withSerwist(nextConfig)
+export default withNextIntl(withSerwist(nextConfig))

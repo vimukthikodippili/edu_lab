@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"g:\\\\edu_lab\\\\edu_lab\\\\front end\\\\abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc\\\\Abstack-Nextjs_v1.0\\\\TS\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -match \"staff\" } | Select-Object -First 20)"
+    ]
+  }
+}

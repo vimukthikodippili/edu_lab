@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { useRouter } from 'next/navigation'
-import { enrollmentSchema, step1Schema, step2Schema, step3Schema, type EnrollmentSchemaType } from '../schemas/enrollmentSchema'
+import { enrollmentSchema, type EnrollmentSchemaType } from '../schemas/enrollmentSchema'
 import { useEnrollStudent } from '../hooks/useEnrollStudent'
 import { useGrades } from '../hooks/useGrades'
 import { useClassSections } from '../hooks/useClassSections'
@@ -15,13 +15,18 @@ import { StudentIdCard } from './StudentIdCard'
 import type { Student } from '../types'
 
 const STEPS = [
-  { id: 1, label: 'Personal Details', icon: 'pi-user' },
-  { id: 2, label: 'Academic Placement', icon: 'pi-book' },
+  { id: 1, label: 'Personal Details',     icon: 'pi-user' },
+  { id: 2, label: 'Academic Placement',   icon: 'pi-book' },
   { id: 3, label: 'Guardian Information', icon: 'pi-users' },
-  { id: 4, label: 'Review & Submit', icon: 'pi-check-circle' },
+  { id: 4, label: 'Review & Submit',      icon: 'pi-check-circle' },
 ]
 
-const STEP_SCHEMAS = [step1Schema, step2Schema, step3Schema]
+// Fields that belong to each step — only these are validated when clicking Next
+const STEP_FIELDS: Record<number, (keyof EnrollmentSchemaType)[]> = {
+  1: ['firstName', 'lastName', 'dateOfBirth', 'gender'],
+  2: ['gradeId', 'classSectionId'],
+  3: ['guardians'],
+}
 
 export function EnrollmentWizard() {
   const router = useRouter()
@@ -39,11 +44,16 @@ export function EnrollmentWizard() {
       contactNumber: '',
       nicNumber: '',
       medicalNotes: '',
-      gradeId: 0,
-      classSectionId: 0,
-      guardians: [{ firstName: '', lastName: '', relationship: 'father', nic: '', phone: '', email: '', address: '' }],
+      gradeId: undefined as any,
+      classSectionId: undefined as any,
+      guardians: [{
+        firstName: '', lastName: '', relationship: 'father',
+        nic: '', phone: '', email: '', address: '',
+      }],
     },
-    mode: 'onTouched',
+    // Only validate when explicitly triggered (Next button click or final submit)
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
   })
 
   const { mutateAsync: enroll, isPending, error } = useEnrollStudent()
@@ -51,35 +61,26 @@ export function EnrollmentWizard() {
   const gradeId = form.watch('gradeId')
   const { data: sections = [] } = useClassSections(gradeId > 0 ? gradeId : null)
 
-  const gradeName = grades.find((g) => g.id === gradeId)?.name ?? '—'
+  const gradeName   = grades.find((g) => g.id === gradeId)?.name ?? '—'
   const classSectionId = form.watch('classSectionId')
   const sectionName = sections.find((s) => s.id === classSectionId)?.name ?? '—'
 
   const goNext = async () => {
-    const stepSchema = STEP_SCHEMAS[currentStep - 1]
-    if (stepSchema) {
-      // Validate only the fields for the current step
-      const values = form.getValues()
-      try {
-        await stepSchema.validate(values, { abortEarly: false })
-        // Clear step-specific errors and advance
-        setCurrentStep((s) => s + 1)
-      } catch {
-        // Trigger RHF validation so field errors render
-        await form.trigger(
-          currentStep === 1
-            ? ['firstName', 'lastName', 'dateOfBirth', 'gender']
-            : currentStep === 2
-              ? ['gradeId', 'classSectionId']
-              : ['guardians'],
-        )
-      }
-    } else {
+    const fields = STEP_FIELDS[currentStep]
+    if (!fields) { setCurrentStep((s) => s + 1); return }
+
+    const isValid = await form.trigger(fields as any)
+    if (isValid) {
+      // Clear errors so the next step starts clean
+      form.clearErrors()
       setCurrentStep((s) => s + 1)
     }
   }
 
-  const goBack = () => setCurrentStep((s) => s - 1)
+  const goBack = () => {
+    form.clearErrors()
+    setCurrentStep((s) => s - 1)
+  }
 
   const onSubmit = form.handleSubmit(async (data) => {
     try {
@@ -109,19 +110,12 @@ export function EnrollmentWizard() {
         </div>
 
         <div className="d-flex gap-2 justify-content-center flex-wrap">
-          <button
-            className="btn btn-outline-secondary"
-            onClick={() => router.push('/admin/students')}
-          >
+          <button className="btn btn-outline-secondary" onClick={() => router.push('/admin/students')}>
             <i className="pi pi-list me-2" />Back to Student List
           </button>
           <button
             className="btn btn-primary"
-            onClick={() => {
-              setEnrolledStudent(null)
-              setCurrentStep(1)
-              form.reset()
-            }}
+            onClick={() => { setEnrolledStudent(null); setCurrentStep(1); form.reset() }}
           >
             <i className="pi pi-plus me-2" />Enroll Another Student
           </button>
@@ -136,30 +130,27 @@ export function EnrollmentWizard() {
     <div>
       {/* Step indicator */}
       <div className="d-flex align-items-center justify-content-between mb-4 position-relative">
-        {/* Progress line */}
-        <div
-          className="position-absolute bg-light border"
-          style={{ height: 2, top: 20, left: 0, right: 0, zIndex: 0 }}
-        />
+        <div className="position-absolute bg-light border"
+          style={{ height: 2, top: 20, left: 0, right: 0, zIndex: 0 }} />
         {STEPS.map((step) => {
-          const done = currentStep > step.id
+          const done   = currentStep > step.id
           const active = currentStep === step.id
           return (
             <div key={step.id} className="d-flex flex-column align-items-center position-relative" style={{ zIndex: 1 }}>
               <div
                 className={`rounded-circle d-flex align-items-center justify-content-center mb-1 ${
-                  done
-                    ? 'bg-success text-white'
-                    : active
-                      ? 'bg-primary text-white'
-                      : 'bg-white border text-muted'
+                  done ? 'bg-success text-white' : active ? 'bg-primary text-white' : 'bg-white border text-muted'
                 }`}
                 style={{ width: 40, height: 40, fontWeight: 600, fontSize: 14 }}
               >
-                {done ? <i className="pi pi-check" /> : <i className={`pi ${step.icon}`} style={{ fontSize: 14 }} />}
+                {done
+                  ? <i className="pi pi-check" />
+                  : <i className={`pi ${step.icon}`} style={{ fontSize: 14 }} />}
               </div>
-              <small className={`d-none d-md-block text-center ${active ? 'fw-semibold text-primary' : 'text-muted'}`}
-                style={{ fontSize: 11, maxWidth: 80 }}>
+              <small
+                className={`d-none d-md-block text-center ${active ? 'fw-semibold text-primary' : 'text-muted'}`}
+                style={{ fontSize: 11, maxWidth: 80 }}
+              >
                 {step.label}
               </small>
             </div>
@@ -182,43 +173,26 @@ export function EnrollmentWizard() {
       )}
 
       {/* Step content */}
-      <form onSubmit={onSubmit}>
+      <form onSubmit={onSubmit} noValidate>
         {currentStep === 1 && <PersonalDetailsStep form={form} />}
         {currentStep === 2 && <AcademicDetailsStep form={form} />}
         {currentStep === 3 && <GuardianStep form={form} />}
         {currentStep === 4 && (
-          <ReviewStep
-            values={form.getValues()}
-            gradeName={gradeName}
-            sectionName={sectionName}
-          />
+          <ReviewStep values={form.getValues()} gradeName={gradeName} sectionName={sectionName} />
         )}
 
         {/* Navigation */}
         <div className="d-flex justify-content-between mt-4 pt-3 border-top">
-          <button
-            type="button"
-            className="btn btn-outline-secondary"
-            onClick={goBack}
-            disabled={currentStep === 1}
-          >
+          <button type="button" className="btn btn-outline-secondary" onClick={goBack} disabled={currentStep === 1}>
             <i className="pi pi-chevron-left me-2" />Back
           </button>
 
           {currentStep < STEPS.length ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={goNext}
-            >
+            <button type="button" className="btn btn-primary" onClick={goNext}>
               Next <i className="pi pi-chevron-right ms-2" />
             </button>
           ) : (
-            <button
-              type="submit"
-              className="btn btn-success"
-              disabled={isPending}
-            >
+            <button type="submit" className="btn btn-success" disabled={isPending}>
               {isPending
                 ? <><span className="spinner-border spinner-border-sm me-2" />Enrolling…</>
                 : <><i className="pi pi-check me-2" />Confirm Enrollment</>}
