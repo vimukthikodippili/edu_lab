@@ -110,3 +110,14 @@ export interface PaginatedStudents {
   page: number
   limit: number
 }
+
+export interface BiometricStatus {
+  isEnrolled: boolean
+  consentGiven: boolean
+  enrolledAt: string | null
+}
+
+export interface EnrollBiometricPayload {
+  templateType: 'fingerprint' | 'facial' | 'both'
+  template: string
+}

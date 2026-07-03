@@ -3,10 +3,12 @@ import { useState } from 'react'
 import type { Guardian, Student, AddGuardianPayload } from '../types'
 import { GuardianCard } from './GuardianCard'
 import { GuardianFormModal } from './GuardianFormModal'
+import { BiometricEnrollModal } from './BiometricEnrollModal'
 import { useAddGuardian } from '../hooks/useAddGuardian'
 import { useUpdateGuardian } from '../hooks/useUpdateGuardian'
 import { useRemoveGuardian } from '../hooks/useRemoveGuardian'
 import { useSetPrimaryGuardian } from '../hooks/useSetPrimaryGuardian'
+import { usePermission } from '@/hooks/usePermission'
 
 interface Props {
   student: Student
@@ -16,10 +18,13 @@ type ModalState =
   | { type: 'closed' }
   | { type: 'add' }
   | { type: 'edit'; guardian: Guardian }
+  | { type: 'biometric'; guardian: Guardian }
 
 export function GuardianList({ student }: Props) {
   const [modal, setModal] = useState<ModalState>({ type: 'closed' })
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
+
+  const canEnroll = usePermission('biometric:enroll')
 
   const addGuardian = useAddGuardian(student.id)
   const updateGuardian = useUpdateGuardian(student.id)
@@ -77,6 +82,11 @@ export function GuardianList({ student }: Props) {
             onSetPrimary={(id) => setPrimaryGuardian.mutate(id)}
             onEdit={(guardian) => setModal({ type: 'edit', guardian })}
             onRemove={(id) => setConfirmRemoveId(id)}
+            onEnroll={(id) => {
+              const guardian = student.guardians.find((g) => g.id === id)
+              if (guardian) setModal({ type: 'biometric', guardian })
+            }}
+            canEnroll={canEnroll}
             isLoading={isAnyLoading}
           />
         ))
@@ -103,11 +113,21 @@ export function GuardianList({ student }: Props) {
       <GuardianFormModal
         guardian={modal.type === 'edit' ? modal.guardian : null}
         isOnlyGuardian={student.guardians.length <= 1}
-        isOpen={modal.type !== 'closed'}
+        isOpen={modal.type === 'add' || modal.type === 'edit'}
         isSubmitting={addGuardian.isPending || updateGuardian.isPending}
         onClose={() => setModal({ type: 'closed' })}
         onSubmit={handleSubmit}
       />
+
+      {/* Biometric enroll modal */}
+      {modal.type === 'biometric' && (
+        <BiometricEnrollModal
+          isOpen
+          guardian={modal.guardian}
+          studentId={student.id}
+          onClose={() => setModal({ type: 'closed' })}
+        />
+      )}
 
       {/* Confirm remove dialog */}
       {confirmRemoveId && (

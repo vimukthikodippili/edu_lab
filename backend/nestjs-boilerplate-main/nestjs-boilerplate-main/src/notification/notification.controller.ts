@@ -45,4 +45,30 @@ export class NotificationController {
   ) {
     return this.service.markRead(id, staffId);
   }
+
+  // ── Guardian notifications ─────────────────────────────────────────────────
+
+  @ApiOperation({ summary: 'List absence alerts for a guardian' })
+  @ApiQuery({ name: 'guardianId', type: String, description: 'Guardian UUID' })
+  @Get('guardian')
+  listForGuardian(@Query('guardianId', ParseUUIDPipe) guardianId: string) {
+    return this.service.findForGuardian(guardianId);
+  }
+
+  @ApiOperation({ summary: 'Get unread absence-alert count for a guardian' })
+  @ApiQuery({ name: 'guardianId', type: String, description: 'Guardian UUID' })
+  @Get('guardian/unread-count')
+  guardianUnreadCount(@Query('guardianId', ParseUUIDPipe) guardianId: string) {
+    return this.service.getGuardianUnreadCount(guardianId).then((count) => ({ count }));
+  }
+
+  @ApiOperation({ summary: 'Mark a guardian notification as read' })
+  @Patch('guardian/:id/read')
+  @HttpCode(HttpStatus.OK)
+  markGuardianRead(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('guardianId', ParseUUIDPipe) guardianId: string,
+  ) {
+    return this.service.markReadForGuardian(id, guardianId);
+  }
 }

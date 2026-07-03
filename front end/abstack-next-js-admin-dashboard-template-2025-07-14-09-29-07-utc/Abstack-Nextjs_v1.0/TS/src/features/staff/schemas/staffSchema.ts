@@ -32,6 +32,13 @@ export const staffSchema = yup.object({
     .min(1, 'At least one role must be assigned')
     .required('Roles are required'),
   photoId: yup.string().optional(),
+  qualificationDocIds: yup.array().of(yup.string().uuid('Invalid file ID').required()).default([]),
+  systemRoleId: yup.mixed<4 | 5>().oneOf([4, 5]).optional(),
+  initialPassword: yup
+    .string()
+    .trim()
+    .min(6, 'Password must be at least 6 characters')
+    .optional(),
 })
 
 export type StaffSchemaType = yup.InferType<typeof staffSchema>

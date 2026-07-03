@@ -1,9 +1,10 @@
 'use client'
 import { use, useState } from 'react'
 import Link from 'next/link'
-import { Mail, Phone, MapPin, Calendar, CreditCard, Edit, UserX, ArrowLeft } from 'lucide-react'
+import { Mail, Phone, MapPin, Calendar, CreditCard, Edit, UserX, ArrowLeft, FileText, Image, Eye, Lock } from 'lucide-react'
 import { useStaffMember } from '@/features/staff/hooks/useStaffMember'
 import { useDeactivateStaff } from '@/features/staff/hooks/useDeactivateStaff'
+import { useSetStaffPassword } from '@/features/staff/hooks/useSetStaffPassword'
 import { StaffRoleBadges } from '@/features/staff/components/StaffRoleBadges'
 import { QualificationTags } from '@/features/staff/components/QualificationTags'
 import { StaffFormModal } from '@/features/staff/components/StaffFormModal'
@@ -17,15 +18,47 @@ const STATUS_BADGE: Record<StaffStatus, string> = {
   retired: 'bg-secondary',
 }
 
+function isPdf(path: string) {
+  return path.toLowerCase().endsWith('.pdf')
+}
+
 export default function StaffProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { data: staff, isLoading, isError } = useStaffMember(id)
   const deactivate = useDeactivateStaff()
+  const setPassword = useSetStaffPassword(id)
+
   const [showEdit, setShowEdit] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
 
   const handleDeactivate = async () => {
     if (!window.confirm(`Deactivate ${staff?.firstName} ${staff?.lastName}? This will mark them as resigned.`)) return
     await deactivate.mutateAsync(id)
+  }
+
+  const handleSetPassword = async () => {
+    setPasswordError(null)
+    setPasswordSuccess(false)
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match.')
+      return
+    }
+    try {
+      await setPassword.mutateAsync({ newPassword })
+      setPasswordSuccess(true)
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to set password.'
+      setPasswordError(msg)
+    }
   }
 
   if (isLoading) {
@@ -52,6 +85,7 @@ export default function StaffProfilePage({ params }: { params: Promise<{ id: str
 
   const fullName = `${staff.firstName} ${staff.lastName}`
   const hue = (staff.firstName.charCodeAt(0) + staff.lastName.charCodeAt(0)) * 7 % 360
+  const qualDocs = staff.qualificationDocs ?? []
 
   return (
     <div className="container-fluid py-4">
@@ -94,7 +128,6 @@ export default function StaffProfilePage({ params }: { params: Promise<{ id: str
             <p className="text-muted small mb-1">{staff.designation}</p>
             <span className="badge bg-light text-dark border">{staff.department}</span>
 
-            {/* Actions — admin/principal only in real app via role check */}
             {staff.status === 'active' && (
               <div className="d-flex gap-2 mt-4 justify-content-center">
                 <button
@@ -216,12 +249,111 @@ export default function StaffProfilePage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* Qualifications */}
-          <div className="card border-0 shadow-sm">
+          <div className="card border-0 shadow-sm mb-4">
             <div className="card-header bg-white border-0 pb-0">
               <h6 className="fw-bold text-muted text-uppercase small mb-0">Qualifications</h6>
             </div>
             <div className="card-body">
               <QualificationTags mode="display" values={staff.qualifications} />
+            </div>
+          </div>
+
+          {/* Qualification Documents */}
+          <div className="card border-0 shadow-sm mb-4">
+            <div className="card-header bg-white border-0 pb-0">
+              <h6 className="fw-bold text-muted text-uppercase small mb-0">Qualification Documents</h6>
+            </div>
+            <div className="card-body">
+              {qualDocs.length === 0 ? (
+                <p className="text-muted small mb-0">No qualification documents uploaded.</p>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {qualDocs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="d-flex align-items-center gap-2 p-2 border rounded bg-light"
+                    >
+                      {doc.path.toLowerCase().endsWith('.pdf') ? (
+                        <FileText size={16} className="text-danger flex-shrink-0" />
+                      ) : (
+                        <Image size={16} className="text-primary flex-shrink-0" />
+                      )}
+                      <span className="small flex-grow-1 text-truncate text-muted">
+                        {doc.path.split('/').pop() ?? `Document ${doc.id.slice(0, 8)}…`}
+                      </span>
+                      <a
+                        href={`${process.env.NEXT_PUBLIC_API_URL}/api/v1${doc.path}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-link btn-sm p-0 d-flex align-items-center gap-1 text-primary"
+                      >
+                        <Eye size={14} /> View
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Set Password */}
+          <div className="card border-0 shadow-sm">
+            <div className="card-header bg-white border-0 pb-0 d-flex align-items-center gap-2">
+              <Lock size={14} className="text-muted" />
+              <h6 className="fw-bold text-muted text-uppercase small mb-0">Account Password</h6>
+            </div>
+            <div className="card-body">
+              <p className="text-muted small mb-3">
+                Set or reset the login password for this staff member&apos;s account.
+              </p>
+
+              {passwordError && (
+                <div className="alert alert-danger py-2 small mb-3">{passwordError}</div>
+              )}
+              {passwordSuccess && (
+                <div className="alert alert-success py-2 small mb-3">Password updated successfully.</div>
+              )}
+
+              <div className="row g-3">
+                <div className="col-sm-6">
+                  <label className="form-label fw-medium small">New Password</label>
+                  <input
+                    type="password"
+                    className="form-control form-control-sm"
+                    placeholder="Min. 6 characters"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="col-sm-6">
+                  <label className="form-label fw-medium small">Confirm Password</label>
+                  <input
+                    type="password"
+                    className="form-control form-control-sm"
+                    placeholder="Re-enter password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-sm mt-3"
+                onClick={handleSetPassword}
+                disabled={setPassword.isPending || !newPassword}
+              >
+                {setPassword.isPending ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-1" role="status" />
+                    Setting…
+                  </>
+                ) : (
+                  'Set Password'
+                )}
+              </button>
             </div>
           </div>
         </div>

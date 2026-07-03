@@ -48,6 +48,9 @@ export class GuardianEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', nullable: true })
   address: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  pushToken: string | null;
+
   @Column({ type: 'boolean', default: false })
   biometricEnrolled: boolean;
 

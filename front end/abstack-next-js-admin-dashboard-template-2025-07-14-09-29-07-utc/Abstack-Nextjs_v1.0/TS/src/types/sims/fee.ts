@@ -1,62 +1,52 @@
-export interface FeeCategory {
-  id: string
-  name: string
-  description?: string
-  isOptional: boolean
-}
-
 export interface FeeStructure {
-  id: string
-  grade: number
-  academicYear: string
-  categories: {
-    category: FeeCategory
-    amount: number
-    dueDate: string
-    installments?: number
-  }[]
+  id: number
+  gradeId: number
+  termId: number
+  feeCategory: string
+  amount: number
+  createdAt: string
+  updatedAt: string
 }
 
-export interface FeeInvoice {
+export type InvoiceStatus = 'pending' | 'paid' | 'overdue'
+
+export interface Invoice {
   id: string
   studentId: string
   studentName: string
-  grade: number
-  academicYear: string
-  items: {
-    categoryId: string
-    categoryName: string
-    amount: number
-    discount: number
-    netAmount: number
-  }[]
-  totalAmount: number
-  totalDiscount: number
-  netAmount: number
-  dueDate: string
-  status: 'draft' | 'sent' | 'partial' | 'paid' | 'overdue' | 'waived'
-  issuedAt: string
-}
-
-export interface FeePayment {
-  id: string
-  invoiceId: string
+  admissionNumber: string
+  termId: number
   amount: number
-  method: 'cash' | 'bank_transfer' | 'online' | 'cheque'
-  referenceNumber?: string
-  paidAt: string
-  recordedBy: string
+  discountAmount: number
+  payableAmount: number
+  status: InvoiceStatus
+  effectiveStatus: InvoiceStatus
+  dueDate: string
 }
 
-export interface FeeDiscount {
+export type FeeWaiverStatus = 'pending' | 'approved' | 'rejected'
+
+export interface FeeWaiverRequest {
   id: string
   studentId: string
-  type: 'sibling' | 'merit' | 'financial_aid' | 'staff_ward' | 'custom'
-  percentage?: number
-  fixedAmount?: number
+  studentName: string
+  admissionNumber: string
+  invoiceId: string
+  invoiceAmount: number
+  invoiceDueDate: string
+  requestedDiscountAmount: number
   reason: string
-  approvedBy: string
-  approvedAt: string
-  validFrom: string
-  validTo?: string
+  status: FeeWaiverStatus
+  requestedById: string
+  decidedById: string | null
+  decidedAt: string | null
+  decisionNote: string | null
+  createdAt: string
+}
+
+export interface GenerateInvoicesSummary {
+  termId: number
+  generatedCount: number
+  skippedAlreadyExistsCount: number
+  skippedNoFeeStructureCount: number
 }

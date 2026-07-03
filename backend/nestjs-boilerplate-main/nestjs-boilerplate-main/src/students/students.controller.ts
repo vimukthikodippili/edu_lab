@@ -63,7 +63,13 @@ export class StudentsController {
   }
 
   @Get('grades')
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head, RoleEnum.teacher)
+  @Roles(
+    RoleEnum.admin,
+    RoleEnum.principal,
+    RoleEnum.section_head,
+    RoleEnum.teacher,
+    RoleEnum.accountant,
+  )
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List all grades (used to populate Grade dropdown in enrollment form)' })
   @ApiOkResponse({ type: [GradeEntity] })

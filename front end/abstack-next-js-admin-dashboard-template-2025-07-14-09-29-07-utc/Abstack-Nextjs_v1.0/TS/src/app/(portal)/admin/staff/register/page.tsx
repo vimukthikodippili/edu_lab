@@ -1,7 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, Paperclip, FileText, Image, X, Eye } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { staffSchema, type StaffSchemaType } from '@/features/staff/schemas/staffSchema'
@@ -9,6 +10,8 @@ import { QualificationTags } from '@/features/staff/components/QualificationTags
 import { STAFF_FUNCTIONAL_ROLES } from '@/features/staff/types'
 import type { StaffFunctionalRole } from '@/features/staff/types'
 import { useCreateStaff } from '@/features/staff/hooks/useCreateStaff'
+import { useUploadFile } from '@/features/staff/hooks/useUploadFile'
+import apiClient from '@/lib/api/axios'
 
 const DEPARTMENTS = [
   'Mathematics', 'Sciences', 'Languages', 'Social Studies', 'Arts',
@@ -16,9 +19,26 @@ const DEPARTMENTS = [
   'Library', 'Counseling', 'Other',
 ]
 
+interface DocMeta {
+  id: string
+  path: string
+  name: string
+}
+
+function isPdf(path: string) {
+  return path.toLowerCase().endsWith('.pdf')
+}
+
 export default function RegisterStaffPage() {
   const router = useRouter()
   const createMutation = useCreateStaff()
+  const uploadFile = useUploadFile()
+
+  const [qualDocs, setQualDocs] = useState<DocMeta[]>([])
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordFieldError, setPasswordFieldError] = useState<string | null>(null)
 
   const {
     register,
@@ -41,6 +61,7 @@ export default function RegisterStaffPage() {
       address: '',
       qualifications: [],
       roles: [],
+      qualificationDocIds: [],
     },
   })
 
@@ -54,12 +75,58 @@ export default function RegisterStaffPage() {
     }
   }
 
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadError(null)
+    try {
+      const result = await uploadFile.mutateAsync(file)
+      const meta: DocMeta = { id: result.file.id, path: result.file.path, name: file.name }
+      const updated = [...qualDocs, meta]
+      setQualDocs(updated)
+      setValue('qualificationDocIds', updated.map((d) => d.id))
+    } catch {
+      setUploadError('Upload failed. Please try again.')
+    }
+    e.target.value = ''
+  }
+
+  const removeDoc = (id: string) => {
+    const updated = qualDocs.filter((d) => d.id !== id)
+    setQualDocs(updated)
+    setValue('qualificationDocIds', updated.map((d) => d.id))
+  }
+
   const onSubmit = async (values: StaffSchemaType) => {
-    await createMutation.mutateAsync({
+    // Validate password fields before submitting
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        setPasswordFieldError('Password must be at least 6 characters.')
+        return
+      }
+      if (newPassword !== confirmPassword) {
+        setPasswordFieldError('Passwords do not match.')
+        return
+      }
+    }
+    setPasswordFieldError(null)
+
+    const result = await createMutation.mutateAsync({
       ...values,
       qualifications: values.qualifications as string[],
       roles: values.roles as StaffFunctionalRole[],
+      qualificationDocIds: values.qualificationDocIds as string[],
     })
+
+    // Set initial password if provided
+    if (newPassword && newPassword.length >= 6) {
+      try {
+        await apiClient.post(`/staff/${result.id}/set-password`, { newPassword })
+      } catch {
+        // Password set is best-effort — staff was created successfully
+      }
+    }
+
     router.push('/admin/staff')
   }
 
@@ -216,6 +283,109 @@ export default function RegisterStaffPage() {
                     />
                   )}
                 />
+
+                <hr />
+                <label className="form-label fw-medium">Qualification Documents</label>
+                <p className="text-muted small mb-2">
+                  Upload certificates, diplomas, or other qualification proof (PDF, JPG, PNG).
+                </p>
+
+                {uploadError && (
+                  <div className="alert alert-danger py-2 small mb-2">{uploadError}</div>
+                )}
+
+                {qualDocs.length > 0 && (
+                  <div className="mb-2">
+                    {qualDocs.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="d-flex align-items-center gap-2 p-2 border rounded mb-1 bg-light"
+                      >
+                        {isPdf(doc.path) ? (
+                          <FileText size={16} className="text-danger flex-shrink-0" />
+                        ) : (
+                          <Image size={16} className="text-primary flex-shrink-0" />
+                        )}
+                        <span className="small flex-grow-1 text-truncate">{doc.name}</span>
+                        <a
+                          href={`${process.env.NEXT_PUBLIC_API_URL}/api/v1${doc.path}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-link btn-sm p-0 text-muted"
+                          title="View"
+                        >
+                          <Eye size={14} />
+                        </a>
+                        <button
+                          type="button"
+                          className="btn btn-link btn-sm p-0 text-danger"
+                          onClick={() => removeDoc(doc.id)}
+                          title="Remove"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <label className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1">
+                  <Paperclip size={14} />
+                  {uploadFile.isPending ? 'Uploading…' : 'Upload Document'}
+                  <input
+                    type="file"
+                    className="d-none"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleDocUpload}
+                    disabled={uploadFile.isPending}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Account Password */}
+          <div className="col-12">
+            <div className="card border-0 shadow-sm">
+              <div
+                className="card-header border-0 text-white"
+                style={{ background: 'linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%)' }}
+              >
+                <h6 className="mb-0 fw-bold">Account Password</h6>
+              </div>
+              <div className="card-body p-4">
+                <p className="text-muted small mb-3">
+                  Set an initial login password for this staff member. You can also set or reset it later from the staff profile page.
+                </p>
+
+                {passwordFieldError && (
+                  <div className="alert alert-danger py-2 small mb-3">{passwordFieldError}</div>
+                )}
+
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">New Password</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      placeholder="Min. 6 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium">Confirm Password</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      placeholder="Re-enter password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -223,7 +393,11 @@ export default function RegisterStaffPage() {
           {/* Submit */}
           <div className="col-12 d-flex justify-content-end gap-2">
             <Link href="/admin/staff" className="btn btn-light px-4">Cancel</Link>
-            <button type="submit" className="btn btn-primary px-5" disabled={createMutation.isPending || isSubmitting}>
+            <button
+              type="submit"
+              className="btn btn-primary px-5"
+              disabled={createMutation.isPending || isSubmitting || uploadFile.isPending}
+            >
               {createMutation.isPending
                 ? <><span className="spinner-border spinner-border-sm me-2" />Registering…</>
                 : 'Register Staff Member'}

@@ -32,7 +32,17 @@ import { TimetableModule } from './timetable/timetable.module';
 import { StaffModule } from './staff/staff.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { NotificationModule } from './notification/notification.module';
+import { AttendanceModule } from './attendance/attendance.module';
+import { GradesModule } from './grades/grades.module';
+import { FeesModule } from './fees/fees.module';
+import { LibraryModule } from './library/library.module';
+import { CommunicationModule } from './communication/communication.module';
+import { PrincipalModule } from './principal/principal.module';
 import { MailerModule } from './mailer/mailer.module';
+import { AuditModule } from './audit/audit.module';
+import { LeaveModule } from './leave/leave.module';
+import { ExpensesModule } from './expenses/expenses.module';
+import { BiometricModule } from './biometric/biometric.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MongooseConfigService } from './database/mongoose-config.service';
 import { DatabaseConfig } from './database/config/database-config.type';
@@ -110,6 +120,16 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     StaffModule,
     EventEmitterModule.forRoot(),
     NotificationModule,
+    AttendanceModule,
+    GradesModule,
+    FeesModule,
+    LibraryModule,
+    CommunicationModule,
+    PrincipalModule,
+    AuditModule,
+    LeaveModule,
+    ExpensesModule,
+    BiometricModule,
   ],
 })
 export class AppModule {}

@@ -7,6 +7,8 @@ interface Props {
   onSetPrimary: (id: string) => void
   onEdit: (guardian: Guardian) => void
   onRemove: (id: string) => void
+  onEnroll?: (guardianId: string) => void
+  canEnroll?: boolean
   isLoading?: boolean
 }
 
@@ -20,7 +22,7 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
-export function GuardianCard({ guardian, isOnlyGuardian, onSetPrimary, onEdit, onRemove, isLoading }: Props) {
+export function GuardianCard({ guardian, isOnlyGuardian, onSetPrimary, onEdit, onRemove, onEnroll, canEnroll, isLoading }: Props) {
   const canRemove = !guardian.isPrimaryContact && !isOnlyGuardian
   const removeTitle = isOnlyGuardian
     ? 'Cannot remove — at least one guardian must remain'
@@ -85,6 +87,39 @@ export function GuardianCard({ guardian, isOnlyGuardian, onSetPrimary, onEdit, o
                 </a>
               </div>
             )}
+
+            {/* Biometric status */}
+            <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
+              {guardian.biometricEnrolled ? (
+                <span className="badge bg-success" style={{ fontSize: 11 }}>
+                  <i className="pi pi-shield me-1" />
+                  Biometrically Enrolled
+                </span>
+              ) : (
+                <>
+                  <span
+                    className="badge bg-warning text-dark"
+                    style={{ fontSize: 11 }}
+                    title="Biometric data not yet enrolled"
+                  >
+                    <i className="pi pi-exclamation-circle me-1" />
+                    Not Enrolled
+                  </span>
+                  {canEnroll && onEnroll && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary py-0"
+                      style={{ fontSize: 12 }}
+                      onClick={() => onEnroll(guardian.id)}
+                      disabled={isLoading}
+                    >
+                      <i className="pi pi-fingerprint me-1" />
+                      Enroll
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           <div className="d-flex flex-column gap-1" style={{ minWidth: 120 }}>

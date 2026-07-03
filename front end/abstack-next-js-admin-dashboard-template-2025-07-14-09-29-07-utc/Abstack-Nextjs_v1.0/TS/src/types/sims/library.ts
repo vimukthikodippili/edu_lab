@@ -6,13 +6,13 @@ export interface Book {
   barcode: string
   category: string
   subject?: string
-  gradeLevel?: number[]
+  gradeLevel?: string
   publisher?: string
   publishYear?: number
   totalCopies: number
   availableCopies: number
   location?: string
-  status: 'available' | 'issued' | 'damaged' | 'lost'
+  status: 'available' | 'damaged' | 'lost'
 }
 
 export interface BookIssuance {
@@ -22,22 +22,37 @@ export interface BookIssuance {
   bookBarcode: string
   borrowerId: string
   borrowerName: string
-  borrowerType: 'student' | 'teacher'
+  admissionNumber: string
   issuedAt: string
-  dueDate: string
+  dueAt: string
   returnedAt?: string
-  fineAmount?: number
-  finePaid?: boolean
-  status: 'issued' | 'returned' | 'overdue'
+  fineAmount?: number | null
+  finePaid: boolean
+  status: 'active' | 'returned' | 'overdue'
+  daysOverdue: number
 }
 
 export interface LibraryFine {
+  loanId: string
+  bookTitle: string
+  studentName: string
+  admissionNumber: string
+  issuedAt: string
+  returnedAt: string | null
+  fineAmount: number
+  finePaid: boolean
+  status: 'active' | 'returned' | 'overdue'
+}
+
+export interface DigitalBook {
   id: string
-  issuanceId: string
-  borrowerId: string
-  borrowerName: string
-  amount: number
-  reason: string
-  status: 'pending' | 'paid' | 'waived'
-  paidAt?: string
+  title: string
+  author: string
+  subject?: string
+  description?: string
+  fileId: string
+  filePath: string
+  uploaderName: string
+  isApproved: boolean
+  createdAt: string
 }

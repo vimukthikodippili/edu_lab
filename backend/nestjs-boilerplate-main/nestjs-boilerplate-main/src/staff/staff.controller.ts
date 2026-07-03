@@ -25,6 +25,8 @@ import { UpdateStaffDto } from './dto/update-staff.dto';
 import { UpdateStaffRolesDto } from './dto/update-staff-roles.dto';
 import { QueryStaffDto } from './dto/query-staff.dto';
 import { UsersService } from '../users/users.service';
+import { SetStaffPasswordDto } from './dto/set-staff-password.dto';
+import { ChangeSystemRoleDto } from './dto/change-system-role.dto';
 
 @ApiTags('Staff')
 @ApiBearerAuth()
@@ -105,6 +107,20 @@ export class StaffController {
     return this.staffService.updateRoles(id, dto);
   }
 
+  @Post(':id/set-password')
+  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Set or reset the password for the user account linked to this staff member' })
+  @ApiParam({ name: 'id', description: 'Staff UUID' })
+  @ApiResponse({ status: 204, description: 'Password updated.' })
+  @ApiResponse({ status: 404, description: 'Staff not found or no linked user account.' })
+  setPassword(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: SetStaffPasswordDto,
+  ) {
+    return this.staffService.setPassword(id, dto.newPassword);
+  }
+
   @Delete(':id')
   @Roles(RoleEnum.admin, RoleEnum.principal)
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -114,5 +130,27 @@ export class StaffController {
   @ApiResponse({ status: 404, description: 'Staff not found.' })
   deactivate(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.staffService.deactivate(id);
+  }
+
+  @Get(':id/system-role')
+  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get the portal login role for a staff member (e.g. teacher vs section_head)' })
+  @ApiParam({ name: 'id', description: 'Staff UUID' })
+  getSystemRole(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
+    return this.staffService.getSystemRole(id);
+  }
+
+  @Patch(':id/system-role')
+  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change the portal login role for a staff member (e.g. promote a teacher to section head)' })
+  @ApiParam({ name: 'id', description: 'Staff UUID' })
+  @ApiResponse({ status: 404, description: 'Staff not found or no linked user account.' })
+  changeSystemRole(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: ChangeSystemRoleDto,
+  ) {
+    return this.staffService.changeSystemRole(id, dto.roleId);
   }
 }

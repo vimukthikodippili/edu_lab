@@ -13,6 +13,7 @@ import {
   FileText,
   Settings,
   ShieldCheck,
+  ShieldAlert,
   QrCode,
   Library,
   CreditCard,
@@ -20,6 +21,10 @@ import {
   BrainCircuit,
   Bell,
   UserCheck,
+  ClipboardCheck,
+  BookCheck,
+  AlertTriangle,
+  Repeat2,
 } from 'lucide-react'
 
 export const MENU_ITEMS: MenuItemType[] = [
@@ -108,6 +113,42 @@ export const MENU_ITEMS: MenuItemType[] = [
     ],
   },
 
+  // ─── Attendance Reports ──────────────────────────────────────────────────
+
+  {
+    key: 'attendance-menu',
+    label: 'Attendance',
+    icon: ClipboardList,
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+    children: [
+      {
+        key: 'attendance-reports',
+        label: 'Attendance Reports',
+        url: '/admin/attendance/reports',
+        parentKey: 'attendance-menu',
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
+    ],
+  },
+
+  // ─── Grades & Exams ──────────────────────────────────────────────────────
+
+  {
+    key: 'admin-grades',
+    label: 'Grades & Exams',
+    icon: ClipboardCheck,
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+    children: [
+      {
+        key: 'admin-class-results',
+        label: 'Class Results',
+        url: '/admin/class-results',
+        parentKey: 'admin-grades',
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
+    ],
+  },
+
   // ─── Staff ────────────────────────────────────────────────────────────────
 
   {
@@ -129,6 +170,14 @@ export const MENU_ITEMS: MenuItemType[] = [
         url: '/admin/staff/register',
         parentKey: 'staff',
         allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
+      {
+        key: 'staff-substitutes',
+        label: 'Substitute Cover',
+        url: '/admin/staff/substitutes',
+        parentKey: 'staff',
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD],
+        icon: Repeat2,
       },
     ],
   },
@@ -161,7 +210,14 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: UserCheck,
     url: '/principal/approvals',
     allowedRoles: [ROLES.PRINCIPAL],
-    isDisabled: true,
+    isDisabled: false,
+  },
+  {
+    key: 'principal-emergency-alert',
+    label: 'Emergency Alert',
+    icon: AlertTriangle,
+    url: '/principal/emergency-alert',
+    allowedRoles: [ROLES.PRINCIPAL],
   },
 
   // ─── Section Head ─────────────────────────────────────────────────────────
@@ -186,6 +242,28 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/admin/students',
     allowedRoles: [ROLES.SECTION_HEAD],
   },
+  {
+    key: 'sh-grades',
+    label: 'Grades & Exams',
+    icon: ClipboardCheck,
+    allowedRoles: [ROLES.SECTION_HEAD],
+    children: [
+      {
+        key: 'sh-assessment-plans',
+        label: 'Assessment Plans',
+        url: '/section-head/assessment-plans',
+        parentKey: 'sh-grades',
+        allowedRoles: [ROLES.SECTION_HEAD],
+      },
+      {
+        key: 'sh-class-results',
+        label: 'Class Results',
+        url: '/section-head/class-results',
+        parentKey: 'sh-grades',
+        allowedRoles: [ROLES.SECTION_HEAD],
+      },
+    ],
+  },
 
   // ─── Teacher ──────────────────────────────────────────────────────────────
 
@@ -208,7 +286,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: ClipboardList,
     url: '/teacher/attendance',
     allowedRoles: [ROLES.TEACHER],
-    isDisabled: true,
   },
   {
     key: 'teacher-marks',
@@ -216,7 +293,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: FileText,
     url: '/teacher/marks',
     allowedRoles: [ROLES.TEACHER],
-    isDisabled: true,
   },
   {
     key: 'teacher-timetable',
@@ -224,6 +300,57 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: Calendar,
     url: '/teacher/timetable',
     allowedRoles: [ROLES.TEACHER],
+  },
+  {
+    key: 'teacher-leave',
+    label: 'My Leave',
+    icon: CalendarDays,
+    allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+    children: [
+      {
+        key: 'teacher-leave-apply',
+        label: 'Apply for Leave',
+        url: '/teacher/leave/apply',
+        parentKey: 'teacher-leave',
+        allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+      },
+      {
+        key: 'teacher-leave-status',
+        label: 'My Requests',
+        url: '/teacher/leave',
+        parentKey: 'teacher-leave',
+        allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+      },
+    ],
+  },
+  {
+    key: 'teacher-library',
+    label: 'Online Library',
+    icon: Library,
+    url: '/library/online',
+    allowedRoles: [ROLES.TEACHER],
+  },
+  {
+    key: 'teacher-grades',
+    label: 'Grades & Exams',
+    icon: BookCheck,
+    allowedRoles: [ROLES.TEACHER],
+    children: [
+      {
+        key: 'teacher-assessment-plans',
+        label: 'Assessment Plans',
+        url: '/teacher/assessment-plans',
+        parentKey: 'teacher-grades',
+        allowedRoles: [ROLES.TEACHER],
+      },
+      {
+        key: 'teacher-class-results',
+        label: 'Class Results',
+        url: '/teacher/class-results',
+        parentKey: 'teacher-grades',
+        allowedRoles: [ROLES.TEACHER],
+      },
+    ],
   },
 
   // ─── Student ──────────────────────────────────────────────────────────────
@@ -256,6 +383,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/student/timetable',
     allowedRoles: [ROLES.STUDENT],
     isDisabled: true,
+  },
+  {
+    key: 'student-library',
+    label: 'Online Library',
+    icon: Library,
+    url: '/library/online',
+    allowedRoles: [ROLES.STUDENT],
   },
 
   // ─── Guardian ─────────────────────────────────────────────────────────────
@@ -330,6 +464,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.SECURITY_OFFICER],
   },
   {
+    key: 'security-gate-terminal',
+    label: 'Gate Terminal',
+    icon: ShieldAlert,
+    url: '/security/gate-terminal',
+    allowedRoles: [ROLES.SECURITY_OFFICER, ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+  },
+  {
     key: 'security-scan',
     label: 'QR Verification',
     icon: QrCode,
@@ -359,7 +500,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: BookOpen,
     url: '/library/books',
     allowedRoles: [ROLES.LIBRARIAN],
-    isDisabled: true,
   },
   {
     key: 'library-issuance',
@@ -367,7 +507,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: ClipboardList,
     url: '/library/issuance',
     allowedRoles: [ROLES.LIBRARIAN],
-    isDisabled: true,
+  },
+  {
+    key: 'library-online',
+    label: 'Online Library',
+    icon: Library,
+    url: '/library/online',
+    allowedRoles: [ROLES.LIBRARIAN],
   },
 
   // ─── Accountant ───────────────────────────────────────────────────────────
@@ -391,7 +537,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: FileText,
     url: '/accounts/fees',
     allowedRoles: [ROLES.ACCOUNTANT],
-    isDisabled: true,
   },
   {
     key: 'accounts-payments',

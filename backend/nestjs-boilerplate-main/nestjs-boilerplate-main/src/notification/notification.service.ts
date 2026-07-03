@@ -2,12 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InAppNotificationEntity } from './entities/in-app-notification.entity';
+import { GuardianNotificationEntity } from './entities/guardian-notification.entity';
 
 @Injectable()
 export class NotificationService {
   constructor(
     @InjectRepository(InAppNotificationEntity)
     private readonly repo: Repository<InAppNotificationEntity>,
+
+    @InjectRepository(GuardianNotificationEntity)
+    private readonly guardianRepo: Repository<GuardianNotificationEntity>,
   ) {}
 
   async createForStaff(
@@ -38,5 +42,43 @@ export class NotificationService {
 
   async getUnreadCount(staffId: string): Promise<number> {
     return this.repo.count({ where: { staffId, isRead: false } });
+  }
+
+  // ── Guardian notifications ─────────────────────────────────────────────────
+
+  async createForGuardian(
+    guardianId: string,
+    title: string,
+    message: string,
+    type: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<GuardianNotificationEntity> {
+    return this.guardianRepo.save(
+      this.guardianRepo.create({ guardianId, title, message, type, metadata: metadata ?? null }),
+    );
+  }
+
+  findForGuardian(guardianId: string, limit = 50): Promise<GuardianNotificationEntity[]> {
+    return this.guardianRepo.find({
+      where: { guardianId },
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  async markReadForGuardian(
+    id: number,
+    guardianId: string,
+  ): Promise<GuardianNotificationEntity> {
+    const notification = await this.guardianRepo.findOne({ where: { id, guardianId } });
+    if (!notification) {
+      throw new NotFoundException(`Guardian notification #${id} not found`);
+    }
+    notification.isRead = true;
+    return this.guardianRepo.save(notification);
+  }
+
+  async getGuardianUnreadCount(guardianId: string): Promise<number> {
+    return this.guardianRepo.count({ where: { guardianId, isRead: false } });
   }
 }

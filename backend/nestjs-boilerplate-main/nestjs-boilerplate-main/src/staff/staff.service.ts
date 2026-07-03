@@ -13,6 +13,9 @@ import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { UpdateStaffRolesDto } from './dto/update-staff-roles.dto';
 import { QueryStaffDto } from './dto/query-staff.dto';
+import { UsersService } from '../users/users.service';
+import { RoleEnum } from '../roles/roles.enum';
+import { StatusEnum } from '../statuses/statuses.enum';
 
 export interface PaginatedStaff {
   data: StaffEntity[];
@@ -36,6 +39,8 @@ export class StaffService {
     private readonly fileRepository: Repository<FileEntity>,
 
     private readonly dataSource: DataSource,
+
+    private readonly usersService: UsersService,
   ) {}
 
   // ─── Create ───────────────────────────────────────────────────────────────
@@ -64,7 +69,12 @@ export class StaffService {
       }
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    // Validate qualification documents if provided
+    if (dto.qualificationDocIds?.length) {
+      await this.validateQualificationDocs(dto.qualificationDocIds);
+    }
+
+    const staff = await this.dataSource.transaction(async (manager) => {
       const employeeNumber = await this.generateEmployeeNumber(
         manager.getRepository(StaffEntity),
       );
@@ -83,6 +93,7 @@ export class StaffService {
           nicNumber: dto.nicNumber,
           address: dto.address ?? null,
           qualifications: dto.qualifications ?? [],
+          qualificationDocIds: dto.qualificationDocIds ?? [],
           status: StaffStatus.ACTIVE,
           photoId: dto.photoId ?? null,
         }),
@@ -91,6 +102,31 @@ export class StaffService {
       await this.clearAndSaveRoles(manager, staff.id, dto.roles);
 
       return this.loadStaffViaManager(manager, staff.id);
+    });
+
+    await this.provisionUserAccount(staff, dto);
+
+    return staff;
+  }
+
+  /**
+   * Auto-creates the portal login for a newly registered staff member.
+   * Without this, staff records existed with no way to ever log in.
+   */
+  private async provisionUserAccount(
+    staff: StaffEntity,
+    dto: CreateStaffDto,
+  ): Promise<void> {
+    const existingUser = await this.usersService.findByEmail(staff.email);
+    if (existingUser) return;
+
+    await this.usersService.create({
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      email: staff.email,
+      password: dto.initialPassword ?? staff.nicNumber,
+      role: { id: dto.systemRoleId ?? RoleEnum.teacher },
+      status: { id: StatusEnum.active },
     });
   }
 
@@ -156,14 +192,17 @@ export class StaffService {
     if (!staff) {
       throw new NotFoundException(`Staff member with id ${id} not found.`);
     }
+    await this.attachQualDocs(staff);
     return staff;
   }
 
   async findByEmail(email: string): Promise<StaffEntity | null> {
-    return this.staffRepository.findOne({
+    const staff = await this.staffRepository.findOne({
       where: { email },
       relations: STAFF_RELATIONS,
     });
+    if (staff) await this.attachQualDocs(staff);
+    return staff;
   }
 
   // ─── Update ───────────────────────────────────────────────────────────────
@@ -195,6 +234,9 @@ export class StaffService {
         });
       }
     }
+    if (dto.qualificationDocIds?.length) {
+      await this.validateQualificationDocs(dto.qualificationDocIds);
+    }
 
     return this.dataSource.transaction(async (manager) => {
       await manager.save(
@@ -211,6 +253,7 @@ export class StaffService {
           ...(dto.nicNumber !== undefined && { nicNumber: dto.nicNumber }),
           ...(dto.address !== undefined && { address: dto.address ?? null }),
           ...(dto.qualifications !== undefined && { qualifications: dto.qualifications }),
+          ...(dto.qualificationDocIds !== undefined && { qualificationDocIds: dto.qualificationDocIds }),
           ...(dto.photoId !== undefined && { photoId: dto.photoId ?? null }),
         }),
       );
@@ -241,13 +284,59 @@ export class StaffService {
     await this.staffRepository.softDelete(id);
   }
 
+  // ─── Password management ──────────────────────────────────────────────────
+
+  async setPassword(id: string, newPassword: string): Promise<void> {
+    const staff = await this.findById(id);
+    const user = await this.usersService.findByEmail(staff.email);
+    if (!user) {
+      throw new NotFoundException(
+        `No user account is linked to staff email "${staff.email}". Create the user account first.`,
+      );
+    }
+    await this.usersService.update(user.id, { password: newPassword });
+  }
+
+  // ─── Portal role management ────────────────────────────────────────────────
+
+  /** Promotes/demotes a staff member's portal login between teacher and section_head. */
+  async changeSystemRole(id: string, roleId: RoleEnum): Promise<StaffEntity> {
+    const staff = await this.findById(id);
+    const user = await this.usersService.findByEmail(staff.email);
+    if (!user) {
+      throw new NotFoundException(
+        `No user account is linked to staff email "${staff.email}". Create the user account first.`,
+      );
+    }
+    await this.usersService.update(user.id, { role: { id: roleId } });
+    return staff;
+  }
+
+  async getSystemRole(id: string): Promise<{ hasAccount: boolean; roleId: number | null }> {
+    const staff = await this.findById(id);
+    const user = await this.usersService.findByEmail(staff.email);
+    return {
+      hasAccount: !!user,
+      roleId: user?.role?.id ? Number(user.role.id) : null,
+    };
+  }
+
   // ─── Private helpers ──────────────────────────────────────────────────────
 
-  /**
-   * Generates the next sequential employee number for the current year.
-   * Format: EMP/YYYY/NNNNN (e.g. EMP/2026/00001)
-   * Must be called inside a transaction with the transactional repository.
-   */
+  private async validateQualificationDocs(ids: string[]): Promise<void> {
+    const files = await this.fileRepository.findByIds(ids);
+    if (files.length !== ids.length) {
+      const foundIds = new Set(files.map((f) => f.id));
+      const missing = ids.filter((id) => !foundIds.has(id));
+      throw new UnprocessableEntityException({
+        status: 422,
+        errors: {
+          qualificationDocIds: `Qualification document(s) not found: ${missing.join(', ')}`,
+        },
+      });
+    }
+  }
+
   private async generateEmployeeNumber(repo: Repository<StaffEntity>): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `EMP/${year}/`;
@@ -269,10 +358,6 @@ export class StaffService {
     return `${prefix}${String(sequence).padStart(5, '0')}`;
   }
 
-  /**
-   * Atomically replaces all role assignments for a staff member.
-   * Must be called inside a transaction.
-   */
   private async clearAndSaveRoles(
     manager: EntityManager,
     staffId: string,
@@ -289,10 +374,6 @@ export class StaffService {
     }
   }
 
-  /**
-   * Loads a staff member with all relations via a transactional EntityManager.
-   * Used at the end of write operations to return a fully-populated response.
-   */
   private async loadStaffViaManager(
     manager: EntityManager,
     staffId: string,
@@ -304,6 +385,16 @@ export class StaffService {
     if (!staff) {
       throw new NotFoundException(`Staff ${staffId} not found after save.`);
     }
+    await this.attachQualDocs(staff);
     return staff;
+  }
+
+  private async attachQualDocs(staff: StaffEntity): Promise<void> {
+    if (!staff.qualificationDocIds?.length) {
+      staff.qualificationDocs = [];
+      return;
+    }
+    const files = await this.fileRepository.findByIds(staff.qualificationDocIds);
+    staff.qualificationDocs = files.map((f) => ({ id: f.id, path: f.path }));
   }
 }

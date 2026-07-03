@@ -25,15 +25,17 @@ export interface Teacher {
 
 export interface LeaveRequest {
   id: string
-  teacherId: string
-  teacherName: string
-  type: 'sick' | 'annual' | 'casual' | 'maternity' | 'no_pay'
+  staffId: string
+  leaveType: 'annual' | 'medical' | 'casual' | 'no_pay'
   startDate: string
   endDate: string
   reason: string
   status: 'pending' | 'approved' | 'rejected'
-  substituteTeacherId?: string
+  decidedById: string | null
+  decidedAt: string | null
+  decisionNote: string | null
   createdAt: string
+  updatedAt: string
 }
 
 export interface PayrollRecord {

@@ -32,12 +32,16 @@ export interface StaffMember {
   nicNumber: string
   address?: string | null
   qualifications: string[]
+  qualificationDocIds: string[]
+  qualificationDocs?: { id: string; path: string }[]
   status: StaffStatus
   roleAssignments: StaffRoleAssignment[]
   photo?: { id: string; path: string } | null
   createdAt: string
   updatedAt: string
 }
+
+export type PortalRoleId = 4 | 5 // 4 = section_head, 5 = teacher
 
 export interface StaffFormValues {
   firstName: string
@@ -50,8 +54,11 @@ export interface StaffFormValues {
   nicNumber: string
   address?: string
   qualifications: string[]
+  qualificationDocIds?: string[]
   roles: StaffFunctionalRole[]
   photoId?: string
+  systemRoleId?: PortalRoleId
+  initialPassword?: string
 }
 
 export interface PaginatedStaff {
@@ -91,4 +98,14 @@ export const STAFF_STATUS_LABELS: Record<StaffStatus, string> = {
   on_leave: 'On Leave',
   resigned: 'Resigned',
   retired: 'Retired',
+}
+
+export const PORTAL_ROLES: { value: PortalRoleId; label: string; description: string }[] = [
+  { value: 5, label: 'Teacher', description: 'Standard teaching staff portal access' },
+  { value: 4, label: 'Section Head', description: 'Can configure assessment plans and approve overrides' },
+]
+
+export const PORTAL_ROLE_LABELS: Record<PortalRoleId, string> = {
+  5: 'Teacher',
+  4: 'Section Head',
 }

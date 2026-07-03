@@ -49,6 +49,9 @@ export class StaffEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar' })
   phone: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  pushToken: string | null;
+
   @Column({ type: 'varchar', unique: true })
   nicNumber: string;
 
@@ -57,6 +60,12 @@ export class StaffEntity extends EntityRelationalHelper {
 
   @Column({ type: 'jsonb', default: [] })
   qualifications: string[];
+
+  @Column({ type: 'jsonb', default: [] })
+  qualificationDocIds: string[];
+
+  // Virtual — populated by StaffService after loading (not a DB column)
+  qualificationDocs?: { id: string; path: string }[];
 
   @Column({ type: 'enum', enum: StaffStatus, default: StaffStatus.ACTIVE })
   status: StaffStatus;

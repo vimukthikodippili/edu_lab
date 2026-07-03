@@ -5,14 +5,18 @@ import {
   IsDateString,
   IsEmail,
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
   MaxLength,
+  MinLength,
 } from 'class-validator';
 import { StaffFunctionalRole } from '../entities/staff-role-assignment.entity';
+import { PORTAL_ROLE_IDS } from './change-system-role.dto';
+import { RoleEnum } from '../../roles/roles.enum';
 
 export class CreateStaffDto {
   @ApiProperty({ example: 'Nimal' })
@@ -91,4 +95,34 @@ export class CreateStaffDto {
   @IsOptional()
   @IsUUID('4', { message: 'photoId must be a valid UUID' })
   photoId?: string;
+
+  @ApiPropertyOptional({
+    example: ['uuid-of-cert-1', 'uuid-of-diploma-1'],
+    description: 'UUIDs of previously-uploaded qualification document files',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true, message: 'Each qualificationDocId must be a valid UUID' })
+  qualificationDocIds?: string[];
+
+  @ApiPropertyOptional({
+    example: RoleEnum.teacher,
+    description: 'Portal login role to provision for this staff member: 5=teacher (default), 4=section_head',
+    enum: PORTAL_ROLE_IDS,
+  })
+  @IsOptional()
+  @IsIn(PORTAL_ROLE_IDS, { message: 'systemRoleId must be 4 (section_head) or 5 (teacher)' })
+  systemRoleId?: RoleEnum;
+
+  @ApiPropertyOptional({
+    example: 'Welcome@123',
+    description: 'Initial portal login password. Defaults to the staff NIC number if omitted.',
+    minLength: 6,
+    maxLength: 128,
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6, { message: 'Initial password must be at least 6 characters.' })
+  @MaxLength(128)
+  initialPassword?: string;
 }

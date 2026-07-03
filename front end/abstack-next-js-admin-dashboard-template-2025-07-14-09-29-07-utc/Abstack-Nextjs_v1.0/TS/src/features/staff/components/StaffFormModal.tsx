@@ -1,18 +1,28 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { staffSchema, type StaffSchemaType } from '../schemas/staffSchema'
-import type { StaffMember, StaffFunctionalRole } from '../types'
-import { STAFF_FUNCTIONAL_ROLES } from '../types'
+import type { StaffMember, StaffFunctionalRole, PortalRoleId } from '../types'
+import { STAFF_FUNCTIONAL_ROLES, PORTAL_ROLES, PORTAL_ROLE_LABELS } from '../types'
 import { QualificationTags } from './QualificationTags'
 import { useCreateStaff } from '../hooks/useCreateStaff'
 import { useUpdateStaff } from '../hooks/useUpdateStaff'
+import { useUploadFile } from '../hooks/useUploadFile'
+import { useSetStaffPassword } from '../hooks/useSetStaffPassword'
+import { useStaffSystemRole, useChangeStaffSystemRole } from '../hooks/useStaffSystemRole'
+import { Paperclip, FileText, Image, X, Eye, Lock, ShieldCheck } from 'lucide-react'
 
 interface Props {
   staff?: StaffMember | null
   onClose: () => void
   onSuccess?: (staff: StaffMember) => void
+}
+
+interface DocMeta {
+  id: string
+  path: string
+  name: string
 }
 
 const DEPARTMENTS = [
@@ -30,12 +40,39 @@ const DEPARTMENTS = [
   'Other',
 ]
 
+function docName(path: string): string {
+  return path.split('/').pop() ?? path
+}
+
+function isPdf(path: string): boolean {
+  return path.toLowerCase().endsWith('.pdf')
+}
+
 export function StaffFormModal({ staff, onClose, onSuccess }: Props) {
   const isEdit = !!staff
   const backdropRef = useRef<HTMLDivElement>(null)
 
   const createMutation = useCreateStaff()
   const updateMutation = useUpdateStaff(staff?.id ?? '')
+  const uploadFile = useUploadFile()
+  const setPasswordMutation = useSetStaffPassword(staff?.id ?? '')
+  const { data: systemRole } = useStaffSystemRole(staff?.id ?? '')
+  const changeRoleMutation = useChangeStaffSystemRole(staff?.id ?? '')
+
+  // Qualification documents state (resolved path + id)
+  const [qualDocs, setQualDocs] = useState<DocMeta[]>([])
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  // Password state (separate from main form)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
+
+  // Portal role change (edit mode only)
+  const [pendingRoleId, setPendingRoleId] = useState<PortalRoleId | null>(null)
+  const [roleChangeError, setRoleChangeError] = useState<string | null>(null)
+  const [roleChangeSuccess, setRoleChangeSuccess] = useState(false)
 
   const {
     register,
@@ -59,6 +96,8 @@ export function StaffFormModal({ staff, onClose, onSuccess }: Props) {
       address: '',
       qualifications: [],
       roles: [],
+      qualificationDocIds: [],
+      systemRoleId: 5,
     },
   })
 
@@ -78,9 +117,29 @@ export function StaffFormModal({ staff, onClose, onSuccess }: Props) {
         qualifications: staff.qualifications,
         roles: staff.roleAssignments.map((r) => r.role),
         photoId: staff.photo?.id,
+        qualificationDocIds: staff.qualificationDocIds ?? [],
       })
+      // Use enriched qualificationDocs from API (id + path), falling back to IDs only
+      const resolvedDocs = staff.qualificationDocs ?? []
+      setQualDocs(
+        (staff.qualificationDocIds ?? []).map((id) => {
+          const resolved = resolvedDocs.find((d) => d.id === id)
+          return {
+            id,
+            path: resolved?.path ?? '',
+            name: resolved?.path ? (resolved.path.split('/').pop() ?? id.slice(0, 8)) : `Document (${id.slice(0, 8)}…)`,
+          }
+        }),
+      )
     }
   }, [staff, reset])
+
+  // Sync the "change role" dropdown once the staff member's current portal role loads
+  useEffect(() => {
+    if (systemRole?.roleId === 4 || systemRole?.roleId === 5) {
+      setPendingRoleId(systemRole.roleId)
+    }
+  }, [systemRole?.roleId])
 
   const selectedRoles = watch('roles') ?? []
   const qualifications = watch('qualifications') ?? []
@@ -93,24 +152,94 @@ export function StaffFormModal({ staff, onClose, onSuccess }: Props) {
     }
   }
 
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadError(null)
+    try {
+      const result = await uploadFile.mutateAsync(file)
+      const meta: DocMeta = { id: result.file.id, path: result.file.path, name: file.name }
+      const updated = [...qualDocs, meta]
+      setQualDocs(updated)
+      setValue('qualificationDocIds', updated.map((d) => d.id))
+    } catch {
+      setUploadError('Upload failed. Please try again.')
+    }
+    // Reset file input so the same file can be re-uploaded if needed
+    e.target.value = ''
+  }
+
+  const removeDoc = (id: string) => {
+    const updated = qualDocs.filter((d) => d.id !== id)
+    setQualDocs(updated)
+    setValue('qualificationDocIds', updated.map((d) => d.id))
+  }
+
+  const handleSetPassword = async () => {
+    setPasswordError(null)
+    setPasswordSuccess(false)
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match.')
+      return
+    }
+    try {
+      await setPasswordMutation.mutateAsync({ newPassword })
+      setPasswordSuccess(true)
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to set password.'
+      setPasswordError(msg)
+    }
+  }
+
+  const handleChangeRole = async () => {
+    setRoleChangeError(null)
+    setRoleChangeSuccess(false)
+    if (!pendingRoleId || pendingRoleId === systemRole?.roleId) return
+    try {
+      await changeRoleMutation.mutateAsync({ roleId: pendingRoleId })
+      setRoleChangeSuccess(true)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to change portal role.'
+      setRoleChangeError(msg)
+    }
+  }
+
   const isPending = createMutation.isPending || updateMutation.isPending
   const serverError = createMutation.error?.message || updateMutation.error?.message
 
   const onSubmit = async (values: StaffSchemaType) => {
-    const payload = {
-      ...values,
-      qualifications: values.qualifications as string[],
-      roles: values.roles as StaffFunctionalRole[],
-    }
-
     if (isEdit) {
+      const payload = {
+        ...values,
+        qualifications: values.qualifications as string[],
+        roles: values.roles as StaffFunctionalRole[],
+        qualificationDocIds: values.qualificationDocIds as string[],
+      }
       const result = await updateMutation.mutateAsync(payload)
       onSuccess?.(result)
+      onClose()
     } else {
+      const payload = {
+        ...values,
+        qualifications: values.qualifications as string[],
+        roles: values.roles as StaffFunctionalRole[],
+        qualificationDocIds: values.qualificationDocIds as string[],
+        systemRoleId: values.systemRoleId ?? 5,
+        initialPassword:
+          newPassword && newPassword === confirmPassword && newPassword.length >= 6
+            ? newPassword
+            : undefined,
+      }
       const result = await createMutation.mutateAsync(payload)
       onSuccess?.(result)
+      onClose()
     }
-    onClose()
   }
 
   return (
@@ -317,7 +446,7 @@ export function StaffFormModal({ staff, onClose, onSuccess }: Props) {
                 <hr className="my-3" />
 
                 {/* ── Section 3: Roles & Qualifications ── */}
-                <div>
+                <div className="mb-4">
                   <h6 className="text-muted text-uppercase fw-bold small mb-3 d-flex align-items-center gap-2">
                     <span
                       className="badge rounded-circle bg-warning d-flex align-items-center justify-content-center"
@@ -378,6 +507,249 @@ export function StaffFormModal({ staff, onClose, onSuccess }: Props) {
                       />
                     )}
                   />
+
+                  {/* Qualification Documents */}
+                  <label className="form-label fw-medium mt-3">Qualification Documents</label>
+                  <p className="text-muted small mb-2">
+                    Upload certificates, diplomas, or other qualification proof (PDF, JPG, PNG).
+                  </p>
+
+                  {uploadError && (
+                    <div className="alert alert-danger py-2 small mb-2">{uploadError}</div>
+                  )}
+
+                  {/* Uploaded docs list */}
+                  {qualDocs.length > 0 && (
+                    <div className="mb-2">
+                      {qualDocs.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="d-flex align-items-center gap-2 p-2 border rounded mb-1 bg-light"
+                        >
+                          {doc.path && isPdf(doc.path) ? (
+                            <FileText size={16} className="text-danger flex-shrink-0" />
+                          ) : (
+                            <Image size={16} className="text-primary flex-shrink-0" />
+                          )}
+                          <span className="small flex-grow-1 text-truncate">
+                            {doc.name || docName(doc.path)}
+                          </span>
+                          {doc.path && (
+                            <a
+                              href={`${process.env.NEXT_PUBLIC_API_URL}/api/v1${doc.path}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-link btn-sm p-0 text-muted"
+                              title="View"
+                            >
+                              <Eye size={14} />
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm p-0 text-danger"
+                            onClick={() => removeDoc(doc.id)}
+                            title="Remove"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <label className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1">
+                    <Paperclip size={14} />
+                    {uploadFile.isPending ? 'Uploading…' : 'Upload Document'}
+                    <input
+                      type="file"
+                      className="d-none"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={handleDocUpload}
+                      disabled={uploadFile.isPending}
+                    />
+                  </label>
+                </div>
+
+                <hr className="my-3" />
+
+                {/* ── Section 4: Portal Access ── */}
+                <div className="mb-4">
+                  <h6 className="text-muted text-uppercase fw-bold small mb-3 d-flex align-items-center gap-2">
+                    <span
+                      className="badge rounded-circle bg-info d-flex align-items-center justify-content-center"
+                      style={{ width: 22, height: 22, fontSize: 11 }}
+                    >
+                      <ShieldCheck size={10} />
+                    </span>
+                    Portal Access
+                  </h6>
+
+                  {!isEdit ? (
+                    <>
+                      <label className="form-label fw-medium">Portal Role</label>
+                      <p className="text-muted small mb-2">
+                        Controls which dashboard this staff member logs into. A teacher can later be
+                        promoted to Section Head from their profile.
+                      </p>
+                      <div className="row g-2">
+                        {PORTAL_ROLES.map(({ value, label, description }) => (
+                          <div key={value} className="col-md-6">
+                            <div
+                              className={`border rounded p-2 ${
+                                watch('systemRoleId') === value
+                                  ? 'border-primary bg-primary bg-opacity-10'
+                                  : 'border-light'
+                              }`}
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => setValue('systemRoleId', value, { shouldValidate: true })}
+                            >
+                              <div className="form-check mb-0">
+                                <input
+                                  type="radio"
+                                  className="form-check-input"
+                                  id={`portal-role-${value}`}
+                                  checked={watch('systemRoleId') === value}
+                                  onChange={() => setValue('systemRoleId', value, { shouldValidate: true })}
+                                />
+                                <label
+                                  className="form-check-label small fw-semibold"
+                                  htmlFor={`portal-role-${value}`}
+                                >
+                                  {label}
+                                </label>
+                              </div>
+                              <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                {description}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <label className="form-label fw-medium">Current Portal Role</label>
+                      {systemRole?.hasAccount === false ? (
+                        <div className="alert alert-warning py-2 small mb-2">
+                          No login account is linked to this staff member yet.
+                        </div>
+                      ) : (
+                        <>
+                          {roleChangeError && (
+                            <div className="alert alert-danger py-2 small mb-2">{roleChangeError}</div>
+                          )}
+                          {roleChangeSuccess && (
+                            <div className="alert alert-success py-2 small mb-2">
+                              Portal role updated successfully.
+                            </div>
+                          )}
+                          <div className="d-flex align-items-center gap-2 flex-wrap">
+                            <span className="badge bg-primary-subtle text-primary px-3 py-2">
+                              {systemRole?.roleId
+                                ? (PORTAL_ROLE_LABELS[systemRole.roleId as PortalRoleId] ?? 'Unknown')
+                                : 'Loading…'}
+                            </span>
+                            <select
+                              className="form-select form-select-sm"
+                              style={{ maxWidth: 180 }}
+                              value={pendingRoleId ?? ''}
+                              onChange={(e) => setPendingRoleId(Number(e.target.value) as PortalRoleId)}
+                            >
+                              {PORTAL_ROLES.map(({ value, label }) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="btn btn-outline-primary btn-sm"
+                              onClick={handleChangeRole}
+                              disabled={
+                                changeRoleMutation.isPending ||
+                                !pendingRoleId ||
+                                pendingRoleId === systemRole?.roleId
+                              }
+                            >
+                              {changeRoleMutation.isPending ? 'Updating…' : 'Update Role'}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <hr className="my-3" />
+
+                {/* ── Section 5: Account Password ── */}
+                <div>
+                  <h6 className="text-muted text-uppercase fw-bold small mb-3 d-flex align-items-center gap-2">
+                    <span
+                      className="badge rounded-circle bg-secondary d-flex align-items-center justify-content-center"
+                      style={{ width: 22, height: 22, fontSize: 11 }}
+                    >
+                      <Lock size={10} />
+                    </span>
+                    {isEdit ? 'Reset Account Password' : 'Set Initial Password'}
+                  </h6>
+                  <p className="text-muted small mb-3">
+                    {isEdit
+                      ? 'Set a new password for this staff member\'s login account. Leave blank to keep the current password.'
+                      : 'Optionally set an initial login password. You can also set it later from the staff profile page.'}
+                  </p>
+
+                  {passwordError && (
+                    <div className="alert alert-danger py-2 small mb-2">{passwordError}</div>
+                  )}
+                  {passwordSuccess && (
+                    <div className="alert alert-success py-2 small mb-2">Password updated successfully.</div>
+                  )}
+
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <label className="form-label fw-medium">New Password</label>
+                      <input
+                        type="password"
+                        className="form-control"
+                        placeholder="Min. 6 characters"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-medium">Confirm Password</label>
+                      <input
+                        type="password"
+                        className="form-control"
+                        placeholder="Re-enter password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </div>
+
+                  {/* In edit mode, password is saved via a separate action */}
+                  {isEdit && (
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm mt-3"
+                      onClick={handleSetPassword}
+                      disabled={setPasswordMutation.isPending || !newPassword}
+                    >
+                      {setPasswordMutation.isPending ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-1" role="status" />
+                          Setting…
+                        </>
+                      ) : (
+                        'Set Password'
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -389,7 +761,7 @@ export function StaffFormModal({ staff, onClose, onSuccess }: Props) {
                 <button
                   type="submit"
                   className="btn btn-primary px-4"
-                  disabled={isPending || isSubmitting}
+                  disabled={isPending || isSubmitting || uploadFile.isPending}
                 >
                   {isPending ? (
                     <>

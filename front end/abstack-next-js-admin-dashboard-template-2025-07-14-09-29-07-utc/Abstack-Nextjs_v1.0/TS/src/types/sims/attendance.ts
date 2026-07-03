@@ -1,4 +1,4 @@
-export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused' | 'holiday'
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused' | 'medical'
 
 export interface AttendanceRecord {
   id: string
@@ -25,4 +25,39 @@ export interface AttendanceSummary {
   late: number
   excused: number
   percentage: number
+}
+
+export interface StudentReportRow {
+  studentId: string
+  studentName: string
+  admissionNumber: string
+  present: number
+  absent: number
+  late: number
+  excused: number
+  medical: number
+  total: number
+  attendanceRate: number
+}
+
+export interface AttendanceReportSummary {
+  present: number
+  absent: number
+  late: number
+  excused: number
+  medical: number
+  total: number
+  attendanceRate: number
+}
+
+export interface AttendanceReport {
+  filters: {
+    classSectionId?: number
+    studentId?: string
+    startDate: string
+    endDate: string
+  }
+  summary: AttendanceReportSummary
+  rows: StudentReportRow[]
+  generatedAt: string
 }

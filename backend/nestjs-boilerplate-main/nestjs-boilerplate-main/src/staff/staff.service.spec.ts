@@ -8,6 +8,7 @@ import { StaffFunctionalRole, StaffRoleAssignmentEntity } from './entities/staff
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { QueryStaffDto } from './dto/query-staff.dto';
+import { UsersService } from '../users/users.service';
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
@@ -73,6 +74,14 @@ const makeMockDataSource = (transactionImpl: (manager: any) => Promise<any>) => 
   transaction: jest.fn().mockImplementation(transactionImpl),
 });
 
+// ─── UsersService mock (staff registration auto-provisions a login) ──────────
+
+const usersServiceMock = {
+  findByEmail: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
+};
+
 // ─── Suite ────────────────────────────────────────────────────────────────────
 
 describe('StaffService', () => {
@@ -89,6 +98,7 @@ describe('StaffService', () => {
         { provide: getRepositoryToken(StaffRoleAssignmentEntity), useValue: repoMock<StaffRoleAssignmentEntity>() },
         { provide: getRepositoryToken(FileEntity), useValue: repoMock<FileEntity>() },
         { provide: DataSource, useValue: makeMockDataSource(transactionImpl) },
+        { provide: UsersService, useValue: usersServiceMock },
       ],
     }).compile();
 
@@ -111,6 +121,9 @@ describe('StaffService', () => {
     jest.clearAllMocks();
     // Reset findOne to return null by default
     mockManager.findOne.mockResolvedValue(makeStaff());
+    // No pre-existing login by default — create() will auto-provision one
+    usersServiceMock.findByEmail.mockResolvedValue(null);
+    usersServiceMock.create.mockResolvedValue({ id: 'user-uuid-001' });
   });
 
   // ─── Employee number generation ─────────────────────────────────────────────
@@ -231,6 +244,78 @@ describe('StaffService', () => {
       // delete old roles + save new batch
       expect(mockManager.delete).toHaveBeenCalledWith(StaffRoleAssignmentEntity, { staffId: STAFF_ID });
       expect(mockManager.save).toHaveBeenCalledTimes(2); // 1 for staff, 1 for roles
+    });
+  });
+
+  // ─── create — portal account provisioning ──────────────────────────────────
+
+  describe('create — portal account provisioning', () => {
+    beforeEach(async () => {
+      await buildModule();
+      staffRepo.findOne
+        .mockResolvedValueOnce(null) // email check
+        .mockResolvedValueOnce(null); // nic check
+    });
+
+    it('provisions a teacher login by default with the NIC as password', async () => {
+      await service.create(baseCreateDto);
+
+      expect(usersServiceMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: baseCreateDto.email,
+          password: baseCreateDto.nicNumber,
+          role: { id: 5 }, // RoleEnum.teacher
+        }),
+      );
+    });
+
+    it('provisions a section_head login when systemRoleId is given', async () => {
+      await service.create({ ...baseCreateDto, systemRoleId: 4 });
+
+      expect(usersServiceMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ role: { id: 4 } }), // RoleEnum.section_head
+      );
+    });
+
+    it('uses the provided initialPassword instead of the NIC', async () => {
+      await service.create({ ...baseCreateDto, initialPassword: 'Welcome@123' });
+
+      expect(usersServiceMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ password: 'Welcome@123' }),
+      );
+    });
+
+    it('does not create a duplicate login when one already exists for the email', async () => {
+      usersServiceMock.findByEmail.mockResolvedValue({ id: 'existing-user' });
+
+      await service.create(baseCreateDto);
+
+      expect(usersServiceMock.create).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── changeSystemRole — promote/demote portal access ───────────────────────
+
+  describe('changeSystemRole', () => {
+    beforeEach(async () => {
+      await buildModule();
+    });
+
+    it('throws 404 when no user account is linked to the staff email', async () => {
+      staffRepo.findOne.mockResolvedValue(makeStaff());
+      usersServiceMock.findByEmail.mockResolvedValue(null);
+
+      await expect(service.changeSystemRole(STAFF_ID, 4)).rejects.toThrow(NotFoundException);
+      expect(usersServiceMock.update).not.toHaveBeenCalled();
+    });
+
+    it('updates the linked user account to the new role', async () => {
+      staffRepo.findOne.mockResolvedValue(makeStaff());
+      usersServiceMock.findByEmail.mockResolvedValue({ id: 'user-uuid-001' });
+
+      await service.changeSystemRole(STAFF_ID, 4); // promote to section_head
+
+      expect(usersServiceMock.update).toHaveBeenCalledWith('user-uuid-001', { role: { id: 4 } });
     });
   });
 
