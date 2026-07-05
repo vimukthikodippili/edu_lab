@@ -319,6 +319,25 @@ export class BiometricService {
         )
         .catch(() => undefined);
 
+      // FR-GS-10 — notify each student's OTHER guardians (parents at home)
+      const releasedAtStr = verifiedAt.toLocaleString('en-LK', { hour: '2-digit', minute: '2-digit' });
+      for (const student of students) {
+        const allSg = await this.sgRepo.find({ where: { studentId: student.id } });
+        for (const sg of allSg) {
+          if (sg.guardianId === guardianId) continue;
+          void this.notificationService
+            .createForGuardian(
+              sg.guardianId,
+              'Child Release Notification',
+              `Your child ${student.firstName} ${student.lastName} has been released to ` +
+                `${guardian.firstName} ${guardian.lastName} at ${releasedAtStr}.`,
+              'release_notification',
+              { studentId: student.id, releasingGuardianId: guardianId, verificationMethod: 'biometric' },
+            )
+            .catch(() => undefined);
+        }
+      }
+
       // 8. Log release event
       const studentIds = JSON.stringify(students.map((s) => s.id));
       await this.releaseLogRepo.save(
@@ -435,6 +454,25 @@ export class BiometricService {
         'release_confirmation',
       )
       .catch(() => undefined);
+
+    // FR-GS-10 — notify each student's OTHER guardians (parents at home)
+    const releasedAtStr = overriddenAt.toLocaleString('en-LK', { hour: '2-digit', minute: '2-digit' });
+    for (const student of students) {
+      const allSg = await this.sgRepo.find({ where: { studentId: student.id } });
+      for (const sg of allSg) {
+        if (sg.guardianId === guardianId) continue;
+        void this.notificationService
+          .createForGuardian(
+            sg.guardianId,
+            'Child Release Notification',
+            `Your child ${student.firstName} ${student.lastName} has been released to ` +
+              `${guardian.firstName} ${guardian.lastName} at ${releasedAtStr}.`,
+            'release_notification',
+            { studentId: student.id, releasingGuardianId: guardianId, verificationMethod: 'manual_override' },
+          )
+          .catch(() => undefined);
+      }
+    }
 
     const studentIds = JSON.stringify(students.map((s) => s.id));
     const saved = await this.releaseLogRepo.save(

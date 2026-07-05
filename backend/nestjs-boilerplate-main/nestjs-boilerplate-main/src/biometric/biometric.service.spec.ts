@@ -23,6 +23,7 @@ import { StaffService } from '../staff/staff.service';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const GUARDIAN_ID = 'guardian-uuid-001';
+const OTHER_GUARDIAN_ID = 'guardian-uuid-002';
 const STAFF_ID = 'staff-uuid-001';
 const CONSENT_ID = 'consent-uuid-001';
 const STUDENT_ID = 'student-uuid-001';
@@ -460,5 +461,83 @@ describe('BiometricService', () => {
 
     expect(releaseLogRepo.save).not.toHaveBeenCalled();
     expect(auditService.log).not.toHaveBeenCalled();
+  });
+
+  // ── Test 14: verify — biometric match dispatches parent notifications ──────────
+
+  it('should notify linked parent guardians (excluding releasing guardian) on biometric match', async () => {
+    guardianRepo.findOne.mockResolvedValue(makeGuardian());
+    vaultRepo.findOne.mockResolvedValue(makeVault());
+    cryptoService.decrypt.mockReturnValue('STORED_TEMPLATE');
+    cryptoService.compare.mockReturnValue(95.0);
+
+    // First sgRepo.find: students for the releasing guardian
+    // Second sgRepo.find: all guardian links for that student
+    sgRepo.find
+      .mockResolvedValueOnce([{ guardianId: GUARDIAN_ID, student: makeStudent() }])
+      .mockResolvedValueOnce([
+        { guardianId: GUARDIAN_ID },         // releasing guardian — must be skipped
+        { guardianId: OTHER_GUARDIAN_ID },   // other guardian — must receive notification
+      ]);
+
+    timetableEntryRepo.find.mockResolvedValue([]);
+    releaseLogRepo.save.mockResolvedValue({});
+
+    await service.verify(GUARDIAN_ID, { scanTemplate: 'LIVE', templateType: 'fingerprint' });
+
+    // Must NOT dispatch release_notification to the releasing guardian
+    expect(notificationService.createForGuardian).not.toHaveBeenCalledWith(
+      GUARDIAN_ID,
+      'Child Release Notification',
+      expect.any(String),
+      'release_notification',
+      expect.any(Object),
+    );
+
+    // MUST notify the other guardian with student name + releasing guardian name
+    expect(notificationService.createForGuardian).toHaveBeenCalledWith(
+      OTHER_GUARDIAN_ID,
+      'Child Release Notification',
+      expect.stringContaining('Saman Silva'),
+      'release_notification',
+      expect.objectContaining({ verificationMethod: 'biometric' }),
+    );
+    expect(notificationService.createForGuardian).toHaveBeenCalledWith(
+      OTHER_GUARDIAN_ID,
+      'Child Release Notification',
+      expect.stringContaining('Kumari Silva'),
+      'release_notification',
+      expect.any(Object),
+    );
+  });
+
+  // ── Test 15: manualOverride — dispatches parent notifications ─────────────────
+
+  it('should notify linked parent guardians on manual override release', async () => {
+    guardianRepo.findOne.mockResolvedValue(makeGuardian());
+
+    sgRepo.find
+      .mockResolvedValueOnce([{ guardianId: GUARDIAN_ID, student: makeStudent() }])
+      .mockResolvedValueOnce([
+        { guardianId: GUARDIAN_ID },
+        { guardianId: OTHER_GUARDIAN_ID },
+      ]);
+
+    timetableEntryRepo.find.mockResolvedValue([]);
+    releaseLogRepo.save.mockResolvedValue({ id: 'log-override-uuid', verificationMethod: 'manual_override', result: 'match', confidence: 0 });
+
+    await service.manualOverride(
+      GUARDIAN_ID,
+      { reason: 'hardware failure', secondaryIdNumber: 'NIC-99999' },
+      STAFF_ID,
+    );
+
+    expect(notificationService.createForGuardian).toHaveBeenCalledWith(
+      OTHER_GUARDIAN_ID,
+      'Child Release Notification',
+      expect.stringContaining('Saman Silva'),
+      'release_notification',
+      expect.objectContaining({ verificationMethod: 'manual_override' }),
+    );
   });
 });
