@@ -7,8 +7,10 @@ import { GuardianEntity } from '../students/entities/guardian.entity';
 import { StudentGuardianEntity } from '../students/entities/student-guardian.entity';
 import { TimetableEntryEntity } from '../timetable/entities/timetable-entry.entity';
 import { UserEntity } from '../users/infrastructure/persistence/relational/entities/user.entity';
+import { StudentEntity } from '../students/entities/student.entity';
 import { BiometricCryptoService } from './biometric-crypto.service';
 import { BiometricService } from './biometric.service';
+import { BiometricReportService } from './biometric-report.service';
 import { BiometricController } from './biometric.controller';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationModule } from '../notification/notification.module';
@@ -25,13 +27,14 @@ import { StaffModule } from '../staff/staff.module';
       StudentGuardianEntity,
       TimetableEntryEntity,
       UserEntity,
+      StudentEntity,
     ]),
     AuditModule,
     NotificationModule,
     UsersModule,
     StaffModule,
   ],
-  providers: [BiometricService, BiometricCryptoService],
+  providers: [BiometricService, BiometricCryptoService, BiometricReportService],
   controllers: [BiometricController],
   exports: [BiometricService],
 })

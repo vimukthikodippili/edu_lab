@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { TimetableEntryEntity } from './entities/timetable-entry.entity';
+import { TimetableEntryEntity, TimetableEntryStatus } from './entities/timetable-entry.entity';
 import { TimetableRecordEntity } from './entities/timetable-record.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
@@ -35,6 +35,17 @@ export interface GenerationResult {
   conflictsCount: number;
   durationMs: number;
   conflicts: ConflictRecord[];
+}
+
+export interface RoomConflictWarning {
+  day: number;
+  period: number;
+  roomNumber: string;
+  conflictingEntry: {
+    classSection: { id: number; name: string };
+    subject: { id: string; name: string };
+    teacher: { id: string; name: string };
+  };
 }
 
 // ─── Internal algorithm types ─────────────────────────────────────────────────
@@ -241,7 +252,10 @@ export class TimetableService {
     return record ?? { academicYear, isLocked: false, finalizedAt: null };
   }
 
-  async updateEntry(id: number, dto: UpdateTimetableEntryDto): Promise<TimetableEntryEntity> {
+  async updateEntry(
+    id: number,
+    dto: UpdateTimetableEntryDto,
+  ): Promise<TimetableEntryEntity & { roomConflict: RoomConflictWarning | null }> {
     const entry = await this.entryRepo.findOne({ where: { id } });
     if (!entry) {
       throw new NotFoundException(`Timetable entry with id ${id} not found.`);
@@ -281,11 +295,40 @@ export class TimetableService {
 
     entry.day = newDay;
     entry.period = newPeriod;
+
+    // Room conflicts are a soft constraint: logged, never blocking the save.
+    let roomConflict: RoomConflictWarning | null = null;
     if (dto.roomNumber !== undefined) {
       entry.roomNumber = dto.roomNumber ?? null;
+
+      if (entry.roomNumber) {
+        const roomClash = await this.entryRepo.findOne({
+          where: {
+            academicYear: entry.academicYear,
+            day: newDay,
+            period: newPeriod,
+            roomNumber: entry.roomNumber,
+          },
+        });
+        if (roomClash && roomClash.id !== id) {
+          roomConflict = {
+            day: newDay,
+            period: newPeriod,
+            roomNumber: entry.roomNumber,
+            conflictingEntry: {
+              classSection: { id: roomClash.classSection.id, name: roomClash.classSection.name },
+              subject: { id: roomClash.subject.id, name: roomClash.subject.name },
+              teacher: { id: roomClash.teacher.id, name: `${roomClash.teacher.firstName} ${roomClash.teacher.lastName}` },
+            },
+          };
+        }
+      }
     }
 
-    return this.entryRepo.save(entry);
+    entry.status = TimetableEntryStatus.CONFIRMED;
+
+    const saved = await this.entryRepo.save(entry);
+    return Object.assign(saved, { roomConflict });
   }
 
   async deleteEntry(id: number): Promise<void> {
@@ -400,6 +443,7 @@ export class TimetableService {
           teacherId: req.teacherId,
           subjectId: req.subjectId,
           roomNumber: null,
+          status: TimetableEntryStatus.DRAFT,
         });
       }
     }

@@ -25,6 +25,11 @@ import {
   BookCheck,
   AlertTriangle,
   Repeat2,
+  NotebookPen,
+  CalendarClock,
+  CalendarCheck,
+  LineChart,
+  Activity,
 } from 'lucide-react'
 
 export const MENU_ITEMS: MenuItemType[] = [
@@ -219,6 +224,20 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/principal/emergency-alert',
     allowedRoles: [ROLES.PRINCIPAL],
   },
+  {
+    key: 'principal-security-audit',
+    label: 'Release Audit Log',
+    icon: ClipboardList,
+    url: '/principal/security-audit',
+    allowedRoles: [ROLES.PRINCIPAL, ROLES.SYSTEM_ADMIN],
+  },
+  {
+    key: 'principal-teacher-performance',
+    label: 'Teacher Performance',
+    icon: Activity,
+    url: '/principal/teacher-performance',
+    allowedRoles: [ROLES.PRINCIPAL, ROLES.SECTION_HEAD],
+  },
 
   // ─── Section Head ─────────────────────────────────────────────────────────
 
@@ -240,6 +259,20 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'My Students',
     icon: GraduationCap,
     url: '/admin/students',
+    allowedRoles: [ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'sectionhead-syllabus-progress',
+    label: 'Syllabus Progress',
+    icon: BarChart2,
+    url: '/section-head/syllabus-progress',
+    allowedRoles: [ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'sectionhead-month-end-summary',
+    label: 'Month-End Summary',
+    icon: CalendarCheck,
+    url: '/section-head/month-end-summary',
     allowedRoles: [ROLES.SECTION_HEAD],
   },
   {
@@ -295,11 +328,53 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.TEACHER],
   },
   {
+    key: 'teacher-grade-trends',
+    label: 'Grade Trends',
+    icon: LineChart,
+    url: '/teacher/grade-trends',
+    allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'teacher-performance',
+    label: 'My Performance',
+    icon: Activity,
+    url: '/teacher/performance',
+    allowedRoles: [ROLES.TEACHER],
+  },
+  {
     key: 'teacher-timetable',
     label: 'Timetable',
     icon: Calendar,
     url: '/teacher/timetable',
     allowedRoles: [ROLES.TEACHER],
+  },
+  {
+    key: 'teacher-syllabus-units',
+    label: 'Syllabus Units',
+    icon: BookOpen,
+    url: '/teacher/syllabus/units',
+    allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'teacher-lesson-plan',
+    label: 'Annual Lesson Plan',
+    icon: CalendarDays,
+    url: '/teacher/syllabus/lesson-plan',
+    allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'teacher-monthly-plan',
+    label: 'Monthly Plan',
+    icon: CalendarClock,
+    url: '/teacher/syllabus/monthly-plan',
+    allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'teacher-class-diary',
+    label: 'Class Diary',
+    icon: NotebookPen,
+    url: '/teacher/class-diary',
+    allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
   },
   {
     key: 'teacher-leave',
@@ -468,6 +543,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'Gate Terminal',
     icon: ShieldAlert,
     url: '/security/gate-terminal',
+    allowedRoles: [ROLES.SECURITY_OFFICER, ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+  },
+  {
+    key: 'security-incidents',
+    label: 'Security Incidents',
+    icon: AlertTriangle,
+    url: '/security/incidents',
     allowedRoles: [ROLES.SECURITY_OFFICER, ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
   },
   {

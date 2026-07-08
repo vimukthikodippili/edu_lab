@@ -43,6 +43,16 @@ import { AuditModule } from './audit/audit.module';
 import { LeaveModule } from './leave/leave.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { BiometricModule } from './biometric/biometric.module';
+import { SyllabusModule } from './syllabus/syllabus.module';
+import { LessonPlanModule } from './lesson-plan/lesson-plan.module';
+import lessonPlanConfig from './lesson-plan/config/lesson-plan.config';
+import { ClassDiaryModule } from './class-diary/class-diary.module';
+import { TeacherTasksModule } from './teacher-tasks/teacher-tasks.module';
+import freePeriodConfig from './teacher-tasks/config/free-period.config';
+import gradeTrendConfig from './grades/config/grade-trend.config';
+import { TeacherPerformanceModule } from './teacher-performance/teacher-performance.module';
+import teacherPerformanceConfig from './teacher-performance/config/teacher-performance.config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MongooseConfigService } from './database/mongoose-config.service';
 import { DatabaseConfig } from './database/config/database-config.type';
@@ -74,6 +84,10 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
         facebookConfig,
         googleConfig,
         appleConfig,
+        lessonPlanConfig,
+        freePeriodConfig,
+        gradeTrendConfig,
+        teacherPerformanceConfig,
       ],
       envFilePath: ['.env'],
     }),
@@ -119,6 +133,7 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     TimetableModule,
     StaffModule,
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     NotificationModule,
     AttendanceModule,
     GradesModule,
@@ -130,6 +145,11 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     LeaveModule,
     ExpensesModule,
     BiometricModule,
+    SyllabusModule,
+    LessonPlanModule,
+    ClassDiaryModule,
+    TeacherTasksModule,
+    TeacherPerformanceModule,
   ],
 })
 export class AppModule {}

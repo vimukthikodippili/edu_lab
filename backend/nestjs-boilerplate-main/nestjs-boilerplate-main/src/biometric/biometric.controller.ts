@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Request,
   UnprocessableEntityException,
   UseGuards,
@@ -20,9 +21,11 @@ import { RolesGuard } from '../roles/roles.guard';
 import { UsersService } from '../users/users.service';
 import { StaffService } from '../staff/staff.service';
 import { BiometricService } from './biometric.service';
+import { BiometricReportService } from './biometric-report.service';
 import { EnrollBiometricDto } from './dto/enroll-biometric.dto';
 import { ManualOverrideBiometricDto } from './dto/manual-override-biometric.dto';
 import { VerifyBiometricDto } from './dto/verify-biometric.dto';
+import { ReleaseLogQueryDto } from './dto/release-log-query.dto';
 
 @ApiTags('Biometric')
 @ApiBearerAuth()
@@ -31,6 +34,7 @@ import { VerifyBiometricDto } from './dto/verify-biometric.dto';
 export class BiometricController {
   constructor(
     private readonly biometricService: BiometricService,
+    private readonly reportService: BiometricReportService,
     private readonly usersService: UsersService,
     private readonly staffService: StaffService,
   ) {}
@@ -111,5 +115,31 @@ export class BiometricController {
   ) {
     const staffId = await this.resolveStaffId(req.user.id);
     return this.biometricService.manualOverride(guardianId, dto, staffId);
+  }
+
+  // ── Release log — read-only (append-only: no PATCH/PUT/DELETE routes exist) ─
+
+  @Get('release-log/summary')
+  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Daily summary of all release events (FR-GS-12 / FR-PR-13)' })
+  async getDailySummary(@Query('date') date?: string) {
+    return this.reportService.getDailySummary(date);
+  }
+
+  @Get('release-log/incidents')
+  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.security_officer)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Security incidents: failed verifications and manual overrides' })
+  async getIncidents(@Query() query: ReleaseLogQueryDto) {
+    return this.reportService.getIncidents(query);
+  }
+
+  @Get('release-log')
+  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.security_officer)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Paginated full audit log of all release events' })
+  async getReleaseLog(@Query() query: ReleaseLogQueryDto) {
+    return this.reportService.getReleaseLog(query);
   }
 }

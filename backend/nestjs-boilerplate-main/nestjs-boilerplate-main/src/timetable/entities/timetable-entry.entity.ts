@@ -11,6 +11,11 @@ import { ClassSectionEntity } from '../../students/entities/class-section.entity
 import { StaffEntity } from '../../staff/entities/staff.entity';
 import { SubjectEntity } from '../../subjects/entities/subject.entity';
 
+export enum TimetableEntryStatus {
+  DRAFT = 'draft',
+  CONFIRMED = 'confirmed',
+}
+
 @Entity({ name: 'timetable_entry' })
 export class TimetableEntryEntity extends EntityRelationalHelper {
   @PrimaryGeneratedColumn()
@@ -36,6 +41,9 @@ export class TimetableEntryEntity extends EntityRelationalHelper {
 
   @Column({ type: 'varchar', length: 20, nullable: true })
   roomNumber: string | null;
+
+  @Column({ type: 'enum', enum: TimetableEntryStatus, default: TimetableEntryStatus.CONFIRMED })
+  status: TimetableEntryStatus;
 
   @CreateDateColumn({ type: 'timestamp with time zone' })
   generatedAt: Date;

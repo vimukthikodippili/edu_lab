@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AttendanceRecordEntity } from './entities/attendance-record.entity';
 import { SchoolHolidayEntity } from './entities/school-holiday.entity';
+import { StaffAttendanceEntity } from './entities/staff-attendance.entity';
 import { StudentEntity } from '../students/entities/student.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
@@ -17,6 +18,7 @@ import { AttendanceController } from './attendance.controller';
     TypeOrmModule.forFeature([
       AttendanceRecordEntity,
       SchoolHolidayEntity,
+      StaffAttendanceEntity,
       StudentEntity,
       ClassSectionEntity,
       TeacherSubjectClassRequirementEntity,

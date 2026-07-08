@@ -51,6 +51,7 @@ export interface Assessment {
   sectionHeadOverride: boolean
   overrideApprovedById: string | null
   subject: { id: string; name: string; code: string }
+  classSection: { id: number; name: string }
   term: AcademicTerm
   createdAt: string
   updatedAt: string
@@ -140,4 +141,28 @@ export interface PublishResultsSummary {
   publishedCount: number
   skippedIncompleteCount: number
   alreadyPublishedCount: number
+}
+
+export interface ScorePoint {
+  assessmentId: string
+  assessmentTitle: string
+  scheduledDate: string
+  percentScore: number
+}
+
+export interface AttendanceGradeFlag {
+  description: string
+  flaggedAt: string
+}
+
+export interface GradeTrendStudentRow {
+  studentId: string
+  firstName: string
+  lastName: string
+  admissionNumber: string
+  decliningTrend: boolean
+  lastComputedAt: string | null
+  series: ScorePoint[]
+  attendanceGradeFlag: AttendanceGradeFlag | null
+  effortOutcomeMismatchFlag: AttendanceGradeFlag | null
 }

@@ -7,7 +7,10 @@ import { MarkEntity } from './entities/mark.entity';
 import { GradingBandEntity } from './entities/grading-band.entity';
 import { SubjectResultEntity } from './entities/subject-result.entity';
 import { TermResultEntity } from './entities/term-result.entity';
+import { StudentGradeTrendEntity } from './entities/student-grade-trend.entity';
+import { AcademicPatternFlagEntity } from './entities/academic-pattern-flag.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
+import { AttendanceRecordEntity } from '../attendance/entities/attendance-record.entity';
 import { StaffEntity } from '../staff/entities/staff.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { StudentEntity } from '../students/entities/student.entity';
@@ -23,6 +26,7 @@ import { ResultComputationService } from './services/result-computation.service'
 import { ResultsQueryService } from './services/results-query.service';
 import { ResultPublishingService } from './services/result-publishing.service';
 import { ReportCardPdfService } from './services/report-card-pdf.service';
+import { GradeTrendService } from './services/grade-trend.service';
 import { ResultComputationListener } from './listeners/result-computation.listener';
 import { ReportCardGenerationListener } from './listeners/report-card-generation.listener';
 import { AcademicTermsController } from './controllers/academic-terms.controller';
@@ -31,8 +35,10 @@ import { AssessmentController } from './controllers/assessment.controller';
 import { MarkController } from './controllers/mark.controller';
 import { GradingBandController } from './controllers/grading-band.controller';
 import { ResultsController } from './controllers/results.controller';
+import { GradeTrendController } from './controllers/grade-trend.controller';
 import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -50,10 +56,14 @@ import { StaffModule } from '../staff/staff.module';
       GradingBandEntity,
       SubjectResultEntity,
       TermResultEntity,
+      StudentGradeTrendEntity,
+      AcademicPatternFlagEntity,
+      AttendanceRecordEntity,
       FileEntity,
     ]),
     UsersModule,
     StaffModule,
+    NotificationModule,
   ],
   providers: [
     AcademicTermsService,
@@ -65,6 +75,7 @@ import { StaffModule } from '../staff/staff.module';
     ResultsQueryService,
     ResultPublishingService,
     ReportCardPdfService,
+    GradeTrendService,
     ResultComputationListener,
     ReportCardGenerationListener,
   ],
@@ -75,6 +86,7 @@ import { StaffModule } from '../staff/staff.module';
     MarkController,
     GradingBandController,
     ResultsController,
+    GradeTrendController,
   ],
   exports: [
     AcademicTermsService,

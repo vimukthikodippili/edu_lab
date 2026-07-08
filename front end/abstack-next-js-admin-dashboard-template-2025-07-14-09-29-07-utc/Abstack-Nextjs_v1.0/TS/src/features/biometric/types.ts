@@ -29,3 +29,33 @@ export interface OverrideResult {
   secondaryIdNumber: string
   students: VerifyStudent[]
 }
+
+export interface ReleaseLogEntry {
+  id: string
+  guardianId: string
+  guardianName: string
+  studentSummary: string
+  result: 'match' | 'no_match' | 'blacklisted'
+  confidence: number
+  verificationMethod: 'biometric' | 'manual_override'
+  templateType: string
+  teachersNotified: number
+  verifiedAt: string
+}
+
+export interface DailySummary {
+  date: string
+  totalEvents: number
+  successful: number
+  failed: number
+  blacklisted: number
+  manualOverrides: number
+  events: ReleaseLogEntry[]
+}
+
+export interface PaginatedReleaseLog {
+  data: ReleaseLogEntry[]
+  total: number
+  page: number
+  limit: number
+}
