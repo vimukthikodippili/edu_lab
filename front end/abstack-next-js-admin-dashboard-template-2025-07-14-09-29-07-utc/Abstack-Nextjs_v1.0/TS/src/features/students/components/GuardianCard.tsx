@@ -31,7 +31,7 @@ export function GuardianCard({ guardian, isOnlyGuardian, onSetPrimary, onEdit, o
     : 'Remove guardian'
 
   return (
-    <div className={`card border mb-3 ${guardian.isPrimaryContact ? 'border-primary shadow-sm' : ''}`}>
+    <div>
       <div className="card-body py-3">
         <div className="d-flex align-items-start justify-content-between gap-2">
           <div className="flex-grow-1">

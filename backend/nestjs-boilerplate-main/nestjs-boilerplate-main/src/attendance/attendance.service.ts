@@ -1,16 +1,18 @@
 import {
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AttendanceRecordEntity, AttendanceStatus } from './entities/attendance-record.entity';
 import { SchoolHolidayEntity } from './entities/school-holiday.entity';
 import { StudentEntity, StudentStatus } from '../students/entities/student.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
+import { LeaveRequestEntity, LeaveStatus } from '../leave/entities/leave-request.entity';
 import { SchoolCalendarConfigService } from '../school-calendar-config/school-calendar-config.service';
 import { GradeStage } from '../students/entities/grade.entity';
 import { BulkMarkAttendanceDto } from './dto/bulk-mark-attendance.dto';
@@ -43,6 +45,9 @@ export class AttendanceService {
 
     @InjectRepository(TeacherSubjectClassRequirementEntity)
     private readonly requirementRepo: Repository<TeacherSubjectClassRequirementEntity>,
+
+    @InjectRepository(LeaveRequestEntity)
+    private readonly leaveRepo: Repository<LeaveRequestEntity>,
 
     private readonly calendarConfigService: SchoolCalendarConfigService,
 
@@ -98,7 +103,8 @@ export class AttendanceService {
     dto: BulkMarkAttendanceDto,
     teacherId: string,
   ): Promise<AttendanceRecordEntity[]> {
-    await this.validateDate(dto.date, dto.classSectionId, dto.overrideReason);
+    const section = await this.validateDate(dto.date, dto.classSectionId, dto.overrideReason);
+    await this.assertCanMarkAttendance(section, teacherId, dto.date);
 
     const dateObj = new Date(dto.date + 'T00:00:00Z');
 
@@ -144,7 +150,7 @@ export class AttendanceService {
     date: string,
     classSectionId: number,
     overrideReason?: string,
-  ): Promise<void> {
+  ): Promise<ClassSectionEntity> {
     const section = await this.classSectionRepo.findOne({
       where: { id: classSectionId },
     });
@@ -179,5 +185,54 @@ export class AttendanceService {
         `${date} is a ${blockReason}. Provide an overrideReason to proceed.`,
       );
     }
+
+    return section;
+  }
+
+  /**
+   * Once a class section has an assigned class teacher, only that teacher may mark
+   * daily attendance for it — unless the class teacher is on approved leave that day,
+   * in which case any other teacher already assigned to the section may mark it.
+   * Sections with no class teacher assigned keep the original open behavior.
+   */
+  private async assertCanMarkAttendance(
+    section: ClassSectionEntity,
+    teacherId: string,
+    date: string,
+  ): Promise<void> {
+    if (!section.classTeacherStaffId) return;
+    if (section.classTeacherStaffId === teacherId) return;
+
+    const teachesSection = await this.requirementRepo.findOne({
+      where: { teacherId, classSectionId: section.id },
+    });
+    if (!teachesSection) {
+      throw new ForbiddenException(
+        'Only the class teacher may mark attendance for this section.',
+      );
+    }
+
+    const classTeacherAbsent = await this.isStaffOnApprovedLeave(
+      section.classTeacherStaffId,
+      date,
+    );
+    if (!classTeacherAbsent) {
+      throw new ForbiddenException(
+        'Only the class teacher may mark attendance for this section today.',
+      );
+    }
+  }
+
+  private async isStaffOnApprovedLeave(staffId: string, date: string): Promise<boolean> {
+    const dateObj = new Date(date + 'T00:00:00Z');
+    const leave = await this.leaveRepo.findOne({
+      where: {
+        staffId,
+        status: LeaveStatus.APPROVED,
+        startDate: LessThanOrEqual(dateObj as unknown as Date),
+        endDate: MoreThanOrEqual(dateObj as unknown as Date),
+      },
+    });
+    return !!leave;
   }
 }

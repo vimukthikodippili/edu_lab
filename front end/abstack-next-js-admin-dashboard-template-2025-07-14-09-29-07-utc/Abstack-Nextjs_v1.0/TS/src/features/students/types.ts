@@ -42,6 +42,7 @@ export interface Guardian {
   /** Injected by the API via @AfterLoad on StudentEntity — true for exactly one guardian per student */
   isPrimaryContact: boolean
   idProof?: { id: string; path: string } | null
+  userId?: number | null
 }
 
 export interface Student {
@@ -64,6 +65,7 @@ export interface Student {
   photo?: { id: string; path: string } | null
   streamId?: number | null
   stream?: ALStream | null
+  userId?: number | null
   createdAt: string
   updatedAt: string
 }

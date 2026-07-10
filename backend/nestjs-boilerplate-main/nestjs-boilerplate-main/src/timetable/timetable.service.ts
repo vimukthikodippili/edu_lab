@@ -91,6 +91,16 @@ export class TimetableService {
   async generate(dto: GenerateTimetableDto): Promise<GenerationResult> {
     const start = Date.now();
 
+    const existingRecord = await this.recordRepo.findOne({ where: { academicYear: dto.academicYear } });
+    if (existingRecord?.isLocked) {
+      throw new UnprocessableEntityException({
+        status: 422,
+        errors: {
+          academicYear: `Timetable for ${dto.academicYear} is finalized. Unlock before regenerating.`,
+        },
+      });
+    }
+
     // 1. Load class sections for the academic year (optionally filtered by grade)
     const sectionWhere: Record<string, unknown> = { academicYear: dto.academicYear };
     if (dto.gradeId) sectionWhere.gradeId = dto.gradeId;
@@ -220,6 +230,11 @@ export class TimetableService {
     }
     await this.recordRepo.save(record);
 
+    await this.entryRepo.update(
+      { academicYear: dto.academicYear },
+      { status: TimetableEntryStatus.PUBLISHED },
+    );
+
     const teacherRows = await this.entryRepo
       .createQueryBuilder('e')
       .select('DISTINCT e.teacherId', 'teacherId')
@@ -261,13 +276,8 @@ export class TimetableService {
       throw new NotFoundException(`Timetable entry with id ${id} not found.`);
     }
 
-    const lockRecord = await this.recordRepo.findOne({ where: { academicYear: entry.academicYear } });
-    if (lockRecord?.isLocked) {
-      throw new UnprocessableEntityException(
-        `Timetable for ${entry.academicYear} is finalized. Unlock before editing.`,
-      );
-    }
-
+    // isLocked only gates regeneration (see generate()) — manual edits remain allowed
+    // even on a finalized/published timetable.
     const newDay = dto.day ?? entry.day;
     const newPeriod = dto.period ?? entry.period;
 
@@ -336,12 +346,8 @@ export class TimetableService {
     if (!entry) {
       throw new NotFoundException(`Timetable entry with id ${id} not found.`);
     }
-    const lockRecord = await this.recordRepo.findOne({ where: { academicYear: entry.academicYear } });
-    if (lockRecord?.isLocked) {
-      throw new UnprocessableEntityException(
-        `Timetable for ${entry.academicYear} is finalized. Unlock before editing.`,
-      );
-    }
+    // isLocked only gates regeneration (see generate()) — manual edits remain allowed
+    // even on a finalized/published timetable.
     await this.entryRepo.remove(entry);
   }
 

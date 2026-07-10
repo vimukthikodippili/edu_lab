@@ -30,6 +30,7 @@ import {
   CalendarCheck,
   LineChart,
   Activity,
+  Award,
 } from 'lucide-react'
 
 export const MENU_ITEMS: MenuItemType[] = [
@@ -68,6 +69,13 @@ export const MENU_ITEMS: MenuItemType[] = [
         url: '/admin/students/enroll',
         parentKey: 'students',
         allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
+      {
+        key: 'students-promote',
+        label: 'Annual Promotion',
+        url: '/admin/students/promote',
+        parentKey: 'students',
+        allowedRoles: [ROLES.SYSTEM_ADMIN],
       },
     ],
   },
@@ -114,6 +122,14 @@ export const MENU_ITEMS: MenuItemType[] = [
         url: '/admin/academic/timetable-setup',
         parentKey: 'academic-setup',
         allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
+      {
+        key: 'admin-rooms',
+        label: 'Classrooms & QR Codes',
+        url: '/admin/rooms',
+        parentKey: 'academic-setup',
+        allowedRoles: [ROLES.SYSTEM_ADMIN],
+        icon: QrCode,
       },
     ],
   },
@@ -216,6 +232,27 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/principal/approvals',
     allowedRoles: [ROLES.PRINCIPAL],
     isDisabled: false,
+  },
+  {
+    key: 'principal-staff-roles',
+    label: 'Staff Roles',
+    icon: Users,
+    url: '/principal/staff',
+    allowedRoles: [ROLES.PRINCIPAL],
+  },
+  {
+    key: 'principal-wellbeing',
+    label: 'Wellbeing Logs',
+    icon: Heart,
+    url: '/principal/wellbeing',
+    allowedRoles: [ROLES.PRINCIPAL],
+  },
+  {
+    key: 'principal-wellbeing-cases',
+    label: 'Wellbeing Cases',
+    icon: ClipboardList,
+    url: '/principal/wellbeing-cases',
+    allowedRoles: [ROLES.PRINCIPAL],
   },
   {
     key: 'principal-emergency-alert',
@@ -377,6 +414,20 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
   },
   {
+    key: 'teacher-class-teacher',
+    label: 'My Class (Year-End Notes)',
+    icon: Award,
+    url: '/teacher/class-teacher',
+    allowedRoles: [ROLES.TEACHER],
+  },
+  {
+    key: 'teacher-wellbeing',
+    label: 'Wellbeing Observation',
+    icon: Heart,
+    url: '/teacher/wellbeing',
+    allowedRoles: [ROLES.TEACHER],
+  },
+  {
     key: 'teacher-leave',
     label: 'My Leave',
     icon: CalendarDays,
@@ -449,7 +500,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: BarChart2,
     url: '/student/grades',
     allowedRoles: [ROLES.STUDENT],
-    isDisabled: true,
   },
   {
     key: 'student-timetable',
@@ -457,7 +507,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: Calendar,
     url: '/student/timetable',
     allowedRoles: [ROLES.STUDENT],
-    isDisabled: true,
   },
   {
     key: 'student-library',
@@ -512,7 +561,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: Heart,
     url: '/counselor/wellbeing',
     allowedRoles: [ROLES.COUNSELOR],
-    isDisabled: true,
+  },
+  {
+    key: 'counselor-cases',
+    label: 'Cases',
+    icon: ClipboardList,
+    url: '/counselor/cases',
+    allowedRoles: [ROLES.COUNSELOR],
   },
   {
     key: 'counselor-career',
@@ -558,7 +613,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: QrCode,
     url: '/security/scan',
     allowedRoles: [ROLES.SECURITY_OFFICER],
-    isDisabled: true,
   },
 
   // ─── Librarian ────────────────────────────────────────────────────────────

@@ -47,11 +47,17 @@ import { SyllabusModule } from './syllabus/syllabus.module';
 import { LessonPlanModule } from './lesson-plan/lesson-plan.module';
 import lessonPlanConfig from './lesson-plan/config/lesson-plan.config';
 import { ClassDiaryModule } from './class-diary/class-diary.module';
+import { ClassCheckInModule } from './class-check-in/class-check-in.module';
+import { ClassRoomsModule } from './class-rooms/class-rooms.module';
+import { StudentNotesModule } from './student-notes/student-notes.module';
+import { CounselorModule } from './counselor/counselor.module';
+import { MoodCheckInModule } from './mood-check-in/mood-check-in.module';
 import { TeacherTasksModule } from './teacher-tasks/teacher-tasks.module';
 import freePeriodConfig from './teacher-tasks/config/free-period.config';
 import gradeTrendConfig from './grades/config/grade-trend.config';
 import { TeacherPerformanceModule } from './teacher-performance/teacher-performance.module';
 import teacherPerformanceConfig from './teacher-performance/config/teacher-performance.config';
+import wellbeingCaseConfig from './counselor/config/wellbeing-case.config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MongooseConfigService } from './database/mongoose-config.service';
@@ -88,6 +94,7 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
         freePeriodConfig,
         gradeTrendConfig,
         teacherPerformanceConfig,
+        wellbeingCaseConfig,
       ],
       envFilePath: ['.env'],
     }),
@@ -148,6 +155,11 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     SyllabusModule,
     LessonPlanModule,
     ClassDiaryModule,
+    ClassCheckInModule,
+    ClassRoomsModule,
+    StudentNotesModule,
+    CounselorModule,
+    MoodCheckInModule,
     TeacherTasksModule,
     TeacherPerformanceModule,
   ],

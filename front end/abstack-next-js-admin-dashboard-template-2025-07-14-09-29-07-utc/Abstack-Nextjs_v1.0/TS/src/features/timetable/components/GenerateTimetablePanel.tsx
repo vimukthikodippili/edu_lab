@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { Zap, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { useGenerateTimetable } from '../hooks/useGenerateTimetable'
+import { useTimetableRecord } from '../hooks/useTimetableRecord'
 import { ConflictPanel } from './ConflictPanel'
 import type { GenerationResult } from '../types'
 
@@ -14,6 +15,9 @@ export function GenerateTimetablePanel() {
   const [errorMsg, setErrorMsg] = useState('')
 
   const generate = useGenerateTimetable()
+  const trimmedYear = academicYear.trim()
+  const { data: record } = useTimetableRecord(trimmedYear || null)
+  const isFinalized = !!record?.isLocked
 
   const handleGenerate = async () => {
     setErrorMsg('')
@@ -45,6 +49,13 @@ export function GenerateTimetablePanel() {
       <div className="card-body px-4 py-3">
         {errorMsg && (
           <div className="alert alert-danger py-2 small mb-3">{errorMsg}</div>
+        )}
+
+        {isFinalized && (
+          <div className="alert alert-warning py-2 small mb-3 d-flex align-items-center gap-2">
+            <AlertTriangle size={15} className="flex-shrink-0" />
+            This timetable is finalized — unlock it first to regenerate.
+          </div>
         )}
 
         {/* Controls row */}
@@ -82,7 +93,8 @@ export function GenerateTimetablePanel() {
 
           <button
             className="btn btn-sm btn-primary d-flex align-items-center gap-2 mb-1"
-            disabled={generate.isPending || !academicYear.trim()}
+            disabled={generate.isPending || !trimmedYear || isFinalized}
+            title={isFinalized ? 'This timetable is finalized — unlock it first to regenerate.' : undefined}
             onClick={handleGenerate}
           >
             {generate.isPending ? (

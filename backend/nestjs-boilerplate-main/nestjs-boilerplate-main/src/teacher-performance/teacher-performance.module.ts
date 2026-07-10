@@ -7,6 +7,7 @@ import { MarkEntity } from '../grades/entities/mark.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { AnnualLessonPlanEntryEntity } from '../lesson-plan/entities/annual-lesson-plan-entry.entity';
+import { TeacherPerformanceSnapshotEntity } from './entities/teacher-performance-snapshot.entity';
 import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
 import { TeacherPerformanceService } from './teacher-performance.service';
@@ -22,6 +23,7 @@ import { TeacherPerformanceController } from './teacher-performance.controller';
       SubjectEntity,
       ClassSectionEntity,
       AnnualLessonPlanEntryEntity,
+      TeacherPerformanceSnapshotEntity,
     ]),
     UsersModule,
     StaffModule,

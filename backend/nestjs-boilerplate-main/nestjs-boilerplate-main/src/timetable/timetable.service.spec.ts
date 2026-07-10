@@ -4,7 +4,7 @@ import { ConflictException, NotFoundException, UnprocessableEntityException } fr
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TimetableService } from './timetable.service';
-import { TimetableEntryEntity } from './entities/timetable-entry.entity';
+import { TimetableEntryEntity, TimetableEntryStatus } from './entities/timetable-entry.entity';
 import { TimetableRecordEntity } from './entities/timetable-record.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
@@ -21,6 +21,7 @@ const repoMock = <T>() => ({
   find: jest.fn(),
   save: jest.fn(),
   remove: jest.fn(),
+  update: jest.fn().mockResolvedValue({ affected: 0 }),
   create: jest.fn((d: Partial<T>) => d as T),
   createQueryBuilder: jest.fn(),
 });
@@ -274,6 +275,88 @@ describe('TimetableService', () => {
       const calls = entryRepo.createQueryBuilder.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
     });
+
+    it('completes generation for a ~30-class dataset well within 30 seconds (FR-P2-TG-05)', async () => {
+      const sectionCount = 30;
+      const sections = Array.from({ length: sectionCount }, (_, i) => makeSection(i + 1));
+      classSectionRepo.find.mockResolvedValue(sections);
+
+      const requirements = sections.map((s, i) =>
+        makeRequirement({
+          id: i + 1,
+          classSectionId: s.id,
+          teacherId: `teacher-${i + 1}`,
+          periodsPerWeek: 5,
+          teacher: makeStaff(`teacher-${i + 1}`),
+        }),
+      );
+
+      const reqQb = {
+        delete: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 0 }),
+        select: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(requirements),
+      } as unknown as SelectQueryBuilder<TeacherSubjectClassRequirementEntity>;
+
+      entryRepo.createQueryBuilder.mockReturnValue(reqQb as any);
+      requirementRepo.createQueryBuilder.mockReturnValue(reqQb as any);
+
+      calendarSvc.findAll.mockResolvedValue([makeCalendarConfig(5, 8)]);
+      entryRepo.save.mockResolvedValue([] as any);
+
+      const result = await service.generate({ academicYear: '2026' });
+
+      expect(result.entriesCreated).toBe(sectionCount * 5);
+      expect(result.durationMs).toBeLessThan(30000);
+    });
+
+    it('marks every generated entry with status: draft', async () => {
+      const section = makeSection(1);
+      classSectionRepo.find.mockResolvedValue([section]);
+
+      const reqQb = {
+        delete: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 0 }),
+        select: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([makeRequirement({ periodsPerWeek: 3 })]),
+      } as unknown as SelectQueryBuilder<TeacherSubjectClassRequirementEntity>;
+
+      entryRepo.createQueryBuilder.mockReturnValue(reqQb as any);
+      requirementRepo.createQueryBuilder.mockReturnValue(reqQb as any);
+
+      calendarSvc.findAll.mockResolvedValue([makeCalendarConfig(5, 8)]);
+      let savedEntries: Partial<TimetableEntryEntity>[] = [];
+      entryRepo.save.mockImplementation(async (entries: any) => {
+        savedEntries = entries;
+        return entries;
+      });
+
+      await service.generate({ academicYear: '2026' });
+
+      expect(savedEntries.length).toBeGreaterThan(0);
+      expect(savedEntries.every((e) => e.status === TimetableEntryStatus.DRAFT)).toBe(true);
+    });
+
+    it('throws when the timetable for that academic year is already finalized', async () => {
+      recordRepo.findOne.mockResolvedValueOnce({
+        id: 1,
+        academicYear: '2026',
+        isLocked: true,
+        finalizedAt: new Date(),
+        finalizedBy: null,
+      } as TimetableRecordEntity);
+
+      await expect(service.generate({ academicYear: '2026' })).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(classSectionRepo.find).not.toHaveBeenCalled();
+    });
   });
 
   // ─── updateEntry — teacher conflict → 409 ────────────────────────────────
@@ -293,6 +376,95 @@ describe('TimetableService', () => {
       await expect(
         service.updateEntry(1, { day: 2, period: 3 }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('logs a room conflict but still saves when the requested room is already booked at that day+period', async () => {
+      const existingEntry = makeEntry({ id: 1, day: 1, period: 1, roomNumber: null, status: TimetableEntryStatus.CONFIRMED });
+      const roomClash = makeEntry({
+        id: 50,
+        day: 1,
+        period: 1,
+        roomNumber: 'Room 5',
+        classSection: { id: 9, name: 'B' } as any,
+        subject: { id: 'subject-other', name: 'Science' } as any,
+        teacher: { id: 'teacher-other', firstName: 'Nimal', lastName: 'Perera' } as any,
+      });
+
+      entryRepo.findOne
+        .mockResolvedValueOnce(existingEntry) // load entry by id
+        .mockResolvedValueOnce(roomClash);    // room-conflict check (no day/period change, so teacher/class checks are skipped)
+
+      recordRepo.findOne.mockResolvedValueOnce(null); // not locked
+      entryRepo.save.mockImplementation(async (e: any) => e);
+
+      const result = await service.updateEntry(1, { roomNumber: 'Room 5' });
+
+      expect(result.roomConflict).not.toBeNull();
+      expect(result.roomConflict?.conflictingEntry.classSection.name).toBe('B');
+      expect(result.roomConflict?.conflictingEntry.teacher.name).toBe('Nimal Perera');
+      expect(entryRepo.save).toHaveBeenCalled(); // soft constraint — never blocks the save
+    });
+
+    it('returns roomConflict: null when the requested room is free at that day+period', async () => {
+      const existingEntry = makeEntry({ id: 1, day: 1, period: 1, roomNumber: null, status: TimetableEntryStatus.CONFIRMED });
+
+      entryRepo.findOne
+        .mockResolvedValueOnce(existingEntry) // load entry by id
+        .mockResolvedValueOnce(null);         // room-conflict check — nothing found
+
+      recordRepo.findOne.mockResolvedValueOnce(null);
+      entryRepo.save.mockImplementation(async (e: any) => e);
+
+      const result = await service.updateEntry(1, { roomNumber: 'Room 9' });
+
+      expect(result.roomConflict).toBeNull();
+    });
+
+    it('flips a draft entry to confirmed status on any successful manual edit', async () => {
+      const existingEntry = makeEntry({ id: 1, day: 1, period: 1, status: TimetableEntryStatus.DRAFT });
+
+      entryRepo.findOne
+        .mockResolvedValueOnce(existingEntry) // load entry by id
+        .mockResolvedValueOnce(null)          // teacher conflict check (day/period changing)
+        .mockResolvedValueOnce(null);         // class conflict check
+
+      recordRepo.findOne.mockResolvedValueOnce(null);
+      entryRepo.save.mockImplementation(async (e: any) => e);
+
+      const result = await service.updateEntry(1, { day: 2, period: 3 });
+
+      expect(result.status).toBe(TimetableEntryStatus.CONFIRMED);
+      expect(result.roomConflict).toBeNull();
+    });
+
+    it('succeeds without ever checking the timetable lock status — manual edits remain allowed once finalized', async () => {
+      const existingEntry = makeEntry({ id: 1, day: 1, period: 1, status: TimetableEntryStatus.PUBLISHED });
+
+      entryRepo.findOne
+        .mockResolvedValueOnce(existingEntry) // load entry by id
+        .mockResolvedValueOnce(null);         // room-conflict check
+
+      entryRepo.save.mockImplementation(async (e: any) => e);
+
+      const result = await service.updateEntry(1, { roomNumber: 'Room 2' });
+
+      expect(result.roomConflict).toBeNull();
+      expect(recordRepo.findOne).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── deleteEntry ──────────────────────────────────────────────────────────
+
+  describe('deleteEntry', () => {
+    it('succeeds without ever checking the timetable lock status — manual edits remain allowed once finalized', async () => {
+      const existingEntry = makeEntry({ id: 1, status: TimetableEntryStatus.PUBLISHED });
+      entryRepo.findOne.mockResolvedValueOnce(existingEntry);
+      entryRepo.remove.mockResolvedValue(existingEntry as any);
+
+      await service.deleteEntry(1);
+
+      expect(entryRepo.remove).toHaveBeenCalledWith(existingEntry);
+      expect(recordRepo.findOne).not.toHaveBeenCalled();
     });
   });
 
@@ -330,6 +502,36 @@ describe('TimetableService', () => {
       expect(event).toBeInstanceOf(TimetableFinalizedEvent);
       expect(event.academicYear).toBe('2026');
       expect(event.teacherIds).toEqual(['teacher-A', 'teacher-B']);
+    });
+
+    it('sets every entry for the academic year to status: published', async () => {
+      recordRepo.findOne.mockResolvedValueOnce(null);
+      recordRepo.create.mockReturnValue({
+        academicYear: '2026',
+        isLocked: true,
+        finalizedAt: expect.any(Date),
+        finalizedBy: null,
+      } as any);
+      recordRepo.save.mockResolvedValue({
+        academicYear: '2026',
+        isLocked: true,
+        finalizedAt: new Date(),
+        finalizedBy: null,
+      } as any);
+
+      const selectQb = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      } as unknown as SelectQueryBuilder<TimetableEntryEntity>;
+      entryRepo.createQueryBuilder.mockReturnValue(selectQb as any);
+
+      await service.finalize({ academicYear: '2026' });
+
+      expect(entryRepo.update).toHaveBeenCalledWith(
+        { academicYear: '2026' },
+        { status: TimetableEntryStatus.PUBLISHED },
+      );
     });
 
     it('throws ConflictException and does not emit event when timetable is already finalized', async () => {

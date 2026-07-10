@@ -8,10 +8,138 @@ import { useAddGuardian } from '../hooks/useAddGuardian'
 import { useUpdateGuardian } from '../hooks/useUpdateGuardian'
 import { useRemoveGuardian } from '../hooks/useRemoveGuardian'
 import { useSetPrimaryGuardian } from '../hooks/useSetPrimaryGuardian'
+import { useLinkGuardianAccount } from '../hooks/useLinkGuardianAccount'
 import { usePermission } from '@/hooks/usePermission'
+import { useNotificationContext } from '@/context/useNotificationContext'
 
 interface Props {
   student: Student
+}
+
+function extractErrorMessage(err: unknown, fallback: string): string {
+  const data = (err as { response?: { data?: { message?: string } } })?.response?.data
+  return data?.message ?? fallback
+}
+
+function GuardianAccountLink({ studentId, guardian }: { studentId: string; guardian: Guardian }) {
+  const { showNotification } = useNotificationContext()
+  const linkAccount = useLinkGuardianAccount(studentId, guardian.id)
+  const [mode, setMode] = useState<'existing' | 'new'>('existing')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  const handleLink = () => {
+    if (!email.trim()) {
+      showNotification({ variant: 'warning', message: 'Enter a login email first.' })
+      return
+    }
+    if (mode === 'new' && password.trim().length < 6) {
+      showNotification({ variant: 'warning', message: 'Password must be at least 6 characters.' })
+      return
+    }
+    linkAccount.mutate(
+      { email: email.trim(), password: mode === 'new' ? password.trim() : undefined },
+      {
+        onSuccess: () => {
+          showNotification({
+            variant: 'success',
+            message: mode === 'new' ? 'Login account created and linked.' : 'Portal account linked.',
+          })
+          setEmail('')
+          setPassword('')
+        },
+        onError: (err) => showNotification({ variant: 'danger', message: extractErrorMessage(err, 'Could not link that account.') }),
+      },
+    )
+  }
+
+  const handleUnlink = () => {
+    linkAccount.mutate(
+      { email: null },
+      {
+        onSuccess: () => showNotification({ variant: 'success', message: 'Portal account unlinked.' }),
+        onError: (err) => showNotification({ variant: 'danger', message: extractErrorMessage(err, 'Could not unlink that account.') }),
+      },
+    )
+  }
+
+  return (
+    <div className="border-top px-3 py-2 bg-light" style={{ fontSize: 13 }}>
+      {guardian.userId ? (
+        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <span className="text-muted">
+            <i className="pi pi-id-card me-1 text-success" />
+            Portal account linked
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-danger py-0"
+            style={{ fontSize: 12 }}
+            onClick={handleUnlink}
+            disabled={linkAccount.isPending}
+          >
+            Unlink
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            <span className="text-muted">
+              <i className="pi pi-id-card me-1" />
+              No portal login linked
+            </span>
+            <div className="btn-group btn-group-sm" role="group">
+              <button
+                type="button"
+                className={`btn py-0 ${mode === 'existing' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                style={{ fontSize: 12 }}
+                onClick={() => setMode('existing')}
+              >
+                Link existing
+              </button>
+              <button
+                type="button"
+                className={`btn py-0 ${mode === 'new' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                style={{ fontSize: 12 }}
+                onClick={() => setMode('new')}
+              >
+                Create new
+              </button>
+            </div>
+          </div>
+          <div className="d-flex flex-wrap align-items-center gap-2 mt-2">
+            <input
+              type="email"
+              className="form-control form-control-sm"
+              style={{ maxWidth: 220 }}
+              placeholder="guardian@sims.edu.lk"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            {mode === 'new' && (
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                style={{ maxWidth: 220 }}
+                placeholder="Set password (min 6 chars)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            )}
+            <button
+              type="button"
+              className="btn btn-sm btn-primary d-flex align-items-center gap-1"
+              onClick={handleLink}
+              disabled={linkAccount.isPending}
+            >
+              {linkAccount.isPending && <span className="spinner-border spinner-border-sm" />}
+              {mode === 'new' ? 'Create & Link' : 'Link'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 type ModalState =
@@ -75,20 +203,25 @@ export function GuardianList({ student }: Props) {
         </div>
       ) : (
         student.guardians.map((g) => (
-          <GuardianCard
+          <div
             key={g.id}
-            guardian={g}
-            isOnlyGuardian={student.guardians.length === 1}
-            onSetPrimary={(id) => setPrimaryGuardian.mutate(id)}
-            onEdit={(guardian) => setModal({ type: 'edit', guardian })}
-            onRemove={(id) => setConfirmRemoveId(id)}
-            onEnroll={(id) => {
-              const guardian = student.guardians.find((g) => g.id === id)
-              if (guardian) setModal({ type: 'biometric', guardian })
-            }}
-            canEnroll={canEnroll}
-            isLoading={isAnyLoading}
-          />
+            className={`card border mb-3 overflow-hidden ${g.isPrimaryContact ? 'border-primary shadow-sm' : ''}`}
+          >
+            <GuardianCard
+              guardian={g}
+              isOnlyGuardian={student.guardians.length === 1}
+              onSetPrimary={(id) => setPrimaryGuardian.mutate(id)}
+              onEdit={(guardian) => setModal({ type: 'edit', guardian })}
+              onRemove={(id) => setConfirmRemoveId(id)}
+              onEnroll={(id) => {
+                const guardian = student.guardians.find((g) => g.id === id)
+                if (guardian) setModal({ type: 'biometric', guardian })
+              }}
+              canEnroll={canEnroll}
+              isLoading={isAnyLoading}
+            />
+            <GuardianAccountLink studentId={student.id} guardian={g} />
+          </div>
         ))
       )}
 

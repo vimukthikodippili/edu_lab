@@ -7,6 +7,7 @@ export interface TimetableEntry {
   teacherId: string
   subjectId: string
   roomNumber: string | null
+  status: 'draft' | 'confirmed' | 'published'
   generatedAt: string
   classSection: {
     id: number
@@ -16,6 +17,21 @@ export interface TimetableEntry {
   }
   teacher: { id: string; firstName: string; lastName: string; employeeNumber: string }
   subject: { id: string; code: string; name: string; category: { id: number; name: string } }
+}
+
+export interface RoomConflictWarning {
+  day: number
+  period: number
+  roomNumber: string
+  conflictingEntry: {
+    classSection: { id: number; name: string }
+    subject: { id: string; name: string }
+    teacher: { id: string; name: string }
+  }
+}
+
+export interface UpdatedTimetableEntry extends TimetableEntry {
+  roomConflict: RoomConflictWarning | null
 }
 
 export interface ConflictRecord {

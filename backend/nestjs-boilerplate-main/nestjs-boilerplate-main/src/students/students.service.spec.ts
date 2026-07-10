@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { StudentsService } from './students.service';
 import { StudentEntity, StudentGender, StudentStatus } from './entities/student.entity';
 import { GuardianEntity, GuardianRelationship } from './entities/guardian.entity';
@@ -9,8 +9,12 @@ import { StudentGuardianEntity } from './entities/student-guardian.entity';
 import { GradeEntity, GradeStage } from './entities/grade.entity';
 import { ClassSectionEntity } from './entities/class-section.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
+import { StaffEntity } from '../staff/entities/staff.entity';
+import { UsersService } from '../users/users.service';
+import { RoleEnum } from '../roles/roles.enum';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { AddGuardianDto } from './dto/add-guardian.dto';
+import { LeavingStatus } from './dto/mark-as-leaving.dto';
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
@@ -27,6 +31,7 @@ const mockSection: ClassSectionEntity = {
   academicYear: '2026',
   gradeId: 6,
   grade: mockGrade,
+  classTeacherStaffId: null,
 };
 
 const mockGuardianDto = {
@@ -141,6 +146,8 @@ describe('StudentsService', () => {
   let fileRepo: jest.Mocked<Repository<FileEntity>>;
   let guardianRepo: jest.Mocked<Repository<GuardianEntity>>;
   let sgRepo: jest.Mocked<Repository<StudentGuardianEntity>>;
+  let staffRepo: jest.Mocked<Repository<StaffEntity>>;
+  let usersService: { findByEmail: jest.Mock; create: jest.Mock };
   let dataSource: jest.Mocked<DataSource>;
 
   const buildService = async (dataSourceOverride?: any) => {
@@ -153,6 +160,8 @@ describe('StudentsService', () => {
         { provide: getRepositoryToken(GradeEntity), useValue: gradeRepo },
         { provide: getRepositoryToken(ClassSectionEntity), useValue: sectionRepo },
         { provide: getRepositoryToken(FileEntity), useValue: fileRepo },
+        { provide: getRepositoryToken(StaffEntity), useValue: staffRepo },
+        { provide: UsersService, useValue: usersService },
         { provide: DataSource, useValue: dataSourceOverride ?? dataSource },
       ],
     }).compile();
@@ -167,6 +176,8 @@ describe('StudentsService', () => {
     gradeRepo = repoMock<GradeEntity>() as any;
     sectionRepo = repoMock<ClassSectionEntity>() as any;
     fileRepo = repoMock<FileEntity>() as any;
+    staffRepo = repoMock<StaffEntity>() as any;
+    usersService = { findByEmail: jest.fn(), create: jest.fn() };
     dataSource = { transaction: jest.fn() } as any;
   });
 
@@ -535,6 +546,419 @@ describe('StudentsService', () => {
       const result = await service.setPrimaryContact(STUDENT_ID, GUARDIAN_ID_1);
       expect(txSpy).not.toHaveBeenCalled();
       expect(result.studentGuardians[0].isPrimaryContact).toBe(true);
+    });
+  });
+
+  // ─── assignClassTeacher ────────────────────────────────────────────────────────
+
+  describe('assignClassTeacher', () => {
+    it('throws 404 when the class section does not exist', async () => {
+      sectionRepo.findOne.mockResolvedValue(null);
+      service = await buildService();
+
+      await expect(
+        service.assignClassTeacher(1, { staffId: 'staff-uuid' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws 422 when the staff member does not exist', async () => {
+      sectionRepo.findOne.mockResolvedValue({ ...mockSection });
+      staffRepo.findOne.mockResolvedValue(null);
+      service = await buildService();
+
+      await expect(
+        service.assignClassTeacher(1, { staffId: 'missing-staff' }),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('assigns a valid staff member as class teacher', async () => {
+      sectionRepo.findOne.mockResolvedValue({ ...mockSection });
+      staffRepo.findOne.mockResolvedValue({ id: 'staff-uuid' } as StaffEntity);
+      sectionRepo.save.mockImplementation((d: any) => Promise.resolve(d));
+      service = await buildService();
+
+      const result = await service.assignClassTeacher(1, { staffId: 'staff-uuid' });
+
+      expect(result.classTeacherStaffId).toBe('staff-uuid');
+    });
+
+    it('clears the class teacher when staffId is null', async () => {
+      sectionRepo.findOne.mockResolvedValue({ ...mockSection, classTeacherStaffId: 'staff-uuid' });
+      sectionRepo.save.mockImplementation((d: any) => Promise.resolve(d));
+      service = await buildService();
+
+      const result = await service.assignClassTeacher(1, { staffId: null });
+
+      expect(result.classTeacherStaffId).toBeNull();
+      expect(staffRepo.findOne).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── transferSection ────────────────────────────────────────────────────────
+
+  describe('transferSection', () => {
+    const targetSection: ClassSectionEntity = {
+      id: 2,
+      name: 'B',
+      academicYear: '2026',
+      gradeId: 6,
+      grade: mockGrade,
+      classTeacherStaffId: null,
+    };
+
+    it('rejects a target section in a different grade', async () => {
+      studentRepo.findOne.mockResolvedValue(makeStudent([]));
+      sectionRepo.findOne.mockResolvedValue({ ...targetSection, gradeId: 7 });
+      service = await buildService();
+
+      await expect(
+        service.transferSection(STUDENT_ID, { classSectionId: 2 }),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('rejects a target section in a different academic year', async () => {
+      studentRepo.findOne.mockResolvedValue(makeStudent([]));
+      sectionRepo.findOne.mockResolvedValue({ ...targetSection, academicYear: '2027' });
+      service = await buildService();
+
+      await expect(
+        service.transferSection(STUDENT_ID, { classSectionId: 2 }),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('moves the student to the target section on success', async () => {
+      const student = makeStudent([]);
+      const updatedStudent = { ...student, classSectionId: 2, classSection: targetSection } as unknown as typeof student;
+      studentRepo.findOne
+        .mockResolvedValueOnce(student) // initial findById
+        .mockResolvedValueOnce(updatedStudent); // re-fetch after save
+      sectionRepo.findOne.mockResolvedValue(targetSection);
+      studentRepo.save.mockResolvedValue(student);
+      service = await buildService();
+
+      const result = await service.transferSection(STUDENT_ID, { classSectionId: 2 });
+
+      expect(result.classSectionId).toBe(2);
+    });
+  });
+
+  // ─── markAsLeaving ──────────────────────────────────────────────────────────
+
+  describe('markAsLeaving', () => {
+    it('sets status to GRADUATED and stores the reason', async () => {
+      const student = makeStudent([]);
+      const updatedStudent = {
+        ...student,
+        status: StudentStatus.GRADUATED,
+        leavingReason: 'Completed A/L',
+      } as unknown as typeof student;
+      studentRepo.findOne
+        .mockResolvedValueOnce(student)
+        .mockResolvedValueOnce(updatedStudent);
+      studentRepo.save.mockResolvedValue(student);
+      service = await buildService();
+
+      const result = await service.markAsLeaving(STUDENT_ID, {
+        status: LeavingStatus.GRADUATED,
+        reason: 'Completed A/L',
+      });
+
+      expect(result.status).toBe(StudentStatus.GRADUATED);
+      expect(result.leavingReason).toBe('Completed A/L');
+    });
+
+    it('sets status to TRANSFERRED', async () => {
+      const student = makeStudent([]);
+      const updatedStudent = {
+        ...student,
+        status: StudentStatus.TRANSFERRED,
+      } as unknown as typeof student;
+      studentRepo.findOne
+        .mockResolvedValueOnce(student)
+        .mockResolvedValueOnce(updatedStudent);
+      studentRepo.save.mockResolvedValue(student);
+      service = await buildService();
+
+      const result = await service.markAsLeaving(STUDENT_ID, {
+        status: LeavingStatus.TRANSFERRED,
+      });
+
+      expect(result.status).toBe(StudentStatus.TRANSFERRED);
+    });
+
+    it('throws 404 when the student does not exist', async () => {
+      studentRepo.findOne.mockResolvedValue(null);
+      service = await buildService();
+
+      await expect(
+        service.markAsLeaving('missing', { status: LeavingStatus.GRADUATED }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ─── linkUserAccount ────────────────────────────────────────────────────────
+
+  describe('linkUserAccount', () => {
+    it('clears the link when email is null', async () => {
+      const student = makeStudent([]);
+      const updated = { ...student, userId: null } as unknown as typeof student;
+      studentRepo.findOne.mockResolvedValueOnce(student).mockResolvedValueOnce(updated);
+      studentRepo.save.mockResolvedValue(student);
+      service = await buildService();
+
+      const result = await service.linkUserAccount(STUDENT_ID, { email: null });
+
+      expect(result.userId).toBeNull();
+      expect(usersService.findByEmail).not.toHaveBeenCalled();
+    });
+
+    it('throws 422 when no user exists with that email and no password is provided', async () => {
+      studentRepo.findOne.mockResolvedValue(makeStudent([]));
+      usersService.findByEmail.mockResolvedValue(null);
+      service = await buildService();
+
+      await expect(
+        service.linkUserAccount(STUDENT_ID, { email: 'nobody@sims.edu.lk' }),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(usersService.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a new student-role login account and links it when no user exists but a password is provided', async () => {
+      const student = makeStudent([]);
+      const updated = { ...student, userId: 99 } as unknown as typeof student;
+      studentRepo.findOne
+        .mockResolvedValueOnce(student) // findById(id)
+        .mockResolvedValueOnce(null) // alreadyLinked lookup — none found
+        .mockResolvedValueOnce(updated); // re-fetch after save
+      usersService.findByEmail.mockResolvedValue(null);
+      usersService.create.mockResolvedValue({ id: 99, role: { id: RoleEnum.student } });
+      studentRepo.save.mockResolvedValue(student);
+      service = await buildService();
+
+      const result = await service.linkUserAccount(STUDENT_ID, {
+        email: 'newstudent@sims.edu.lk',
+        password: 'secret123',
+      });
+
+      expect(usersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'newstudent@sims.edu.lk',
+          password: 'secret123',
+          firstName: student.firstName,
+          lastName: student.lastName,
+          role: { id: RoleEnum.student },
+        }),
+      );
+      expect(result.userId).toBe(99);
+    });
+
+    it('throws 422 when the matched user does not have the Student role', async () => {
+      studentRepo.findOne.mockResolvedValue(makeStudent([]));
+      usersService.findByEmail.mockResolvedValue({
+        id: 42,
+        role: { id: RoleEnum.teacher },
+      });
+      service = await buildService();
+
+      await expect(
+        service.linkUserAccount(STUDENT_ID, { email: 'teacher@sims.edu.lk' }),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('throws ConflictException when the user account is already linked to a different student', async () => {
+      studentRepo.findOne
+        .mockResolvedValueOnce(makeStudent([])) // findById(id)
+        .mockResolvedValueOnce({ id: 'other-student-id' } as unknown as StudentEntity); // alreadyLinked lookup
+      usersService.findByEmail.mockResolvedValue({
+        id: 42,
+        role: { id: RoleEnum.student },
+      });
+      service = await buildService();
+
+      await expect(
+        service.linkUserAccount(STUDENT_ID, { email: 'student@sims.edu.lk' }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('links the student to the resolved user on the happy path', async () => {
+      const student = makeStudent([]);
+      const updated = { ...student, userId: 42 } as unknown as typeof student;
+      studentRepo.findOne
+        .mockResolvedValueOnce(student) // findById(id)
+        .mockResolvedValueOnce(null) // alreadyLinked lookup — none found
+        .mockResolvedValueOnce(updated); // re-fetch after save
+      usersService.findByEmail.mockResolvedValue({
+        id: 42,
+        role: { id: RoleEnum.student },
+      });
+      studentRepo.save.mockResolvedValue(student);
+      service = await buildService();
+
+      const result = await service.linkUserAccount(STUDENT_ID, { email: 'student@sims.edu.lk' });
+
+      expect(result.userId).toBe(42);
+    });
+  });
+
+  // ─── findByUserId ───────────────────────────────────────────────────────────
+
+  describe('findByUserId', () => {
+    it('returns null when no student is linked to this userId', async () => {
+      studentRepo.findOne.mockResolvedValue(null);
+      service = await buildService();
+
+      const result = await service.findByUserId(999);
+
+      expect(result).toBeNull();
+    });
+
+    it('returns the linked student', async () => {
+      const student = makeStudent([]);
+      studentRepo.findOne.mockResolvedValue(student);
+      service = await buildService();
+
+      const result = await service.findByUserId(42);
+
+      expect(studentRepo.findOne).toHaveBeenCalledWith({
+        where: { userId: 42 },
+        relations: expect.any(Array),
+      });
+      expect(result).toBe(student);
+    });
+  });
+
+  // ─── Guardian self-service ────────────────────────────────────────────────
+
+  const GUARDIAN_ID = 'guardian-1';
+  const makeGuardianFixture = (overrides: Partial<GuardianEntity> = {}): GuardianEntity =>
+    ({
+      id: GUARDIAN_ID,
+      firstName: 'Sunethra',
+      lastName: 'Perera',
+      userId: null,
+      ...overrides,
+    }) as unknown as GuardianEntity;
+  const makeSgLink = (overrides: Partial<StudentGuardianEntity> = {}): StudentGuardianEntity =>
+    ({ studentId: STUDENT_ID, guardianId: GUARDIAN_ID, ...overrides }) as unknown as StudentGuardianEntity;
+
+  describe('findGuardianByUserId', () => {
+    it('returns null when no guardian is linked to this userId', async () => {
+      guardianRepo.findOne.mockResolvedValue(null);
+      service = await buildService();
+
+      const result = await service.findGuardianByUserId(999);
+
+      expect(result).toBeNull();
+    });
+
+    it('returns the linked guardian', async () => {
+      const guardian = makeGuardianFixture({ userId: 42 });
+      guardianRepo.findOne.mockResolvedValue(guardian);
+      service = await buildService();
+
+      const result = await service.findGuardianByUserId(42);
+
+      expect(result).toBe(guardian);
+    });
+  });
+
+  describe('findStudentsForGuardian', () => {
+    it('returns an empty array when the guardian has no linked students', async () => {
+      sgRepo.find.mockResolvedValue([]);
+      service = await buildService();
+
+      const result = await service.findStudentsForGuardian(GUARDIAN_ID);
+
+      expect(result).toEqual([]);
+      expect(studentRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('returns the students linked via StudentGuardianEntity', async () => {
+      const students = [makeStudent([])];
+      sgRepo.find.mockResolvedValue([makeSgLink()]);
+      studentRepo.find.mockResolvedValue(students);
+      service = await buildService();
+
+      const result = await service.findStudentsForGuardian(GUARDIAN_ID);
+
+      expect(result).toBe(students);
+    });
+  });
+
+  describe('linkGuardianUserAccount', () => {
+    it('throws 404 when the guardian is not linked to this student', async () => {
+      sgRepo.findOne.mockResolvedValue(null);
+      service = await buildService();
+
+      await expect(
+        service.linkGuardianUserAccount(STUDENT_ID, GUARDIAN_ID, { email: 'guardian@sims.edu.lk' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws 422 when no user exists and no password is supplied', async () => {
+      sgRepo.findOne.mockResolvedValue(makeSgLink());
+      guardianRepo.findOne.mockResolvedValue(makeGuardianFixture());
+      usersService.findByEmail.mockResolvedValue(null);
+      service = await buildService();
+
+      await expect(
+        service.linkGuardianUserAccount(STUDENT_ID, GUARDIAN_ID, { email: 'guardian@sims.edu.lk' }),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('creates a new guardian-role account when none exists and a password is supplied', async () => {
+      sgRepo.findOne.mockResolvedValue(makeSgLink());
+      guardianRepo.findOne.mockResolvedValue(makeGuardianFixture());
+      usersService.findByEmail.mockResolvedValue(null);
+      usersService.create.mockResolvedValue({ id: 77, role: { id: RoleEnum.guardian } });
+      guardianRepo.save.mockResolvedValue(makeGuardianFixture({ userId: 77 }));
+      service = await buildService();
+
+      const result = await service.linkGuardianUserAccount(STUDENT_ID, GUARDIAN_ID, {
+        email: 'guardian@sims.edu.lk',
+        password: 'secret123',
+      });
+
+      expect(usersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'guardian@sims.edu.lk', role: { id: RoleEnum.guardian } }),
+      );
+      expect(result.userId).toBe(77);
+    });
+
+    it('throws 422 when the matched user does not have the Guardian role', async () => {
+      sgRepo.findOne.mockResolvedValue(makeSgLink());
+      guardianRepo.findOne.mockResolvedValue(makeGuardianFixture());
+      usersService.findByEmail.mockResolvedValue({ id: 5, role: { id: RoleEnum.teacher } });
+      service = await buildService();
+
+      await expect(
+        service.linkGuardianUserAccount(STUDENT_ID, GUARDIAN_ID, { email: 'teacher@sims.edu.lk' }),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('throws ConflictException when the user account is already linked to a different guardian', async () => {
+      sgRepo.findOne.mockResolvedValue(makeSgLink());
+      usersService.findByEmail.mockResolvedValue({ id: 5, role: { id: RoleEnum.guardian } });
+      guardianRepo.findOne
+        .mockResolvedValueOnce(makeGuardianFixture())
+        .mockResolvedValueOnce(makeGuardianFixture({ id: 'other-guardian' }));
+      service = await buildService();
+
+      await expect(
+        service.linkGuardianUserAccount(STUDENT_ID, GUARDIAN_ID, { email: 'guardian@sims.edu.lk' }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('clears the link when email is null', async () => {
+      sgRepo.findOne.mockResolvedValue(makeSgLink());
+      guardianRepo.findOne.mockResolvedValue(makeGuardianFixture({ userId: 5 }));
+      guardianRepo.save.mockResolvedValue(makeGuardianFixture({ userId: null }));
+      service = await buildService();
+
+      const result = await service.linkGuardianUserAccount(STUDENT_ID, GUARDIAN_ID, { email: null });
+
+      expect(result.userId).toBeNull();
+      expect(usersService.findByEmail).not.toHaveBeenCalled();
     });
   });
 });

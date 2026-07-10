@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import { Cron } from '@nestjs/schedule';
 import { In, Repository } from 'typeorm';
 import { StaffAttendanceEntity, StaffAttendanceStatus } from '../attendance/entities/staff-attendance.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
@@ -9,6 +10,7 @@ import { MarkEntity, MarkStatus } from '../grades/entities/mark.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { AnnualLessonPlanEntryEntity } from '../lesson-plan/entities/annual-lesson-plan-entry.entity';
+import { TeacherPerformanceSnapshotEntity } from './entities/teacher-performance-snapshot.entity';
 import { AllConfigType } from '../config/config.type';
 import {
   AttendanceSummary,
@@ -29,6 +31,8 @@ interface SectionPassRateStats {
 
 @Injectable()
 export class TeacherPerformanceService {
+  private readonly logger = new Logger(TeacherPerformanceService.name);
+
   constructor(
     @InjectRepository(StaffAttendanceEntity)
     private readonly staffAttendanceRepo: Repository<StaffAttendanceEntity>,
@@ -50,6 +54,9 @@ export class TeacherPerformanceService {
 
     @InjectRepository(AnnualLessonPlanEntryEntity)
     private readonly entryRepo: Repository<AnnualLessonPlanEntryEntity>,
+
+    @InjectRepository(TeacherPerformanceSnapshotEntity)
+    private readonly snapshotRepo: Repository<TeacherPerformanceSnapshotEntity>,
 
     private readonly configService: ConfigService<AllConfigType>,
   ) {}
@@ -88,7 +95,7 @@ export class TeacherPerformanceService {
       attendance: this.summarizeAttendance(attendanceRecords),
       classResults,
       syllabus: this.summarizeSyllabus(syllabusEntries),
-      behindScheduleOutlier: this.computeBehindScheduleOutlier(syllabusEntries, consecutivePeriods),
+      behindScheduleOutlier: await this.computeBehindScheduleOutlierFromSnapshots(staffId, consecutivePeriods),
     };
   }
 
@@ -290,47 +297,75 @@ export class TeacherPerformanceService {
     return stats.passRate;
   }
 
-  computeBehindScheduleOutlier(
-    entries: AnnualLessonPlanEntryEntity[],
-    consecutivePeriods: number,
-  ): boolean {
+  /**
+   * Weekly, per-teacher snapshot of syllabus pace: how much of the annual plan is actually
+   * complete vs. how much the plan itself expects to be complete by this point in the year.
+   * Persisted so the behind-schedule outlier can look at real history across weeks, rather than
+   * recomputing "how many months has this been going on" from raw entries every time.
+   */
+  @Cron('0 6 * * 1')
+  async generateWeeklySnapshots(): Promise<void> {
+    const academicYear = String(new Date().getFullYear());
     const todayIso = new Date().toISOString().slice(0, 10);
-    const currentMonth = todayIso.slice(0, 7);
+    const weekStartDate = this.getWeekStartDate(new Date());
 
-    const byMonth = new Map<string, AnnualLessonPlanEntryEntity[]>();
+    const entries = await this.entryRepo.find({ where: { academicYear } });
+
+    const byStaff = new Map<string, AnnualLessonPlanEntryEntity[]>();
     for (const entry of entries) {
-      const month = entry.plannedCompletionDate.slice(0, 7);
-      if (month === currentMonth) continue;
-      const bucket = byMonth.get(month) ?? [];
+      const bucket = byStaff.get(entry.staffId) ?? [];
       bucket.push(entry);
-      byMonth.set(month, bucket);
+      byStaff.set(entry.staffId, bucket);
     }
 
-    const elapsedMonths = [...byMonth.keys()].sort().reverse();
-    if (!elapsedMonths.length) return false;
+    let count = 0;
+    for (const [staffId, staffEntries] of byStaff) {
+      const total = staffEntries.length;
+      if (total === 0) continue;
 
-    // Start from the TRUE most recent elapsed month (not just the most recent one with data) —
-    // if that month has zero planned entries at all, the streak breaks immediately, since a
-    // month with nothing planned can't itself prove ongoing lateness.
-    let streak = 0;
-    let expectedMonth = this.previousMonthKey(currentMonth);
-    for (const month of elapsedMonths) {
-      if (month !== expectedMonth) break;
-      const monthEntries = byMonth.get(month)!;
-      const hasOverdue = monthEntries.some((e) => !e.isComplete && e.plannedCompletionDate < todayIso);
-      if (!hasOverdue) break;
-      streak += 1;
-      expectedMonth = this.previousMonthKey(expectedMonth);
+      const completed = staffEntries.filter((e) => e.isComplete).length;
+      const due = staffEntries.filter((e) => e.plannedCompletionDate <= todayIso).length;
+
+      const syllabusCompletionPercent = (completed / total) * 100;
+      const plannedCompletionPercent = (due / total) * 100;
+
+      let snapshot = await this.snapshotRepo.findOne({ where: { staffId, weekStartDate } });
+      snapshot =
+        snapshot ??
+        this.snapshotRepo.create({ staffId, weekStartDate, academicYear });
+      snapshot.syllabusCompletionPercent = syllabusCompletionPercent;
+      snapshot.plannedCompletionPercent = plannedCompletionPercent;
+
+      await this.snapshotRepo.save(snapshot);
+      count++;
     }
 
-    return streak >= consecutivePeriods;
+    this.logger.log(`Generated ${count} teacher performance snapshot(s) for week of ${weekStartDate}.`);
   }
 
-  private previousMonthKey(monthKey: string): string {
-    const [year, month] = monthKey.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, 1));
-    date.setUTCMonth(date.getUTCMonth() - 1);
-    return date.toISOString().slice(0, 7);
+  private getWeekStartDate(date: Date): string {
+    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const day = d.getUTCDay(); // 0=Sun, 1=Mon, ...
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    d.setUTCDate(d.getUTCDate() + diffToMonday);
+    return d.toISOString().slice(0, 10);
+  }
+
+  async computeBehindScheduleOutlierFromSnapshots(
+    staffId: string,
+    consecutivePeriods: number,
+  ): Promise<boolean> {
+    const snapshots = await this.snapshotRepo.find({
+      where: { staffId },
+      order: { weekStartDate: 'DESC' },
+      take: consecutivePeriods,
+    });
+
+    if (snapshots.length < consecutivePeriods) return false;
+
+    return snapshots.every(
+      (s) => s.syllabusCompletionPercent < s.plannedCompletionPercent,
+    );
   }
 
   private summarizeSyllabus(entries: AnnualLessonPlanEntryEntity[]): SyllabusSummary {

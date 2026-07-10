@@ -10,6 +10,7 @@ import { StaffEntity } from '../staff/entities/staff.entity';
 import { UserEntity } from '../users/infrastructure/persistence/relational/entities/user.entity';
 import { LessonPlanService } from './lesson-plan.service';
 import { LessonPlanController } from './lesson-plan.controller';
+import { TimetableFinalizedListener } from './listeners/timetable-finalized.listener';
 import { NotificationModule } from '../notification/notification.module';
 import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
@@ -30,7 +31,7 @@ import { StaffModule } from '../staff/staff.module';
     UsersModule,
     StaffModule,
   ],
-  providers: [LessonPlanService],
+  providers: [LessonPlanService, TimetableFinalizedListener],
   controllers: [LessonPlanController],
   exports: [LessonPlanService],
 })

@@ -14,6 +14,8 @@ import { AttendanceRecordEntity } from '../attendance/entities/attendance-record
 import { StaffEntity } from '../staff/entities/staff.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { StudentEntity } from '../students/entities/student.entity';
+import { GuardianEntity } from '../students/entities/guardian.entity';
+import { StudentGuardianEntity } from '../students/entities/student-guardian.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { StudentSubjectEnrollmentEntity } from '../enrollments/entities/student-subject-enrollment.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
@@ -51,6 +53,8 @@ import { NotificationModule } from '../notification/notification.module';
       StaffEntity,
       ClassSectionEntity,
       StudentEntity,
+      GuardianEntity,
+      StudentGuardianEntity,
       TeacherSubjectClassRequirementEntity,
       StudentSubjectEnrollmentEntity,
       GradingBandEntity,

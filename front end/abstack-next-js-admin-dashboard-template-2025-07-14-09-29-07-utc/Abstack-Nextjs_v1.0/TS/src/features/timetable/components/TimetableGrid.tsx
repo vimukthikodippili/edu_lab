@@ -1,7 +1,7 @@
 'use client'
 import React, { useState } from 'react'
-import { Pencil, Trash2, X, Check } from 'lucide-react'
-import type { TimetableEntry } from '../types'
+import { Pencil, Trash2, X, Check, AlertTriangle } from 'lucide-react'
+import type { TimetableEntry, RoomConflictWarning } from '../types'
 import { DAY_LABELS } from '../types'
 import { useUpdateTimetableEntry } from '../hooks/useUpdateTimetableEntry'
 import { useDeleteTimetableEntry } from '../hooks/useDeleteTimetableEntry'
@@ -44,14 +44,20 @@ function EditEntryModal({
   const [period, setPeriod] = useState(entry.period)
   const [room, setRoom] = useState(entry.roomNumber ?? '')
   const [err, setErr] = useState('')
+  const [roomConflict, setRoomConflict] = useState<RoomConflictWarning | null>(null)
   const update = useUpdateTimetableEntry()
   const del = useDeleteTimetableEntry()
 
   const handleSave = async () => {
     setErr('')
     try {
-      await update.mutateAsync({ id: entry.id, day, period, roomNumber: room || null })
-      onClose()
+      const result = await update.mutateAsync({ id: entry.id, day, period, roomNumber: room || null })
+      if (result.roomConflict) {
+        // Soft constraint — the save succeeded, but warn instead of silently closing.
+        setRoomConflict(result.roomConflict)
+      } else {
+        onClose()
+      }
     } catch (e: any) {
       setErr(e?.response?.data?.message ?? 'Failed to save.')
     }
@@ -84,6 +90,22 @@ function EditEntryModal({
 
           <div className="px-4 py-3 d-flex flex-column gap-3">
             {err && <div className="alert alert-danger py-2 small mb-0">{err}</div>}
+
+            {roomConflict && (
+              <div
+                className="rounded-2 px-3 py-2 small d-flex align-items-start gap-2"
+                style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e' }}
+              >
+                <AlertTriangle size={15} className="flex-shrink-0 mt-1" />
+                <div>
+                  <div className="fw-semibold">Saved — but room {roomConflict.roomNumber} is already booked</div>
+                  <div style={{ fontSize: '0.75rem' }}>
+                    {roomConflict.conflictingEntry.classSection.name} · {roomConflict.conflictingEntry.subject.name} ·{' '}
+                    {roomConflict.conflictingEntry.teacher.name} has this room at the same day and period. You may want to reassign.
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="rounded-2 px-3 py-2 small" style={{ background: '#f0f2ff', border: '1px solid #c7d2fe' }}>
               <div className="fw-semibold" style={{ color: '#4338ca' }}>
@@ -138,7 +160,10 @@ function EditEntryModal({
               Remove
             </button>
             <div className="d-flex gap-2">
-              <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancel</button>
+              <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>
+                {roomConflict ? 'Close' : 'Cancel'}
+              </button>
+              {!roomConflict && (
               <button
                 className="btn btn-sm btn-primary d-flex align-items-center gap-1"
                 disabled={update.isPending}
@@ -147,6 +172,7 @@ function EditEntryModal({
                 {update.isPending ? <span className="spinner-border spinner-border-sm" /> : <Check size={12} />}
                 Save
               </button>
+              )}
             </div>
           </div>
         </div>
@@ -210,15 +236,49 @@ function GridCell({
           padding: '4px 8px',
           cursor: canEdit ? 'pointer' : 'default',
           transition: 'filter 0.15s',
+          position: 'relative',
         }}
         onClick={() => canEdit && setEditing(true)}
         title={canEdit ? 'Click to edit' : undefined}
       >
+        {entry.status === 'draft' && (
+          <span
+            title="Generated draft — not yet reviewed"
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: '#f59e0b',
+              boxShadow: '0 0 0 2px #fff',
+            }}
+          />
+        )}
+        {entry.status === 'published' && (
+          <span
+            title="Finalized and distributed"
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: '#16a34a',
+              boxShadow: '0 0 0 2px #fff',
+            }}
+          />
+        )}
         <div className="fw-semibold" style={{ fontSize: '0.72rem', color: colors.text, lineHeight: 1.2 }}>
           {entry.subject.code}
         </div>
         <div style={{ fontSize: '0.68rem', color: colors.text, opacity: 0.85, lineHeight: 1.2, marginTop: 1 }}>
           {entry.subject.name.length > 14 ? entry.subject.name.slice(0, 13) + '…' : entry.subject.name}
+        </div>
+        <div className="fw-medium" style={{ fontSize: '0.63rem', color: colors.text, opacity: 0.75, marginTop: 1 }}>
+          {entry.classSection.grade.name} · {entry.classSection.name}
         </div>
         <div className="text-muted" style={{ fontSize: '0.63rem', marginTop: 2 }}>
           {entry.teacher.firstName[0]}. {entry.teacher.lastName}

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AttendanceService } from './attendance.service';
@@ -9,6 +9,7 @@ import { SchoolHolidayEntity } from './entities/school-holiday.entity';
 import { StudentEntity } from '../students/entities/student.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
+import { LeaveRequestEntity, LeaveStatus } from '../leave/entities/leave-request.entity';
 import { SchoolCalendarConfigService } from '../school-calendar-config/school-calendar-config.service';
 import { GradeStage } from '../students/entities/grade.entity';
 
@@ -49,6 +50,8 @@ describe('AttendanceService', () => {
   let attendanceRepo: jest.Mocked<Repository<AttendanceRecordEntity>>;
   let holidayRepo: jest.Mocked<Repository<SchoolHolidayEntity>>;
   let classSectionRepo: jest.Mocked<Repository<ClassSectionEntity>>;
+  let requirementRepo: jest.Mocked<Repository<TeacherSubjectClassRequirementEntity>>;
+  let leaveRepo: jest.Mocked<Repository<LeaveRequestEntity>>;
   let calendarSvc: jest.Mocked<SchoolCalendarConfigService>;
 
   beforeEach(async () => {
@@ -56,7 +59,8 @@ describe('AttendanceService', () => {
     holidayRepo = repoMock<SchoolHolidayEntity>() as any;
     const studentRepo = repoMock<StudentEntity>() as any;
     classSectionRepo = repoMock<ClassSectionEntity>() as any;
-    const requirementRepo = repoMock<TeacherSubjectClassRequirementEntity>() as any;
+    requirementRepo = repoMock<TeacherSubjectClassRequirementEntity>() as any;
+    leaveRepo = repoMock<LeaveRequestEntity>() as any;
     calendarSvc = { findByStage: jest.fn(), findAll: jest.fn() } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -67,6 +71,7 @@ describe('AttendanceService', () => {
         { provide: getRepositoryToken(StudentEntity), useValue: studentRepo },
         { provide: getRepositoryToken(ClassSectionEntity), useValue: classSectionRepo },
         { provide: getRepositoryToken(TeacherSubjectClassRequirementEntity), useValue: requirementRepo },
+        { provide: getRepositoryToken(LeaveRequestEntity), useValue: leaveRepo },
         { provide: SchoolCalendarConfigService, useValue: calendarSvc },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
@@ -157,6 +162,69 @@ describe('AttendanceService', () => {
       expect(attendanceRepo.save).toHaveBeenCalledTimes(1);
       const saved = (attendanceRepo.save as jest.Mock).mock.calls[0][0] as AttendanceRecordEntity[];
       expect(saved[0].overrideReason).toBe('Special exam day');
+    });
+  });
+
+  describe('attendance-marking authorization (class teacher gating)', () => {
+    const MONDAY = '2026-06-29';
+    const dto = {
+      classSectionId: 1,
+      date: MONDAY,
+      defaultStatus: AttendanceStatus.PRESENT,
+      entries: [{ studentId: 'uuid-A', status: AttendanceStatus.PRESENT }],
+    };
+    const sectionWithClassTeacher = (): ClassSectionEntity =>
+      ({ ...makeSection(), classTeacherStaffId: 'class-teacher-uuid' }) as ClassSectionEntity;
+
+    beforeEach(() => {
+      calendarSvc.findByStage.mockResolvedValue(makeCalendarConfig(5) as any);
+      holidayRepo.findOne.mockResolvedValue(null);
+      attendanceRepo.findBy.mockResolvedValue([]);
+      attendanceRepo.create.mockImplementation((d) => d as AttendanceRecordEntity);
+      attendanceRepo.save.mockResolvedValue([] as any);
+    });
+
+    it('allows the assigned class teacher to mark their own section', async () => {
+      classSectionRepo.findOne.mockResolvedValue(sectionWithClassTeacher());
+
+      await service.bulkMark(dto as any, 'class-teacher-uuid');
+
+      expect(attendanceRepo.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a teacher who neither is the class teacher nor teaches the section', async () => {
+      classSectionRepo.findOne.mockResolvedValue(sectionWithClassTeacher());
+      requirementRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.bulkMark(dto as any, 'other-teacher-uuid')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(attendanceRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects a teacher who teaches the section but the class teacher is not on approved leave', async () => {
+      classSectionRepo.findOne.mockResolvedValue(sectionWithClassTeacher());
+      requirementRepo.findOne.mockResolvedValue({ id: 'req-1' } as unknown as TeacherSubjectClassRequirementEntity);
+      leaveRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.bulkMark(dto as any, 'other-teacher-uuid')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(attendanceRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('allows a teacher who teaches the section when the class teacher is on approved leave covering today', async () => {
+      classSectionRepo.findOne.mockResolvedValue(sectionWithClassTeacher());
+      requirementRepo.findOne.mockResolvedValue({ id: 'req-1' } as unknown as TeacherSubjectClassRequirementEntity);
+      leaveRepo.findOne.mockResolvedValue({
+        id: 'leave-1',
+        staffId: 'class-teacher-uuid',
+        status: LeaveStatus.APPROVED,
+      } as LeaveRequestEntity);
+
+      await service.bulkMark(dto as any, 'other-teacher-uuid');
+
+      expect(attendanceRepo.save).toHaveBeenCalledTimes(1);
     });
   });
 });

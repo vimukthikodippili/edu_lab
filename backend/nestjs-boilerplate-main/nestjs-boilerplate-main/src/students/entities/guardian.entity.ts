@@ -51,6 +51,11 @@ export class GuardianEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', nullable: true })
   pushToken: string | null;
 
+  // Links this guardian's record to their portal login account (UserEntity.id,
+  // a plain numeric auto-increment PK in this codebase — not a uuid).
+  @Column({ type: 'int', nullable: true, unique: true })
+  userId: number | null;
+
   @Column({ type: 'boolean', default: false })
   biometricEnrolled: boolean;
 

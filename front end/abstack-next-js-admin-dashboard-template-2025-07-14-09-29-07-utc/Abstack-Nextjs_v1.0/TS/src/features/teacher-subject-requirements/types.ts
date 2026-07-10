@@ -10,6 +10,7 @@ export interface ClassSection {
     name: string
     stage: string
   }
+  classTeacherStaffId: string | null
 }
 
 export interface TeacherSummary {

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import * as QRCode from 'qrcode';
 import { StudentEntity, StudentStatus } from './entities/student.entity';
 import { GuardianEntity } from './entities/guardian.entity';
@@ -14,11 +14,19 @@ import { StudentGuardianEntity } from './entities/student-guardian.entity';
 import { GradeEntity } from './entities/grade.entity';
 import { ClassSectionEntity } from './entities/class-section.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
+import { StaffEntity } from '../staff/entities/staff.entity';
+import { UsersService } from '../users/users.service';
+import { RoleEnum } from '../roles/roles.enum';
+import { StatusEnum } from '../statuses/statuses.enum';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { QueryStudentDto } from './dto/query-student.dto';
 import { AddGuardianDto } from './dto/add-guardian.dto';
 import { UpdateGuardianDto } from './dto/update-guardian.dto';
 import { CreateClassSectionDto } from './dto/create-class-section.dto';
+import { AssignClassTeacherDto } from './dto/assign-class-teacher.dto';
+import { TransferSectionDto } from './dto/transfer-section.dto';
+import { LeavingStatus, MarkAsLeavingDto } from './dto/mark-as-leaving.dto';
+import { LinkUserAccountDto } from './dto/link-user-account.dto';
 
 export interface PaginatedStudents {
   data: StudentEntity[];
@@ -57,6 +65,11 @@ export class StudentsService {
 
     @InjectRepository(FileEntity)
     private readonly fileRepository: Repository<FileEntity>,
+
+    @InjectRepository(StaffEntity)
+    private readonly staffRepository: Repository<StaffEntity>,
+
+    private readonly usersService: UsersService,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -424,6 +437,14 @@ export class StudentsService {
     return student;
   }
 
+  /** Self-resolution for student-facing features — never trust a client-supplied studentId. */
+  async findByUserId(userId: number): Promise<StudentEntity | null> {
+    return this.studentRepository.findOne({
+      where: { userId },
+      relations: STUDENT_RELATIONS,
+    });
+  }
+
   async findByAdmissionNumber(admissionNumber: string): Promise<StudentEntity> {
     const student = await this.studentRepository.findOne({
       where: { admissionNumber },
@@ -483,6 +504,230 @@ export class StudentsService {
       relations: ['grade'],
       order: { name: 'ASC' },
     });
+  }
+
+  async findMyClassTeacherSections(staffId: string): Promise<ClassSectionEntity[]> {
+    return this.classSectionRepository.find({
+      where: { classTeacherStaffId: staffId },
+      relations: ['grade'],
+      order: { academicYear: 'DESC', name: 'ASC' },
+    });
+  }
+
+  async assignClassTeacher(
+    classSectionId: number,
+    dto: AssignClassTeacherDto,
+  ): Promise<ClassSectionEntity> {
+    const classSection = await this.classSectionRepository.findOne({
+      where: { id: classSectionId },
+    });
+    if (!classSection) {
+      throw new NotFoundException(`Class section with id ${classSectionId} not found.`);
+    }
+
+    if (dto.staffId) {
+      const staff = await this.staffRepository.findOne({ where: { id: dto.staffId } });
+      if (!staff) {
+        throw new UnprocessableEntityException({
+          status: 422,
+          errors: { staffId: `Staff with id ${dto.staffId} does not exist.` },
+        });
+      }
+    }
+
+    classSection.classTeacherStaffId = dto.staffId ?? null;
+    return this.classSectionRepository.save(classSection);
+  }
+
+  /**
+   * Moves a student to a different class section within the same grade and
+   * academic year (e.g. balancing class sizes mid-year). This does not write
+   * an enrollment-history row — history is year-boundary only (see the
+   * annual promotion engine), and a same-year section move isn't a transition.
+   */
+  async transferSection(studentId: string, dto: TransferSectionDto): Promise<StudentEntity> {
+    const student = await this.findById(studentId);
+
+    const targetSection = await this.classSectionRepository.findOne({
+      where: { id: dto.classSectionId },
+    });
+    if (!targetSection) {
+      throw new UnprocessableEntityException({
+        status: 422,
+        errors: { classSectionId: `Class section with id ${dto.classSectionId} does not exist.` },
+      });
+    }
+    if (targetSection.gradeId !== student.gradeId) {
+      throw new UnprocessableEntityException({
+        status: 422,
+        errors: { classSectionId: 'Target section must be in the student\'s current grade.' },
+      });
+    }
+    if (targetSection.academicYear !== student.academicYear) {
+      throw new UnprocessableEntityException({
+        status: 422,
+        errors: { classSectionId: 'Target section must be in the student\'s current academic year.' },
+      });
+    }
+
+    await this.studentRepository.save({
+      ...student,
+      classSectionId: targetSection.id,
+      classSection: targetSection,
+    });
+    return this.findById(studentId);
+  }
+
+  // ─── Leaving ───────────────────────────────────────────────────────
+
+  async markAsLeaving(id: string, dto: MarkAsLeavingDto): Promise<StudentEntity> {
+    const student = await this.findById(id);
+    const status =
+      dto.status === LeavingStatus.GRADUATED
+        ? StudentStatus.GRADUATED
+        : StudentStatus.TRANSFERRED;
+
+    await this.studentRepository.save({
+      ...student,
+      status,
+      leavingReason: dto.reason ?? null,
+    });
+    return this.findById(id);
+  }
+
+  // ─── Portal Account Linking ────────────────────────────────────────
+
+  /**
+   * Links (or clears, when email is null) this student's record to a portal
+   * login account. This is the only place a student's own studentId can be
+   * derived from their JWT — self-service student features resolve via
+   * `StudentEntity.userId`, never a client-supplied studentId.
+   */
+  async linkUserAccount(id: string, dto: LinkUserAccountDto): Promise<StudentEntity> {
+    const student = await this.findById(id);
+
+    if (!dto.email) {
+      await this.studentRepository.save({ ...student, userId: null });
+      return this.findById(id);
+    }
+
+    let user = await this.usersService.findByEmail(dto.email);
+    if (!user) {
+      if (!dto.password) {
+        throw new UnprocessableEntityException({
+          status: 422,
+          errors: {
+            email: `No user account exists with email ${dto.email}. Provide a password to create one.`,
+          },
+        });
+      }
+      user = await this.usersService.create({
+        firstName: student.firstName,
+        lastName: student.lastName,
+        email: dto.email,
+        password: dto.password,
+        role: { id: RoleEnum.student },
+        status: { id: StatusEnum.active },
+      });
+    }
+    if (String(user.role?.id) !== String(RoleEnum.student)) {
+      throw new UnprocessableEntityException({
+        status: 422,
+        errors: { email: 'This user account does not have the Student role.' },
+      });
+    }
+
+    const userId = Number(user.id);
+    const alreadyLinked = await this.studentRepository.findOne({
+      where: { userId },
+    });
+    if (alreadyLinked && alreadyLinked.id !== id) {
+      throw new ConflictException(
+        'This user account is already linked to a different student.',
+      );
+    }
+
+    await this.studentRepository.save({ ...student, userId });
+    return this.findById(id);
+  }
+
+  /** Self-resolution for guardian-facing features — mirrors findByUserId for students. */
+  async findGuardianByUserId(userId: number): Promise<GuardianEntity | null> {
+    return this.guardianRepository.findOne({ where: { userId } });
+  }
+
+  /** All students linked to a given guardian, via the existing StudentGuardianEntity join. */
+  async findStudentsForGuardian(guardianId: string): Promise<StudentEntity[]> {
+    const links = await this.sgRepository.find({ where: { guardianId } });
+    if (!links.length) return [];
+    return this.studentRepository.find({
+      where: { id: In(links.map((l) => l.studentId)) },
+      relations: STUDENT_RELATIONS,
+    });
+  }
+
+  /**
+   * Links (or clears, when email is null) a guardian's record to a portal
+   * login account — the guardian-side mirror of linkUserAccount() above.
+   * Creates a new Guardian-role account on the spot when email has no
+   * matching user yet and a password is supplied.
+   */
+  async linkGuardianUserAccount(
+    studentId: string,
+    guardianId: string,
+    dto: LinkUserAccountDto,
+  ): Promise<GuardianEntity> {
+    const junction = await this.sgRepository.findOne({ where: { studentId, guardianId } });
+    if (!junction) {
+      throw new NotFoundException(
+        `Guardian ${guardianId} is not linked to student ${studentId}.`,
+      );
+    }
+
+    const guardian = await this.guardianRepository.findOne({ where: { id: guardianId } });
+    if (!guardian) {
+      throw new NotFoundException(`Guardian with id ${guardianId} not found.`);
+    }
+
+    if (!dto.email) {
+      return this.guardianRepository.save({ ...guardian, userId: null });
+    }
+
+    let user = await this.usersService.findByEmail(dto.email);
+    if (!user) {
+      if (!dto.password) {
+        throw new UnprocessableEntityException({
+          status: 422,
+          errors: {
+            email: `No user account exists with email ${dto.email}. Provide a password to create one.`,
+          },
+        });
+      }
+      user = await this.usersService.create({
+        firstName: guardian.firstName,
+        lastName: guardian.lastName,
+        email: dto.email,
+        password: dto.password,
+        role: { id: RoleEnum.guardian },
+        status: { id: StatusEnum.active },
+      });
+    }
+    if (String(user.role?.id) !== String(RoleEnum.guardian)) {
+      throw new UnprocessableEntityException({
+        status: 422,
+        errors: { email: 'This user account does not have the Guardian role.' },
+      });
+    }
+
+    const userId = Number(user.id);
+    const alreadyLinked = await this.guardianRepository.findOne({ where: { userId } });
+    if (alreadyLinked && alreadyLinked.id !== guardianId) {
+      throw new ConflictException(
+        'This user account is already linked to a different guardian.',
+      );
+    }
+
+    return this.guardianRepository.save({ ...guardian, userId });
   }
 
   // ─── Soft Delete ───────────────────────────────────────────────────

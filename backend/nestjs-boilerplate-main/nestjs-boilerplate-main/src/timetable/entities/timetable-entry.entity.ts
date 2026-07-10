@@ -14,6 +14,7 @@ import { SubjectEntity } from '../../subjects/entities/subject.entity';
 export enum TimetableEntryStatus {
   DRAFT = 'draft',
   CONFIRMED = 'confirmed',
+  PUBLISHED = 'published',
 }
 
 @Entity({ name: 'timetable_entry' })

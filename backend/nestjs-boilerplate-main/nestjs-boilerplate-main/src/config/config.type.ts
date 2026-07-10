@@ -10,6 +10,7 @@ import { LessonPlanConfig } from '../lesson-plan/config/lesson-plan-config.type'
 import { FreePeriodConfig } from '../teacher-tasks/config/free-period-config.type';
 import { GradeTrendConfig } from '../grades/config/grade-trend-config.type';
 import { TeacherPerformanceConfig } from '../teacher-performance/config/teacher-performance-config.type';
+import { WellbeingCaseConfig } from '../counselor/config/wellbeing-case-config.type';
 
 export type AllConfigType = {
   app: AppConfig;
@@ -24,4 +25,5 @@ export type AllConfigType = {
   freePeriod: FreePeriodConfig;
   gradeTrend: GradeTrendConfig;
   teacherPerformance: TeacherPerformanceConfig;
+  wellbeingCase: WellbeingCaseConfig;
 };

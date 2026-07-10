@@ -20,6 +20,7 @@ export const ENDPOINTS = {
     TIMELINE: (id: string) => `/students/${id}/timeline`,
     DOCUMENTS: (id: string) => `/students/${id}/documents`,
     SEARCH: '/students/search',
+    BY_ADMISSION_NUMBER: (admissionNumber: string) => `/students/admission/${encodeURIComponent(admissionNumber)}`,
   },
   TEACHERS: {
     LIST: '/teachers',
@@ -171,6 +172,15 @@ export const ENDPOINTS = {
   },
   TEACHER_TASKS: {
     FREE_PERIOD: '/teacher-tasks/free-period',
+  },
+  CLASS_CHECK_IN: {
+    STATUS: '/check-in/status',
+    CHECK_IN: '/check-in',
+    BY_ROOM: (roomId: string) => `/check-in/room/${roomId}`,
+  },
+  CLASS_ROOMS: {
+    LIST: '/class-rooms',
+    QR_PDF: '/class-rooms/qr-codes/pdf',
   },
   TEACHER_PERFORMANCE: {
     ME: '/teacher-performance/me',

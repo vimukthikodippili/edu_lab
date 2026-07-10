@@ -10,6 +10,7 @@ import { MarkEntity, MarkStatus } from '../grades/entities/mark.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { AnnualLessonPlanEntryEntity } from '../lesson-plan/entities/annual-lesson-plan-entry.entity';
+import { TeacherPerformanceSnapshotEntity } from './entities/teacher-performance-snapshot.entity';
 
 const staffId = 'teacher-uuid';
 const subjectId1 = 'subj-1';
@@ -32,6 +33,7 @@ describe('TeacherPerformanceService', () => {
   let subjectRepo: { find: jest.Mock };
   let classSectionRepo: { find: jest.Mock; findOne: jest.Mock };
   let entryRepo: { find: jest.Mock };
+  let snapshotRepo: { find: jest.Mock; findOne: jest.Mock; create: jest.Mock; save: jest.Mock };
   let configService: { get: jest.Mock };
 
   beforeEach(async () => {
@@ -42,6 +44,12 @@ describe('TeacherPerformanceService', () => {
     subjectRepo = { find: jest.fn().mockResolvedValue([]) };
     classSectionRepo = { find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null) };
     entryRepo = { find: jest.fn().mockResolvedValue([]) };
+    snapshotRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((dto) => ({ ...dto })),
+      save: jest.fn(async (row) => row),
+    };
     configService = {
       get: jest.fn().mockImplementation((key: string) => {
         if (key === 'teacherPerformance.passMarkPercent') return 40;
@@ -60,6 +68,7 @@ describe('TeacherPerformanceService', () => {
         { provide: getRepositoryToken(SubjectEntity), useValue: subjectRepo },
         { provide: getRepositoryToken(ClassSectionEntity), useValue: classSectionRepo },
         { provide: getRepositoryToken(AnnualLessonPlanEntryEntity), useValue: entryRepo },
+        { provide: getRepositoryToken(TeacherPerformanceSnapshotEntity), useValue: snapshotRepo },
         { provide: ConfigService, useValue: configService },
       ],
     }).compile();
@@ -252,65 +261,87 @@ describe('TeacherPerformanceService', () => {
     });
   });
 
-  describe('computeBehindScheduleOutlier — pure outlier threshold logic', () => {
-    const makeEntry = (plannedCompletionDate: string, isComplete: boolean) =>
-      ({ plannedCompletionDate, isComplete }) as never;
+  describe('computeBehindScheduleOutlierFromSnapshots — pure outlier threshold logic', () => {
+    const makeSnapshot = (weekStartDate: string, syllabusCompletionPercent: number, plannedCompletionPercent: number) =>
+      ({ weekStartDate, syllabusCompletionPercent, plannedCompletionPercent }) as never;
 
-    it('flags when the two most recent elapsed months are both overdue (trailing consecutive streak)', () => {
-      const today = new Date();
-      const monthKey = (offset: number) => {
-        const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - offset, 1));
-        return d.toISOString().slice(0, 7);
-      };
-      const entries = [
-        makeEntry(`${monthKey(1)}-05`, false), // most recent elapsed month, overdue
-        makeEntry(`${monthKey(2)}-05`, false), // month before that, also overdue
-      ];
-      expect(service.computeBehindScheduleOutlier(entries, 2)).toBe(true);
+    it('flags when the last N snapshots are all behind schedule', async () => {
+      snapshotRepo.find.mockResolvedValue([
+        makeSnapshot('2026-07-27', 40, 55), // most recent, behind
+        makeSnapshot('2026-07-20', 35, 48), // week before, also behind
+      ]);
+
+      const result = await service.computeBehindScheduleOutlierFromSnapshots(staffId, 2);
+      expect(result).toBe(true);
     });
 
-    it('does not flag when the most recent elapsed month is clean, even if an older month was overdue', () => {
-      const today = new Date();
-      const monthKey = (offset: number) => {
-        const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - offset, 1));
-        return d.toISOString().slice(0, 7);
-      };
-      const entries = [
-        makeEntry(`${monthKey(1)}-05`, true), // most recent elapsed month, completed on time -> clean
-        makeEntry(`${monthKey(2)}-05`, false), // older month, overdue
-      ];
-      expect(service.computeBehindScheduleOutlier(entries, 2)).toBe(false);
+    it('does not flag when the most recent snapshot is on or ahead of schedule', async () => {
+      snapshotRepo.find.mockResolvedValue([
+        makeSnapshot('2026-07-27', 60, 55), // most recent, on schedule (completion >= planned)
+        makeSnapshot('2026-07-20', 35, 48), // week before, behind
+      ]);
+
+      const result = await service.computeBehindScheduleOutlierFromSnapshots(staffId, 2);
+      expect(result).toBe(false);
     });
 
-    it('does not flag when a zero-entry gap month sits between two overdue months (streak broken)', () => {
-      const today = new Date();
-      const monthKey = (offset: number) => {
-        const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - offset, 1));
-        return d.toISOString().slice(0, 7);
-      };
-      // offset 1 (most recent elapsed month) has no entries at all; offset 2 and 3 are both overdue
-      // but are no longer "consecutive" once the gap at offset 1 is accounted for.
-      const entries = [
-        makeEntry(`${monthKey(2)}-05`, false),
-        makeEntry(`${monthKey(3)}-05`, false),
-      ];
-      expect(service.computeBehindScheduleOutlier(entries, 2)).toBe(false);
+    it('does not flag when fewer than the configured number of snapshots exist yet', async () => {
+      snapshotRepo.find.mockResolvedValue([makeSnapshot('2026-07-27', 40, 55)]);
+
+      const result = await service.computeBehindScheduleOutlierFromSnapshots(staffId, 2);
+      expect(result).toBe(false);
     });
 
-    it('does not flag when fewer than the configured number of consecutive months have any data', () => {
-      const today = new Date();
-      const monthKey = (offset: number) => {
-        const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - offset, 1));
-        return d.toISOString().slice(0, 7);
-      };
-      const entries = [makeEntry(`${monthKey(1)}-05`, false)];
-      expect(service.computeBehindScheduleOutlier(entries, 2)).toBe(false);
-    });
+    it('queries only the most recent N snapshots, ordered newest first', async () => {
+      snapshotRepo.find.mockResolvedValue([]);
 
-    it('excludes the current in-progress month from the streak entirely', () => {
+      await service.computeBehindScheduleOutlierFromSnapshots(staffId, 3);
+
+      expect(snapshotRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { staffId },
+          order: { weekStartDate: 'DESC' },
+          take: 3,
+        }),
+      );
+    });
+  });
+
+  describe('generateWeeklySnapshots — weekly aggregation job', () => {
+    it('persists one snapshot per teacher with correctly computed completion/planned percentages', async () => {
       const todayIso = new Date().toISOString().slice(0, 10);
-      const entries = [makeEntry(todayIso, false)];
-      expect(service.computeBehindScheduleOutlier(entries, 1)).toBe(false);
+      const pastDate = '2020-01-01'; // always in the past, always "due"
+      const futureDate = '2099-01-01'; // always in the future, never "due"
+
+      entryRepo.find.mockResolvedValue([
+        // Teacher A: 4 units total, 1 complete, 2 due-by-now (past+today), 1 not yet due
+        { staffId: 'teacher-A', plannedCompletionDate: pastDate, isComplete: true },
+        { staffId: 'teacher-A', plannedCompletionDate: pastDate, isComplete: false },
+        { staffId: 'teacher-A', plannedCompletionDate: todayIso, isComplete: false },
+        { staffId: 'teacher-A', plannedCompletionDate: futureDate, isComplete: false },
+      ]);
+
+      snapshotRepo.findOne.mockResolvedValue(null);
+      snapshotRepo.create.mockImplementation((dto: any) => ({ ...dto }));
+      snapshotRepo.save.mockImplementation(async (row: any) => row);
+
+      await service.generateWeeklySnapshots();
+
+      expect(snapshotRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          staffId: 'teacher-A',
+          syllabusCompletionPercent: 25, // 1 of 4 complete
+          plannedCompletionPercent: 75, // 3 of 4 due by today (past, past, today)
+        }),
+      );
+    });
+
+    it('skips teachers with zero lesson plan entries for the current academic year', async () => {
+      entryRepo.find.mockResolvedValue([]);
+
+      await service.generateWeeklySnapshots();
+
+      expect(snapshotRepo.save).not.toHaveBeenCalled();
     });
   });
 
@@ -415,15 +446,10 @@ describe('TeacherPerformanceService', () => {
   });
 
   describe('getPerformanceForStaff — behindScheduleOutlier wiring', () => {
-    it('surfaces the teacher-level behind-schedule outlier flag computed from their syllabus entries', async () => {
-      const today = new Date();
-      const monthKey = (offset: number) => {
-        const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - offset, 1));
-        return d.toISOString().slice(0, 7);
-      };
-      entryRepo.find.mockResolvedValue([
-        { id: 'e1', staffId, isComplete: false, plannedCompletionDate: `${monthKey(1)}-05`, syllabusUnit: { subjectId: subjectId1, subject: { name: 'Mathematics' } } },
-        { id: 'e2', staffId, isComplete: false, plannedCompletionDate: `${monthKey(2)}-05`, syllabusUnit: { subjectId: subjectId1, subject: { name: 'Mathematics' } } },
+    it('surfaces the teacher-level behind-schedule outlier flag computed from persisted weekly snapshots', async () => {
+      snapshotRepo.find.mockResolvedValue([
+        { weekStartDate: '2026-07-27', syllabusCompletionPercent: 40, plannedCompletionPercent: 55 },
+        { weekStartDate: '2026-07-20', syllabusCompletionPercent: 35, plannedCompletionPercent: 48 },
       ]);
 
       const result = await service.getPerformanceForStaff(staffId);
@@ -431,8 +457,8 @@ describe('TeacherPerformanceService', () => {
       expect(result.behindScheduleOutlier).toBe(true);
     });
 
-    it('is false when there is no consecutive behind-schedule streak', async () => {
-      entryRepo.find.mockResolvedValue([]);
+    it('is false when there is no consecutive behind-schedule streak in the snapshot history', async () => {
+      snapshotRepo.find.mockResolvedValue([]);
       const result = await service.getPerformanceForStaff(staffId);
       expect(result.behindScheduleOutlier).toBe(false);
     });

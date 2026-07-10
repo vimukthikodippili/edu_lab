@@ -22,4 +22,7 @@ export class ClassSectionEntity {
 
   @Column({ type: 'int' })
   gradeId: number;
+
+  @Column({ type: 'uuid', nullable: true })
+  classTeacherStaffId: string | null;
 }

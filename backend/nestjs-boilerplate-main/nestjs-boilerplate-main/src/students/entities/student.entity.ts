@@ -72,6 +72,16 @@ export class StudentEntity extends EntityRelationalHelper {
   @Column({ type: 'enum', enum: StudentStatus, default: StudentStatus.ACTIVE })
   status: StudentStatus;
 
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  leavingReason: string | null;
+
+  // Links this student's record to their portal login account (UserEntity.id).
+  // UserEntity uses a plain numeric auto-increment PK in this codebase (not a
+  // uuid, unlike Student/Staff) — this column must match that type.
+  // Nullable — most students are enrolled before/without a login account being linked.
+  @Column({ type: 'int', nullable: true, unique: true })
+  userId: number | null;
+
   // QR code stored as base64 data URL — encodes admission number for scanner
   @Column({ type: 'text', nullable: true })
   qrCode: string | null;

@@ -1,14 +1,17 @@
 'use client'
 import React, { useState } from 'react'
-import { ClipboardList, ChevronRight, Plus } from 'lucide-react'
+import { ClipboardList, ChevronRight, Plus, GraduationCap } from 'lucide-react'
 import { useGrades } from '@/features/students/hooks/useGrades'
 import { useClassSections } from '@/features/teacher-subject-requirements/hooks/useClassSections'
 import { useClassSectionRequirements } from '@/features/teacher-subject-requirements/hooks/useClassSectionRequirements'
 import { useCreateClassSection } from '@/features/teacher-subject-requirements/hooks/useCreateClassSection'
+import { useAssignClassTeacher } from '@/features/teacher-subject-requirements/hooks/useAssignClassTeacher'
+import { useStaff } from '@/features/staff/hooks/useStaff'
 import { AllocationBar } from '@/features/teacher-subject-requirements/components/AllocationBar'
 import { RequirementRow } from '@/features/teacher-subject-requirements/components/RequirementRow'
 import { AddRequirementForm } from '@/features/teacher-subject-requirements/components/AddRequirementForm'
 import type { ClassSection } from '@/features/teacher-subject-requirements/types'
+import type { StaffMember } from '@/features/staff/types'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
 
@@ -155,11 +158,13 @@ function AddSectionModal({ onClose }: { onClose: () => void }) {
 
 function SectionList({
   sections,
+  staffById,
   selectedId,
   onSelect,
   onAdd,
 }: {
   sections: ClassSection[]
+  staffById: Map<string, StaffMember>
   selectedId: number | null
   onSelect: (id: number) => void
   onAdd: () => void
@@ -172,32 +177,46 @@ function SectionList({
             No class sections found. Create one with the button below.
           </div>
         )}
-        {sections.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => onSelect(s.id)}
-            className="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3 border-0"
-            style={
-              selectedId === s.id
-                ? { borderLeft: '3px solid #667eea', background: '#f0f2ff' }
-                : { borderLeft: '3px solid transparent' }
-            }
-          >
-            <div>
-              <div
-                className="small fw-semibold"
-                style={{ color: selectedId === s.id ? '#4338ca' : undefined }}
-              >
-                {s.grade.name} · Section {s.name}
+        {sections.map((s) => {
+          const classTeacher = s.classTeacherStaffId ? staffById.get(s.classTeacherStaffId) : null
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onSelect(s.id)}
+              className="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3 border-0"
+              style={
+                selectedId === s.id
+                  ? { borderLeft: '3px solid #667eea', background: '#f0f2ff' }
+                  : { borderLeft: '3px solid transparent' }
+              }
+            >
+              <div>
+                <div
+                  className="small fw-semibold"
+                  style={{ color: selectedId === s.id ? '#4338ca' : undefined }}
+                >
+                  {s.grade.name} · Section {s.name}
+                </div>
+                <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+                  {s.academicYear}
+                </div>
+                <div
+                  className="d-flex align-items-center gap-1"
+                  style={{ fontSize: '0.72rem' }}
+                >
+                  <GraduationCap size={11} className={classTeacher ? 'text-primary' : 'text-muted'} />
+                  {classTeacher ? (
+                    <span className="text-primary">{classTeacher.firstName} {classTeacher.lastName}</span>
+                  ) : (
+                    <span className="text-muted fst-italic">Unassigned</span>
+                  )}
+                </div>
               </div>
-              <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-                {s.academicYear}
-              </div>
-            </div>
-            <ChevronRight size={14} className="text-muted" />
-          </button>
-        ))}
+              <ChevronRight size={14} className="text-muted" />
+            </button>
+          )
+        })}
       </div>
 
       {/* Add section button at bottom */}
@@ -216,7 +235,51 @@ function SectionList({
 
 // ─── Requirements Panel ───────────────────────────────────────────────────────
 
-function RequirementsPanel({ classSectionId }: { classSectionId: number }) {
+function ClassTeacherControl({
+  classSection,
+  staffOptions,
+}: {
+  classSection: ClassSection
+  staffOptions: StaffMember[]
+}) {
+  const assignClassTeacher = useAssignClassTeacher()
+  const [value, setValue] = useState(classSection.classTeacherStaffId ?? '')
+
+  const handleChange = (staffId: string) => {
+    setValue(staffId)
+    assignClassTeacher.mutate({ classSectionId: classSection.id, staffId: staffId || null })
+  }
+
+  return (
+    <div className="d-flex align-items-center gap-2">
+      <GraduationCap size={14} className="text-muted flex-shrink-0" />
+      <label className="small text-muted fw-semibold mb-0 flex-shrink-0">Class Teacher</label>
+      <select
+        className="form-select form-select-sm"
+        style={{ maxWidth: 240 }}
+        value={value}
+        onChange={(e) => handleChange(e.target.value)}
+        disabled={assignClassTeacher.isPending}
+      >
+        <option value="">— Unassigned —</option>
+        {staffOptions.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.firstName} {s.lastName}
+          </option>
+        ))}
+      </select>
+      {assignClassTeacher.isPending && <span className="spinner-border spinner-border-sm text-muted" />}
+    </div>
+  )
+}
+
+function RequirementsPanel({
+  classSectionId,
+  staffOptions,
+}: {
+  classSectionId: number
+  staffOptions: StaffMember[]
+}) {
   const { data, isLoading, isError } = useClassSectionRequirements(classSectionId)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -244,7 +307,7 @@ function RequirementsPanel({ classSectionId }: { classSectionId: number }) {
     <div>
       {/* Section subheader */}
       <div className="px-4 pt-3 pb-2 border-bottom">
-        <div className="d-flex align-items-center gap-2 flex-wrap">
+        <div className="d-flex align-items-center gap-2 flex-wrap mb-2">
           <h6 className="mb-0 fw-bold">
             {classSection.grade.name} · Section {classSection.name}
           </h6>
@@ -253,6 +316,7 @@ function RequirementsPanel({ classSectionId }: { classSectionId: number }) {
             {classSection.grade.stage.replace(/_/g, ' ')}
           </span>
         </div>
+        <ClassTeacherControl classSection={classSection} staffOptions={staffOptions} />
       </div>
 
       {/* Allocation bar */}
@@ -325,6 +389,9 @@ export default function PeriodRequirementsPage() {
     gradeId: gradeFilter,
     academicYear: yearFilter || undefined,
   })
+  const { data: staffData } = useStaff({ status: 'active', limit: 100 } as any)
+  const staffOptions = staffData?.data ?? []
+  const staffById = new Map(staffOptions.map((s) => [s.id, s]))
 
   return (
     <div className="container-fluid px-4 py-4">
@@ -417,6 +484,7 @@ export default function PeriodRequirementsPage() {
             ) : (
               <SectionList
                 sections={sections}
+                staffById={staffById}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
                 onAdd={() => setShowAddModal(true)}
@@ -452,7 +520,7 @@ export default function PeriodRequirementsPage() {
                 </button>
               </div>
             ) : (
-              <RequirementsPanel classSectionId={selectedId} />
+              <RequirementsPanel classSectionId={selectedId} staffOptions={staffOptions} />
             )}
           </div>
         </div>
