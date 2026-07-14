@@ -9,6 +9,7 @@ import { SubjectResultEntity } from './entities/subject-result.entity';
 import { TermResultEntity } from './entities/term-result.entity';
 import { StudentGradeTrendEntity } from './entities/student-grade-trend.entity';
 import { AcademicPatternFlagEntity } from './entities/academic-pattern-flag.entity';
+import { AssessmentMaterialsCheckEntity } from './entities/assessment-materials-check.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { AttendanceRecordEntity } from '../attendance/entities/attendance-record.entity';
 import { StaffEntity } from '../staff/entities/staff.entity';
@@ -23,6 +24,7 @@ import { AcademicTermsService } from './services/academic-terms.service';
 import { TermAssessmentPlanService } from './services/term-assessment-plan.service';
 import { AssessmentService } from './services/assessment.service';
 import { MarkService } from './services/mark.service';
+import { MaterialsCheckService } from './services/materials-check.service';
 import { GradingBandService } from './services/grading-band.service';
 import { ResultComputationService } from './services/result-computation.service';
 import { ResultsQueryService } from './services/results-query.service';
@@ -35,6 +37,7 @@ import { AcademicTermsController } from './controllers/academic-terms.controller
 import { TermAssessmentPlanController } from './controllers/term-assessment-plan.controller';
 import { AssessmentController } from './controllers/assessment.controller';
 import { MarkController } from './controllers/mark.controller';
+import { MaterialsCheckController } from './controllers/materials-check.controller';
 import { GradingBandController } from './controllers/grading-band.controller';
 import { ResultsController } from './controllers/results.controller';
 import { GradeTrendController } from './controllers/grade-trend.controller';
@@ -62,6 +65,7 @@ import { NotificationModule } from '../notification/notification.module';
       TermResultEntity,
       StudentGradeTrendEntity,
       AcademicPatternFlagEntity,
+      AssessmentMaterialsCheckEntity,
       AttendanceRecordEntity,
       FileEntity,
     ]),
@@ -74,6 +78,7 @@ import { NotificationModule } from '../notification/notification.module';
     TermAssessmentPlanService,
     AssessmentService,
     MarkService,
+    MaterialsCheckService,
     GradingBandService,
     ResultComputationService,
     ResultsQueryService,
@@ -88,6 +93,7 @@ import { NotificationModule } from '../notification/notification.module';
     TermAssessmentPlanController,
     AssessmentController,
     MarkController,
+    MaterialsCheckController,
     GradingBandController,
     ResultsController,
     GradeTrendController,

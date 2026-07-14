@@ -56,8 +56,14 @@ import { TeacherTasksModule } from './teacher-tasks/teacher-tasks.module';
 import freePeriodConfig from './teacher-tasks/config/free-period.config';
 import gradeTrendConfig from './grades/config/grade-trend.config';
 import { TeacherPerformanceModule } from './teacher-performance/teacher-performance.module';
+import { CareerModule } from './career/career.module';
+import { LmsModule } from './lms/lms.module';
 import teacherPerformanceConfig from './teacher-performance/config/teacher-performance.config';
 import wellbeingCaseConfig from './counselor/config/wellbeing-case.config';
+import counselorNoteConfig from './counselor/config/counselor-note.config';
+import liveSessionConfig from './lms/config/live-session.config';
+import livekitConfig from './lms/config/livekit.config';
+import livekitEgressConfig from './lms/config/livekit-egress.config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MongooseConfigService } from './database/mongoose-config.service';
@@ -95,6 +101,10 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
         gradeTrendConfig,
         teacherPerformanceConfig,
         wellbeingCaseConfig,
+        counselorNoteConfig,
+        liveSessionConfig,
+        livekitConfig,
+        livekitEgressConfig,
       ],
       envFilePath: ['.env'],
     }),
@@ -162,6 +172,8 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     MoodCheckInModule,
     TeacherTasksModule,
     TeacherPerformanceModule,
+    CareerModule,
+    LmsModule,
   ],
 })
 export class AppModule {}

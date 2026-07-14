@@ -49,6 +49,8 @@ function AddAssessmentModal({
   const [assessmentType, setAssessmentType] = useState<AssessmentType>('monthly_test')
   const [scheduledDate, setScheduledDate] = useState('')
   const [totalMarks, setTotalMarks] = useState(100)
+  const [requiresMaterialsCheck, setRequiresMaterialsCheck] = useState(false)
+  const [instructions, setInstructions] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
@@ -67,6 +69,8 @@ function AddAssessmentModal({
         scheduledDate,
         totalMarks,
         sectionHeadOverride: false,
+        requiresMaterialsCheck,
+        instructions: instructions.trim() || undefined,
       })
       setSuccess(true)
       setTimeout(onClose, 1200)
@@ -168,6 +172,34 @@ function AddAssessmentModal({
                     required
                   />
                 </div>
+              </div>
+
+              <div className="form-check mt-3">
+                <input
+                  type="checkbox"
+                  className="form-check-input"
+                  id="requiresMaterialsCheck"
+                  checked={requiresMaterialsCheck}
+                  onChange={(e) => setRequiresMaterialsCheck(e.target.checked)}
+                />
+                <label className="form-check-label small" htmlFor="requiresMaterialsCheck">
+                  Requires a materials-readiness check before marks can be submitted
+                  <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>
+                    e.g. confirm every student has their full color set before a drawing activity
+                  </span>
+                </label>
+              </div>
+
+              <div className="mt-3">
+                <label className="form-label fw-semibold small">Instructions for marking (optional)</label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  placeholder="e.g. Score out of 20: consider correct use of light/dark shading and suitable colour combinations."
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  maxLength={2000}
+                />
               </div>
             </div>
             <div className="modal-footer border-0 px-4 pb-4">

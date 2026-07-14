@@ -61,6 +61,8 @@ export class AssessmentService {
       createdByTeacherId,
       sectionHeadOverride: dto.sectionHeadOverride ?? false,
       overrideApprovedById: dto.sectionHeadOverride ? createdByTeacherId : null,
+      requiresMaterialsCheck: dto.requiresMaterialsCheck ?? false,
+      instructions: dto.instructions ?? null,
     });
 
     return this.assessmentRepo.save(assessment);

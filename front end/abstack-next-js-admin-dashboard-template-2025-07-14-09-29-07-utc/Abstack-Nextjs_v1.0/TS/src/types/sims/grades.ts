@@ -50,6 +50,8 @@ export interface Assessment {
   createdByTeacherId: string
   sectionHeadOverride: boolean
   overrideApprovedById: string | null
+  requiresMaterialsCheck: boolean
+  instructions: string | null
   subject: { id: string; name: string; code: string }
   classSection: { id: number; name: string }
   term: AcademicTerm
@@ -153,6 +155,36 @@ export interface ScorePoint {
 export interface AttendanceGradeFlag {
   description: string
   flaggedAt: string
+}
+
+export interface MaterialsCheckRow {
+  studentId: string
+  firstName: string
+  lastName: string
+  admissionNumber: string
+  hasFullMaterials: boolean | null
+  note: string | null
+}
+
+export interface MaterialsCheckStatus {
+  assessmentId: string
+  requiresMaterialsCheck: boolean
+  allConfirmed: boolean
+  totalStudents: number
+  confirmedCount: number
+  roster: MaterialsCheckRow[]
+}
+
+export interface MaterialsCheckEntryPayload {
+  studentId: string
+  hasFullMaterials: boolean
+  note?: string
+}
+
+export interface BulkMaterialsCheckPayload {
+  assessmentId: string
+  defaultHasFullMaterials: boolean
+  entries: MaterialsCheckEntryPayload[]
 }
 
 export interface GradeTrendStudentRow {

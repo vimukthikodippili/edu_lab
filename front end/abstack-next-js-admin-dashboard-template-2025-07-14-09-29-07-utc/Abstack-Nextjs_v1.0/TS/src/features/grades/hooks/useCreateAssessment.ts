@@ -11,6 +11,8 @@ interface CreateAssessmentPayload {
   scheduledDate: string
   totalMarks: number
   sectionHeadOverride?: boolean
+  requiresMaterialsCheck?: boolean
+  instructions?: string
 }
 
 export function useCreateAssessment() {

@@ -13,7 +13,7 @@ export function useUploadFile() {
       const form = new FormData()
       form.append('file', file)
       const { data } = await apiClient.post<{ file: UploadedFile }>('/files/upload', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': undefined },
       })
       return data
     },

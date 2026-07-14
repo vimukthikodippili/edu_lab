@@ -31,6 +31,10 @@ import {
   LineChart,
   Activity,
   Award,
+  Lock,
+  Compass,
+  ListChecks,
+  Video,
 } from 'lucide-react'
 
 export const MENU_ITEMS: MenuItemType[] = [
@@ -255,6 +259,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.PRINCIPAL],
   },
   {
+    key: 'principal-notes',
+    label: 'Session Notes',
+    icon: Lock,
+    url: '/principal/notes',
+    allowedRoles: [ROLES.PRINCIPAL],
+  },
+  {
     key: 'principal-emergency-alert',
     label: 'Emergency Alert',
     icon: AlertTriangle,
@@ -450,6 +461,20 @@ export const MENU_ITEMS: MenuItemType[] = [
     ],
   },
   {
+    key: 'teacher-assignments',
+    label: 'Homework & Assignments',
+    icon: ListChecks,
+    url: '/teacher/assignments',
+    allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'teacher-live-classes',
+    label: 'Live Online Classes',
+    icon: Video,
+    url: '/teacher/live-classes',
+    allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+  },
+  {
     key: 'teacher-library',
     label: 'Online Library',
     icon: Library,
@@ -502,6 +527,20 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.STUDENT],
   },
   {
+    key: 'student-assignments',
+    label: 'My Assignments',
+    icon: ListChecks,
+    url: '/student/assignments',
+    allowedRoles: [ROLES.STUDENT],
+  },
+  {
+    key: 'student-live-classes',
+    label: 'Live Online Classes',
+    icon: Video,
+    url: '/student/live-classes',
+    allowedRoles: [ROLES.STUDENT],
+  },
+  {
     key: 'student-timetable',
     label: 'Timetable',
     icon: Calendar,
@@ -513,6 +552,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'Online Library',
     icon: Library,
     url: '/library/online',
+    allowedRoles: [ROLES.STUDENT],
+  },
+  {
+    key: 'student-self-discovery',
+    label: 'Self-Discovery',
+    icon: Compass,
+    url: '/student/self-discovery',
     allowedRoles: [ROLES.STUDENT],
   },
 
@@ -538,6 +584,20 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/guardian/children',
     allowedRoles: [ROLES.GUARDIAN],
     isDisabled: true,
+  },
+  {
+    key: 'guardian-assignments',
+    label: 'Homework & Assignments',
+    icon: ListChecks,
+    url: '/guardian/assignments',
+    allowedRoles: [ROLES.GUARDIAN],
+  },
+  {
+    key: 'guardian-wellbeing',
+    label: 'Wellbeing Updates',
+    icon: Heart,
+    url: '/guardian/wellbeing',
+    allowedRoles: [ROLES.GUARDIAN],
   },
 
   // ─── Counselor ────────────────────────────────────────────────────────────
@@ -570,12 +630,18 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.COUNSELOR],
   },
   {
+    key: 'counselor-notes',
+    label: 'Session Notes',
+    icon: Lock,
+    url: '/counselor/notes',
+    allowedRoles: [ROLES.COUNSELOR],
+  },
+  {
     key: 'counselor-career',
     label: 'Career Guidance',
     icon: BrainCircuit,
     url: '/counselor/career',
     allowedRoles: [ROLES.COUNSELOR],
-    isDisabled: true,
   },
 
   // ─── Security Officer ─────────────────────────────────────────────────────

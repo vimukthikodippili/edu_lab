@@ -55,6 +55,17 @@ export class AssessmentEntity extends EntityRelationalHelper {
   @Column({ type: 'uuid', nullable: true })
   overrideApprovedById: string | null;
 
+  // Opts this assessment into the pre-submission materials-readiness gate (e.g. "does every
+  // student have their full color set?") — general-purpose, not specific to any one subject.
+  // Default false: every pre-existing assessment is completely unaffected.
+  @Column({ type: 'boolean', default: false })
+  requiresMaterialsCheck: boolean;
+
+  // Free-text guidance shown to the marking teacher (e.g. rubric criteria) — deliberately not
+  // a structured multi-criterion schema; marks stay a single flat score, as everywhere else.
+  @Column({ type: 'text', nullable: true })
+  instructions: string | null;
+
   @ManyToOne(() => SubjectEntity, { nullable: false, eager: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'subjectId' })
   subject: SubjectEntity;

@@ -14,7 +14,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 interface Props {
   selectedId: string | null
-  onSelect: (id: string, name: string) => void
+  onSelect: (id: string, name: string, userId?: number | null) => void
   placeholder?: string
 }
 
@@ -53,7 +53,7 @@ export function StudentPicker({ selectedId, onSelect, placeholder }: Props) {
                 key={student.id}
                 type="button"
                 className={`list-group-item list-group-item-action d-flex align-items-center justify-content-between ${selectedId === student.id ? 'active' : ''}`}
-                onClick={() => onSelect(student.id, `${student.firstName} ${student.lastName}`)}
+                onClick={() => onSelect(student.id, `${student.firstName} ${student.lastName}`, student.userId)}
               >
                 <span className="small">{student.firstName} {student.lastName}</span>
                 <span className={`small ${selectedId === student.id ? 'text-white-50' : 'text-muted'}`}>

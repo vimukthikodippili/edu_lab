@@ -11,6 +11,10 @@ import { FreePeriodConfig } from '../teacher-tasks/config/free-period-config.typ
 import { GradeTrendConfig } from '../grades/config/grade-trend-config.type';
 import { TeacherPerformanceConfig } from '../teacher-performance/config/teacher-performance-config.type';
 import { WellbeingCaseConfig } from '../counselor/config/wellbeing-case-config.type';
+import { CounselorNoteConfig } from '../counselor/config/counselor-note-config.type';
+import { LiveSessionConfig } from '../lms/config/live-session-config.type';
+import { LiveKitConfig } from '../lms/config/livekit-config.type';
+import { LiveKitEgressConfig } from '../lms/config/livekit-egress-config.type';
 
 export type AllConfigType = {
   app: AppConfig;
@@ -26,4 +30,8 @@ export type AllConfigType = {
   gradeTrend: GradeTrendConfig;
   teacherPerformance: TeacherPerformanceConfig;
   wellbeingCase: WellbeingCaseConfig;
+  counselorNote: CounselorNoteConfig;
+  liveSession: LiveSessionConfig;
+  livekit: LiveKitConfig;
+  livekitEgress: LiveKitEgressConfig;
 };

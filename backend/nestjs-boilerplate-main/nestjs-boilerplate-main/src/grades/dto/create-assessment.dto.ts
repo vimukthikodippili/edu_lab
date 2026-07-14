@@ -8,6 +8,7 @@ import {
   IsUUID,
   Length,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -46,4 +47,13 @@ export class CreateAssessmentDto {
   @IsOptional()
   @IsBoolean()
   sectionHeadOverride?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  requiresMaterialsCheck?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  instructions?: string;
 }

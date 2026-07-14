@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { ClassCheckInService } from './class-check-in.service';
 import {
   ClassCheckInEntity,
@@ -19,7 +20,7 @@ const MONDAY_9AM = new Date(2026, 0, 5, 9, 0);
 describe('ClassCheckInService', () => {
   let service: ClassCheckInService;
 
-  let checkInRepo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock };
+  let checkInRepo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; find: jest.Mock };
   let timetableRepo: { findOne: jest.Mock };
   let classRoomRepo: { findOne: jest.Mock };
   let configService: { get: jest.Mock };
@@ -29,6 +30,7 @@ describe('ClassCheckInService', () => {
       findOne: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockImplementation((data) => data),
       save: jest.fn().mockImplementation((data) => Promise.resolve({ id: 'checkin-1', ...data })),
+      find: jest.fn().mockResolvedValue([]),
     };
     timetableRepo = { findOne: jest.fn().mockResolvedValue(null) };
     classRoomRepo = { findOne: jest.fn().mockResolvedValue(null) };
@@ -247,6 +249,157 @@ describe('ClassCheckInService', () => {
 
       expect(result).toBe(existing);
       expect(checkInRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('checkInFromLiveSession', () => {
+    const classSectionId = 27;
+    const subjectId = 'subject-uuid-1';
+
+    it('returns null when there is no active period right now (never throws)', async () => {
+      jest.setSystemTime(new Date(2026, 0, 5, 7, 0)); // before school start
+      const result = await service.checkInFromLiveSession(classSectionId, subjectId, teacherId);
+      expect(result).toBeNull();
+      expect(timetableRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('returns null when no timetable entry matches this class/subject/teacher for the current day+period', async () => {
+      timetableRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.checkInFromLiveSession(classSectionId, subjectId, teacherId);
+
+      expect(result).toBeNull();
+      expect(timetableRepo.findOne).toHaveBeenCalledWith({
+        where: { classSectionId, subjectId, teacherId, day: 1, period: 3 },
+      });
+    });
+
+    it('creates a check-in row with method live_session_auto on the happy path', async () => {
+      timetableRepo.findOne.mockResolvedValue({
+        id: 40,
+        classSectionId,
+        subjectId,
+        teacherId,
+        day: 1,
+        period: 3,
+      });
+      checkInRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.checkInFromLiveSession(classSectionId, subjectId, teacherId);
+
+      expect(checkInRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timetableEntryId: 40,
+          date: '2026-01-05',
+          teacherId,
+          method: ClassCheckInMethod.LIVE_SESSION_AUTO,
+        }),
+      );
+      expect(result).toEqual(
+        expect.objectContaining({ timetableEntryId: 40, method: ClassCheckInMethod.LIVE_SESSION_AUTO }),
+      );
+    });
+
+    it('idempotency: returns the existing row instead of creating a duplicate when a check-in already exists (e.g. the teacher had already tapped in)', async () => {
+      const existing = { id: 'checkin-3', timetableEntryId: 40, date: '2026-01-05' };
+      timetableRepo.findOne.mockResolvedValue({
+        id: 40,
+        classSectionId,
+        subjectId,
+        teacherId,
+        day: 1,
+        period: 3,
+      });
+      checkInRepo.findOne.mockResolvedValue(existing);
+
+      const result = await service.checkInFromLiveSession(classSectionId, subjectId, teacherId);
+
+      expect(result).toBe(existing);
+      expect(checkInRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findForAudit', () => {
+    it('queries with no where clause when no filters are given, ordered newest-first', async () => {
+      await service.findForAudit({});
+
+      expect(checkInRepo.find).toHaveBeenCalledWith({
+        where: {},
+        order: { date: 'DESC', checkedInAt: 'DESC' },
+      });
+    });
+
+    it('filters by teacherId alone', async () => {
+      await service.findForAudit({ teacherId });
+
+      expect(checkInRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { teacherId } }),
+      );
+    });
+
+    it('filters by classSectionId alone via the timetableEntry relation', async () => {
+      await service.findForAudit({ classSectionId: 27 });
+
+      expect(checkInRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { timetableEntry: { classSectionId: 27 } },
+        }),
+      );
+    });
+
+    it('filters by a date range when both dateFrom and dateTo are given', async () => {
+      await service.findForAudit({ dateFrom: '2026-01-01', dateTo: '2026-01-31' });
+
+      expect(checkInRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { date: Between('2026-01-01', '2026-01-31') },
+        }),
+      );
+    });
+
+    it('filters by dateFrom only as an open-ended lower bound', async () => {
+      await service.findForAudit({ dateFrom: '2026-01-01' });
+
+      expect(checkInRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { date: MoreThanOrEqual('2026-01-01') },
+        }),
+      );
+    });
+
+    it('filters by dateTo only as an open-ended upper bound', async () => {
+      await service.findForAudit({ dateTo: '2026-01-31' });
+
+      expect(checkInRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { date: LessThanOrEqual('2026-01-31') },
+        }),
+      );
+    });
+
+    it('combines teacherId, classSectionId, and a date range together', async () => {
+      await service.findForAudit({
+        teacherId,
+        classSectionId: 27,
+        dateFrom: '2026-01-01',
+        dateTo: '2026-01-31',
+      });
+
+      expect(checkInRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            teacherId,
+            timetableEntry: { classSectionId: 27 },
+            date: Between('2026-01-01', '2026-01-31'),
+          },
+        }),
+      );
+    });
+
+    it('returns an empty array when nothing matches', async () => {
+      checkInRepo.find.mockResolvedValue([]);
+      const result = await service.findForAudit({ teacherId: 'no-such-teacher' });
+      expect(result).toEqual([]);
     });
   });
 });

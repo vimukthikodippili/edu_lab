@@ -7,6 +7,8 @@ import { useAcademicTerms } from '@/features/grades/hooks/useAcademicTerms'
 import { useMyAssessments } from '@/features/grades/hooks/useMyAssessments'
 import { useMarksForAssessment } from '@/features/grades/hooks/useMarksForAssessment'
 import { useBulkUpsertMarks } from '@/features/grades/hooks/useBulkUpsertMarks'
+import { useMaterialsCheckStatus } from '@/features/grades/hooks/useMaterialsCheckStatus'
+import { MaterialsCheckPanel } from '@/features/grades/components/MaterialsCheckPanel'
 import { useNotificationContext } from '@/context/useNotificationContext'
 import { ASSESSMENT_TYPE_LABELS } from '@/types/sims/grades'
 import type { MarkRosterRow } from '@/types/sims/grades'
@@ -120,6 +122,10 @@ function MarksEntryContent() {
 
   const roster = marksData?.roster ?? []
   const assessment = marksData?.assessment
+  const { data: materialsStatus } = useMaterialsCheckStatus(
+    assessment?.requiresMaterialsCheck ? selectedAssessmentId : null,
+  )
+  const materialsBlocked = !!assessment?.requiresMaterialsCheck && !materialsStatus?.allConfirmed
 
   // Auto-select first term
   useEffect(() => {
@@ -187,6 +193,14 @@ function MarksEntryContent() {
       showNotification({
         variant: 'warning',
         message: 'Enter at least one score before saving.',
+      })
+      return
+    }
+
+    if (status === 'submitted' && materialsBlocked) {
+      showNotification({
+        variant: 'warning',
+        message: 'Complete the materials check for every student before submitting marks.',
       })
       return
     }
@@ -291,6 +305,22 @@ function MarksEntryContent() {
           )}
         </div>
       </div>
+
+      {/* ── Instructions ───────────────────────────────────────────── */}
+      {assessment?.instructions && (
+        <div
+          className="rounded-3 p-3 mb-4 d-flex align-items-start gap-2"
+          style={{ background: '#eef2ff', color: '#3730a3', fontSize: '0.85rem' }}
+        >
+          <AlertCircle size={16} className="flex-shrink-0 mt-1" />
+          <span>{assessment.instructions}</span>
+        </div>
+      )}
+
+      {/* ── Materials-readiness gate ──────────────────────────────── */}
+      {assessment?.requiresMaterialsCheck && selectedAssessmentId && (
+        <MaterialsCheckPanel assessmentId={selectedAssessmentId} />
+      )}
 
       {/* ── Locked banner ──────────────────────────────────────────── */}
       {allSubmitted && (
@@ -398,7 +428,8 @@ function MarksEntryContent() {
                     border: 'none',
                   }}
                   onClick={() => handleSave('submitted')}
-                  disabled={bulkUpsert.isPending}
+                  disabled={bulkUpsert.isPending || materialsBlocked}
+                  title={materialsBlocked ? 'Complete the materials check for every student first' : undefined}
                 >
                   <Send size={14} />
                   {bulkUpsert.isPending ? 'Submitting…' : 'Submit Final'}

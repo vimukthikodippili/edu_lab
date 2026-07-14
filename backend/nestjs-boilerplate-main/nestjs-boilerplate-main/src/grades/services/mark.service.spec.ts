@@ -13,6 +13,7 @@ import { AssessmentEntity, AssessmentType } from '../entities/assessment.entity'
 import { StudentEntity, StudentStatus } from '../../students/entities/student.entity';
 import { TeacherSubjectClassRequirementEntity } from '../../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { MarksSubmittedEvent } from '../events/marks-submitted.event';
+import { MaterialsCheckService } from './materials-check.service';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ describe('MarkService', () => {
   let studentRepo: MockRepo<StudentEntity>;
   let requirementRepo: MockRepo<TeacherSubjectClassRequirementEntity>;
   let eventEmitter: { emit: jest.Mock };
+  let materialsCheckService: { getStatus: jest.Mock };
 
   beforeEach(async () => {
     markRepo = repoMock<MarkEntity>();
@@ -73,6 +75,7 @@ describe('MarkService', () => {
     studentRepo = repoMock<StudentEntity>();
     requirementRepo = repoMock<TeacherSubjectClassRequirementEntity>();
     eventEmitter = { emit: jest.fn() };
+    materialsCheckService = { getStatus: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -85,6 +88,7 @@ describe('MarkService', () => {
           useValue: requirementRepo,
         },
         { provide: EventEmitter2, useValue: eventEmitter },
+        { provide: MaterialsCheckService, useValue: materialsCheckService },
       ],
     }).compile();
 
@@ -251,6 +255,68 @@ describe('MarkService', () => {
       ).rejects.toThrow(ForbiddenException);
       expect(markRepo.save).not.toHaveBeenCalled();
       expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Materials-Readiness Gate', () => {
+    it('regression: an assessment with requiresMaterialsCheck unset (the default for every existing assessment) is completely unaffected — the gate is never consulted', async () => {
+      assessmentRepo.findOne!.mockResolvedValue(makeAssessment({ totalMarks: 50 }));
+      requirementRepo.findOne!.mockResolvedValue({ id: 1 });
+      markRepo.findBy!.mockResolvedValue([]);
+      markRepo.save!.mockImplementation((entries) => Promise.resolve(entries));
+
+      await service.bulkUpsert(makeDto({ status: MarkStatus.SUBMITTED }) as any, 'teacher-uuid', false);
+
+      expect(materialsCheckService.getStatus).not.toHaveBeenCalled();
+      expect(markRepo.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not consult the gate for DRAFT submissions, even on a gated assessment', async () => {
+      assessmentRepo.findOne!.mockResolvedValue(
+        makeAssessment({ totalMarks: 50, requiresMaterialsCheck: true }),
+      );
+      requirementRepo.findOne!.mockResolvedValue({ id: 1 });
+      markRepo.findBy!.mockResolvedValue([]);
+      markRepo.save!.mockImplementation((entries) => Promise.resolve(entries));
+
+      await service.bulkUpsert(makeDto({ status: MarkStatus.DRAFT }) as any, 'teacher-uuid', false);
+
+      expect(materialsCheckService.getStatus).not.toHaveBeenCalled();
+    });
+
+    it('blocks SUBMITTED marks on a gated assessment when materials readiness is not fully confirmed', async () => {
+      assessmentRepo.findOne!.mockResolvedValue(
+        makeAssessment({ totalMarks: 50, requiresMaterialsCheck: true }),
+      );
+      requirementRepo.findOne!.mockResolvedValue({ id: 1 });
+      materialsCheckService.getStatus.mockResolvedValue({
+        allConfirmed: false,
+        totalStudents: 20,
+        confirmedCount: 17,
+      });
+
+      await expect(
+        service.bulkUpsert(makeDto({ status: MarkStatus.SUBMITTED }) as any, 'teacher-uuid', false),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(markRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('allows SUBMITTED marks on a gated assessment once materials readiness is fully confirmed', async () => {
+      assessmentRepo.findOne!.mockResolvedValue(
+        makeAssessment({ totalMarks: 50, requiresMaterialsCheck: true }),
+      );
+      requirementRepo.findOne!.mockResolvedValue({ id: 1 });
+      markRepo.findBy!.mockResolvedValue([]);
+      markRepo.save!.mockImplementation((entries) => Promise.resolve(entries));
+      materialsCheckService.getStatus.mockResolvedValue({
+        allConfirmed: true,
+        totalStudents: 20,
+        confirmedCount: 20,
+      });
+
+      await service.bulkUpsert(makeDto({ status: MarkStatus.SUBMITTED }) as any, 'teacher-uuid', false);
+
+      expect(markRepo.save).toHaveBeenCalledTimes(1);
     });
   });
 

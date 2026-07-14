@@ -65,6 +65,10 @@ export class TeacherSubjectRequirementsService {
     return { classSection: section, totalWeeklySlots, allocatedPeriods, availablePeriods, requirements };
   }
 
+  async findByTeacher(teacherId: string): Promise<TeacherSubjectClassRequirementEntity[]> {
+    return this.repo.find({ where: { teacherId }, order: { createdAt: 'ASC' } });
+  }
+
   async create(dto: CreateRequirementDto): Promise<TeacherSubjectClassRequirementEntity> {
     await this.requireTeacher(dto.teacherId);
     await this.requireSubject(dto.subjectId);

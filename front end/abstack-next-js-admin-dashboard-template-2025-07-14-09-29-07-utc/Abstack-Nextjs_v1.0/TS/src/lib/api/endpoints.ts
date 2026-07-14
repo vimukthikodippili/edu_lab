@@ -204,15 +204,36 @@ export const ENDPOINTS = {
     OCEAN_SUBMIT: '/career/ocean/submit',
     RIASEC: '/career/riasec',
     RIASEC_SUBMIT: '/career/riasec/submit',
+    // Kept declared but unused: a studentId-keyed route needs a studentId<->userId bridge
+    // that would require importing StudentEntity into the (deliberately isolated) career
+    // module — out of scope for the student-facing self-view built so far. RESULTS_ME below
+    // is what the student's own page actually calls.
     RESULTS: (studentId: string) => `/career/results/${studentId}`,
+    RESULTS_ME: '/career/results/me',
   },
   LMS: {
     ASSIGNMENTS: '/lms/assignments',
     ASSIGNMENT_BY_ID: (id: string) => `/lms/assignments/${id}`,
+    ASSIGNMENTS_MY_CLASS: '/lms/assignments/my-class',
+    ASSIGNMENTS_MINE: '/lms/assignments/mine',
     SUBMISSIONS: (assignmentId: string) => `/lms/assignments/${assignmentId}/submissions`,
+    SUBMISSION_ME: (assignmentId: string) => `/lms/assignments/${assignmentId}/submissions/me`,
+    SUBMISSION_STATUSES: '/lms/assignments/submissions/statuses',
+    ROSTER: (assignmentId: string) => `/lms/assignments/${assignmentId}/roster`,
+    GRADE: (assignmentId: string, submissionId: string) =>
+      `/lms/assignments/${assignmentId}/submissions/${submissionId}/grade`,
+    FOR_CHILD: (studentId: string) => `/lms/assignments/guardian/${studentId}`,
     LIVE_CLASSES: '/lms/live-classes',
     LIVE_CLASS_BY_ID: (id: string) => `/lms/live-classes/${id}`,
     LIVE_JOIN: (id: string) => `/lms/live-classes/${id}/join`,
+    LIVE_CLASSES_MY_CLASS: '/lms/live-classes/my-class',
+    LIVE_CLASSES_MINE: '/lms/live-classes/mine',
+    LIVE_TOKEN: (id: string) => `/lms/live-classes/${id}/token`,
+    LIVE_END: (id: string) => `/lms/live-classes/${id}/end`,
+    LIVE_ATTENDANCE_JOIN: (id: string) => `/lms/live-classes/${id}/attendance/join`,
+    LIVE_ATTENDANCE_LEAVE: (id: string) => `/lms/live-classes/${id}/attendance/leave`,
+    LIVE_ATTENDANCE_ROSTER: (id: string) => `/lms/live-classes/${id}/attendance`,
+    LIVE_WHITEBOARD_SNAPSHOT: (id: string) => `/lms/live-classes/${id}/whiteboard-snapshot`,
   },
   FILES: {
     UPLOAD: '/files/upload',

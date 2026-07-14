@@ -30,6 +30,7 @@ export interface TeacherSubjectClassRequirement {
   updatedAt: string
   teacher: TeacherSummary
   subject: Subject
+  classSection: ClassSection
 }
 
 export interface ClassSectionRequirementsResponse {

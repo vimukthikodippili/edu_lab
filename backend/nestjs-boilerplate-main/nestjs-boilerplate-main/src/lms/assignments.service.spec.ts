@@ -1,0 +1,173 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
+import { ObjectLiteral, Repository } from 'typeorm';
+import { AssignmentsService } from './assignments.service';
+import { AssignmentEntity } from './entities/assignment.entity';
+import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
+import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
+import { CreateAssignmentDto } from './dto/create-assignment.dto';
+
+type MockRepo<T extends ObjectLiteral> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+
+const repoMock = <T extends ObjectLiteral>(): MockRepo<T> => ({
+  findOne: jest.fn(),
+  find: jest.fn(),
+  findByIds: jest.fn(),
+  save: jest.fn(),
+  create: jest.fn((d: Partial<T>) => d as T),
+});
+
+const makeDto = (overrides: Partial<CreateAssignmentDto> = {}): CreateAssignmentDto => ({
+  classSectionId: 1,
+  subjectId: 'subject-uuid',
+  title: 'Chapter 4 — Fractions Worksheet',
+  instructions: 'Complete questions 1-10.',
+  dueDate: '2026-08-01',
+  ...overrides,
+});
+
+describe('AssignmentsService', () => {
+  let service: AssignmentsService;
+  let assignmentRepo: MockRepo<AssignmentEntity>;
+  let fileRepo: MockRepo<FileEntity>;
+  let requirementRepo: MockRepo<TeacherSubjectClassRequirementEntity>;
+
+  beforeEach(async () => {
+    assignmentRepo = repoMock<AssignmentEntity>();
+    fileRepo = repoMock<FileEntity>();
+    requirementRepo = repoMock<TeacherSubjectClassRequirementEntity>();
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AssignmentsService,
+        { provide: getRepositoryToken(AssignmentEntity), useValue: assignmentRepo },
+        { provide: getRepositoryToken(FileEntity), useValue: fileRepo },
+        {
+          provide: getRepositoryToken(TeacherSubjectClassRequirementEntity),
+          useValue: requirementRepo,
+        },
+      ],
+    }).compile();
+
+    service = module.get<AssignmentsService>(AssignmentsService);
+    jest.clearAllMocks();
+  });
+
+  describe('create — authorization', () => {
+    it('throws ForbiddenException when the teacher is not assigned to teach this subject for this class section', async () => {
+      requirementRepo.findOne!.mockResolvedValue(null);
+
+      await expect(
+        service.create(makeDto(), 'teacher-uuid', false),
+      ).rejects.toThrow(ForbiddenException);
+      expect(assignmentRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('succeeds when the teacher is assigned to teach the subject for the class section', async () => {
+      requirementRepo.findOne!.mockResolvedValue({ id: 1 });
+      assignmentRepo.save!.mockImplementation((a) => Promise.resolve({ ...a, id: 'assignment-1' }));
+      fileRepo.findByIds!.mockResolvedValue([]);
+
+      const result = await service.create(makeDto(), 'teacher-uuid', false);
+
+      expect(result.id).toBe('assignment-1');
+      expect(assignmentRepo.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('allows a privileged actor (section_head/admin/principal) to bypass the teach-assignment check', async () => {
+      assignmentRepo.save!.mockImplementation((a) => Promise.resolve({ ...a, id: 'assignment-1' }));
+
+      await service.create(makeDto(), 'section-head-uuid', true);
+
+      expect(requirementRepo.findOne).not.toHaveBeenCalled();
+      expect(assignmentRepo.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('create — attachment validation', () => {
+    it('rejects with 422 naming the missing attachment id(s)', async () => {
+      requirementRepo.findOne!.mockResolvedValue({ id: 1 });
+      fileRepo.findByIds!.mockResolvedValue([{ id: 'file-1', path: '/f1' }]);
+
+      await expect(
+        service.create(
+          makeDto({ attachmentFileIds: ['file-1', 'file-missing'] }),
+          'teacher-uuid',
+          false,
+        ),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(assignmentRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('succeeds and populates virtual attachments when all ids resolve', async () => {
+      requirementRepo.findOne!.mockResolvedValue({ id: 1 });
+      fileRepo.findByIds!.mockResolvedValue([
+        { id: 'file-1', path: '/f1' },
+        { id: 'file-2', path: '/f2' },
+      ]);
+      assignmentRepo.save!.mockImplementation((a) => Promise.resolve({ ...a, id: 'assignment-1' }));
+
+      const result = await service.create(
+        makeDto({ attachmentFileIds: ['file-1', 'file-2'] }),
+        'teacher-uuid',
+        false,
+      );
+
+      expect(result.attachments).toEqual([
+        { id: 'file-1', path: '/f1' },
+        { id: 'file-2', path: '/f2' },
+      ]);
+    });
+  });
+
+  describe('findForClassSection — the class-scoping guarantee', () => {
+    it('returns an assignment created for class section A when queried for A, ordered by dueDate ascending', async () => {
+      assignmentRepo.find!.mockResolvedValue([
+        { id: 'a-1', classSectionId: 1, dueDate: '2026-08-01', attachmentFileIds: [] },
+      ]);
+
+      const result = await service.findForClassSection(1);
+
+      expect(assignmentRepo.find).toHaveBeenCalledWith({
+        where: { classSectionId: 1 },
+        order: { dueDate: 'ASC' },
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('a-1');
+    });
+
+    it('does not return a class-section-A assignment when queried for class section B', async () => {
+      // The repo is queried with a where clause scoped to the requested section only —
+      // simulate the DB honoring that filter (a section-A row is never in section B's result set).
+      assignmentRepo.find!.mockImplementation(({ where }: { where: { classSectionId: number } }) =>
+        Promise.resolve(
+          [{ id: 'a-1', classSectionId: 1, dueDate: '2026-08-01', attachmentFileIds: [] }].filter(
+            (a) => a.classSectionId === where.classSectionId,
+          ),
+        ),
+      );
+
+      const result = await service.findForClassSection(2);
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('findMine', () => {
+    it("returns only the caller's own created assignments, ordered by dueDate descending", async () => {
+      assignmentRepo.find!.mockResolvedValue([
+        { id: 'a-2', createdByTeacherId: 'teacher-uuid', dueDate: '2026-09-01', attachmentFileIds: [] },
+        { id: 'a-1', createdByTeacherId: 'teacher-uuid', dueDate: '2026-08-01', attachmentFileIds: [] },
+      ]);
+
+      const result = await service.findMine('teacher-uuid');
+
+      expect(assignmentRepo.find).toHaveBeenCalledWith({
+        where: { createdByTeacherId: 'teacher-uuid' },
+        order: { dueDate: 'DESC' },
+      });
+      expect(result.map((a) => a.id)).toEqual(['a-2', 'a-1']);
+    });
+  });
+});

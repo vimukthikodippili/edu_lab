@@ -16,6 +16,7 @@ import {
 import { TeacherSubjectClassRequirementEntity } from '../../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { BulkUpsertMarksDto } from '../dto/bulk-upsert-marks.dto';
 import { MarksSubmittedEvent } from '../events/marks-submitted.event';
+import { MaterialsCheckService } from './materials-check.service';
 
 export interface MarkRosterRow {
   studentId: string;
@@ -40,6 +41,7 @@ export class MarkService {
     @InjectRepository(TeacherSubjectClassRequirementEntity)
     private readonly requirementRepo: Repository<TeacherSubjectClassRequirementEntity>,
     private readonly eventEmitter: EventEmitter2,
+    private readonly materialsCheckService: MaterialsCheckService,
   ) {}
 
   private async assertAuthorized(
@@ -117,6 +119,21 @@ export class MarkService {
       throw new NotFoundException(`Assessment ${dto.assessmentId} not found.`);
     }
     await this.assertAuthorized(assessment, teacherId, isPrivileged);
+
+    // Materials-Readiness Gate — mirrors the Timetable-First Gate in lesson-plan.service.ts:
+    // an assessment opted into this check cannot have marks submitted until every student in
+    // the class section has been confirmed as materials-ready. Assessments that don't require
+    // the check (the overwhelming majority — this defaults to false) are completely unaffected.
+    if (assessment.requiresMaterialsCheck && dto.status === MarkStatus.SUBMITTED) {
+      const status = await this.materialsCheckService.getStatus(assessment.id);
+      if (!status.allConfirmed) {
+        const unconfirmed = status.totalStudents - status.confirmedCount;
+        throw new UnprocessableEntityException(
+          `Materials readiness has not been confirmed for ${unconfirmed} of ${status.totalStudents} student(s). ` +
+            `Complete the materials check before submitting marks for this assessment.`,
+        );
+      }
+    }
 
     const violations = dto.entries
       .filter((e) => e.score > assessment.totalMarks)

@@ -10,6 +10,7 @@ import {
 import { EntityRelationalHelper } from '../../utils/relational-entity-helper';
 import { StaffEntity } from '../../staff/entities/staff.entity';
 import { SubjectEntity } from '../../subjects/entities/subject.entity';
+import { ClassSectionEntity } from '../../students/entities/class-section.entity';
 
 @Entity({ name: 'teacher_subject_class_requirement' })
 export class TeacherSubjectClassRequirementEntity extends EntityRelationalHelper {
@@ -41,4 +42,8 @@ export class TeacherSubjectClassRequirementEntity extends EntityRelationalHelper
   @ManyToOne(() => SubjectEntity, { nullable: false, eager: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'subjectId' })
   subject: SubjectEntity;
+
+  @ManyToOne(() => ClassSectionEntity, { nullable: false, eager: true, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'classSectionId' })
+  classSection: ClassSectionEntity;
 }

@@ -91,6 +91,30 @@ describe('TeacherSubjectRequirementsService', () => {
     jest.clearAllMocks();
   });
 
+  // ─── findByTeacher ─────────────────────────────────────────────────────────
+
+  describe('findByTeacher', () => {
+    it("returns only the given teacher's own requirement rows, ordered by createdAt ascending", async () => {
+      repo.find.mockResolvedValue([makeReq({ id: 1 }), makeReq({ id: 2 })]);
+
+      const result = await service.findByTeacher('teacher-uuid');
+
+      expect(repo.find).toHaveBeenCalledWith({
+        where: { teacherId: 'teacher-uuid' },
+        order: { createdAt: 'ASC' },
+      });
+      expect(result).toHaveLength(2);
+    });
+
+    it('returns an empty array when the teacher has no requirements', async () => {
+      repo.find.mockResolvedValue([]);
+
+      const result = await service.findByTeacher('teacher-with-no-classes');
+
+      expect(result).toEqual([]);
+    });
+  });
+
   // ─── create — duplicate → 409 ─────────────────────────────────────────────
 
   describe('create', () => {

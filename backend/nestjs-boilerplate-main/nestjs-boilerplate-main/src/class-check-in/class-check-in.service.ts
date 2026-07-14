@@ -1,7 +1,13 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Repository } from 'typeorm';
+import {
+  Between,
+  FindOptionsWhere,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from 'typeorm';
 import {
   ClassCheckInEntity,
   ClassCheckInMethod,
@@ -106,6 +112,54 @@ export class ClassCheckInService {
     }
 
     return this.saveCheckIn(entry, teacherId, ClassCheckInMethod.QR_SCAN);
+  }
+
+  /** Best-effort side effect of a LiveSession starting — resolves the class's own scheduled
+   * period (classSectionId+subjectId+teacherId+current day/period), not just "whatever's
+   * active for this teacher," so a live class started outside its own scheduled slot doesn't
+   * silently check in against an unrelated period. Returns null (never throws) when no
+   * matching period is found — this is a side effect, not a user-facing action. */
+  async checkInFromLiveSession(
+    classSectionId: number,
+    subjectId: string,
+    teacherId: string,
+  ): Promise<ClassCheckInEntity | null> {
+    const now = new Date();
+    const currentPeriod = this.getCurrentPeriod(now);
+    if (currentPeriod <= 0) return null;
+
+    const entry = await this.timetableRepo.findOne({
+      where: { classSectionId, subjectId, teacherId, day: now.getDay(), period: currentPeriod },
+    });
+    if (!entry) return null;
+
+    return this.saveCheckIn(entry, teacherId, ClassCheckInMethod.LIVE_SESSION_AUTO);
+  }
+
+  async findForAudit(filters: {
+    teacherId?: string;
+    classSectionId?: number;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<ClassCheckInEntity[]> {
+    const where: FindOptionsWhere<ClassCheckInEntity> = {};
+
+    if (filters.teacherId) where.teacherId = filters.teacherId;
+    if (filters.classSectionId) {
+      where.timetableEntry = { classSectionId: filters.classSectionId };
+    }
+    if (filters.dateFrom && filters.dateTo) {
+      where.date = Between(filters.dateFrom, filters.dateTo);
+    } else if (filters.dateFrom) {
+      where.date = MoreThanOrEqual(filters.dateFrom);
+    } else if (filters.dateTo) {
+      where.date = LessThanOrEqual(filters.dateTo);
+    }
+
+    return this.checkInRepo.find({
+      where,
+      order: { date: 'DESC', checkedInAt: 'DESC' },
+    });
   }
 
   private async saveCheckIn(

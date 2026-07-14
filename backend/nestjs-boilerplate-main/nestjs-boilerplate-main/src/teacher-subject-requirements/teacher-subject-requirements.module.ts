@@ -5,6 +5,8 @@ import { StaffEntity } from '../staff/entities/staff.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { SchoolCalendarConfigModule } from '../school-calendar-config/school-calendar-config.module';
+import { UsersModule } from '../users/users.module';
+import { StaffModule } from '../staff/staff.module';
 import { TeacherSubjectRequirementsService } from './teacher-subject-requirements.service';
 import { TeacherSubjectRequirementsController } from './teacher-subject-requirements.controller';
 
@@ -17,6 +19,8 @@ import { TeacherSubjectRequirementsController } from './teacher-subject-requirem
       ClassSectionEntity,
     ]),
     SchoolCalendarConfigModule,
+    UsersModule,
+    StaffModule,
   ],
   providers: [TeacherSubjectRequirementsService],
   controllers: [TeacherSubjectRequirementsController],

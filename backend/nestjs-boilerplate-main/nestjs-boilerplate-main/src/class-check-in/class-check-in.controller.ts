@@ -1,10 +1,14 @@
 import {
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  MethodNotAllowedException,
   Param,
+  Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -16,6 +20,8 @@ import { RolesGuard } from '../roles/roles.guard';
 import { UsersService } from '../users/users.service';
 import { StaffService } from '../staff/staff.service';
 import { ClassCheckInService } from './class-check-in.service';
+import { AuditClassCheckInQueryDto } from './dto/audit-class-check-in-query.dto';
+import { ClassCheckInEntity } from './entities/class-check-in.entity';
 
 @ApiTags('Class Check-In')
 @ApiBearerAuth()
@@ -75,5 +81,29 @@ export class ClassCheckInController {
   ) {
     const staffId = await this.resolveStaffId(req.user.id);
     return this.classCheckInService.checkInByRoom(staffId, roomId);
+  }
+
+  @Get('audit')
+  @Roles(RoleEnum.admin, RoleEnum.principal)
+  async audit(
+    @Query() query: AuditClassCheckInQueryDto,
+  ): Promise<ClassCheckInEntity[]> {
+    return this.classCheckInService.findForAudit(query);
+  }
+
+  @Patch(':id')
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.principal)
+  update(): never {
+    throw new MethodNotAllowedException(
+      'ClassCheckIn records are append-only and cannot be updated.',
+    );
+  }
+
+  @Delete(':id')
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.principal)
+  remove(): never {
+    throw new MethodNotAllowedException(
+      'ClassCheckIn records are append-only and cannot be deleted.',
+    );
   }
 }
