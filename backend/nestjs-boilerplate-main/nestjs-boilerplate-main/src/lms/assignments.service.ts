@@ -1,10 +1,12 @@
 import { ForbiddenException, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { AssignmentEntity } from './entities/assignment.entity';
+import { AssignmentTopicAllocationEntity } from './entities/assignment-topic-allocation.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
+import { SubjectTopicsService } from '../subject-topics/subject-topics.service';
 
 @Injectable()
 export class AssignmentsService {
@@ -17,6 +19,12 @@ export class AssignmentsService {
 
     @InjectRepository(TeacherSubjectClassRequirementEntity)
     private readonly requirementRepo: Repository<TeacherSubjectClassRequirementEntity>,
+
+    @InjectRepository(AssignmentTopicAllocationEntity)
+    private readonly allocationRepo: Repository<AssignmentTopicAllocationEntity>,
+
+    private readonly subjectTopicsService: SubjectTopicsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   private async assertAuthorized(
@@ -52,6 +60,61 @@ export class AssignmentsService {
     });
   }
 
+  private async attachTopicAllocations(assignments: AssignmentEntity[]): Promise<void> {
+    if (assignments.length === 0) return;
+    const allocations = await this.allocationRepo.find({
+      where: { assignmentId: In(assignments.map((a) => a.id)) },
+    });
+    const byAssignmentId = new Map<string, AssignmentTopicAllocationEntity[]>();
+    for (const allocation of allocations) {
+      const list = byAssignmentId.get(allocation.assignmentId) ?? [];
+      list.push(allocation);
+      byAssignmentId.set(allocation.assignmentId, list);
+    }
+    assignments.forEach((a) => {
+      a.topicAllocations = byAssignmentId.get(a.id) ?? [];
+    });
+  }
+
+  /** Validates the allocation list against the subject's own topics and computes the total —
+   * shared by create() so a manual total can never be supplied independently of these rules. */
+  private async validateAndResolveAllocations(
+    subjectId: string,
+    topicAllocations: CreateAssignmentDto['topicAllocations'],
+  ): Promise<{ totalMarks: number; topics: Map<string, Awaited<ReturnType<SubjectTopicsService['findById']>>> }> {
+    // @ArrayMinSize(1) already enforces this at the HTTP boundary — re-checked here so a
+    // direct service caller can never bypass it and save a zero-mark assignment.
+    if (topicAllocations.length === 0) {
+      throw new UnprocessableEntityException(
+        'At least one topic allocation is required.',
+      );
+    }
+
+    const topicIds = topicAllocations.map((a) => a.subjectTopicId);
+    if (new Set(topicIds).size !== topicIds.length) {
+      throw new UnprocessableEntityException('Duplicate topic in the allocation list.');
+    }
+
+    const topics = new Map<string, Awaited<ReturnType<SubjectTopicsService['findById']>>>();
+    for (const topicId of topicIds) {
+      const topic = await this.subjectTopicsService.findById(topicId);
+      if (topic.subjectId !== subjectId) {
+        throw new UnprocessableEntityException(
+          `Topic "${topic.title}" does not belong to this subject.`,
+        );
+      }
+      if (topic.isArchived) {
+        throw new UnprocessableEntityException(
+          `Topic "${topic.title}" is archived and cannot be used for a new assignment.`,
+        );
+      }
+      topics.set(topic.id, topic);
+    }
+
+    const totalMarks = topicAllocations.reduce((sum, a) => sum + a.maxMarks, 0);
+    return { totalMarks, topics };
+  }
+
   async create(
     dto: CreateAssignmentDto,
     teacherId: string,
@@ -71,17 +134,45 @@ export class AssignmentsService {
       }
     }
 
-    const assignment = this.assignmentRepo.create({
-      classSectionId: dto.classSectionId,
-      subjectId: dto.subjectId,
-      title: dto.title,
-      instructions: dto.instructions,
-      dueDate: dto.dueDate,
-      attachmentFileIds: dto.attachmentFileIds ?? [],
-      createdByTeacherId: teacherId,
+    const { totalMarks, topics } = await this.validateAndResolveAllocations(
+      dto.subjectId,
+      dto.topicAllocations,
+    );
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const assignmentRepo = manager.getRepository(AssignmentEntity);
+      const allocationRepo = manager.getRepository(AssignmentTopicAllocationEntity);
+
+      const assignment = await assignmentRepo.save(
+        assignmentRepo.create({
+          classSectionId: dto.classSectionId,
+          subjectId: dto.subjectId,
+          title: dto.title,
+          instructions: dto.instructions,
+          dueDate: dto.dueDate,
+          attachmentFileIds: dto.attachmentFileIds ?? [],
+          totalMarks,
+          createdByTeacherId: teacherId,
+        }),
+      );
+
+      const allocations = await allocationRepo.save(
+        dto.topicAllocations.map((a) =>
+          allocationRepo.create({
+            assignmentId: assignment.id,
+            subjectTopicId: a.subjectTopicId,
+            maxMarks: a.maxMarks,
+          }),
+        ),
+      );
+      allocations.forEach((a) => {
+        a.subjectTopic = topics.get(a.subjectTopicId)!;
+      });
+
+      assignment.topicAllocations = allocations;
+      return assignment;
     });
 
-    const saved = await this.assignmentRepo.save(assignment);
     await this.attachFiles([saved]);
     return saved;
   }
@@ -94,6 +185,7 @@ export class AssignmentsService {
       order: { dueDate: 'ASC' },
     });
     await this.attachFiles(assignments);
+    await this.attachTopicAllocations(assignments);
     return assignments;
   }
 
@@ -103,6 +195,7 @@ export class AssignmentsService {
       order: { dueDate: 'DESC' },
     });
     await this.attachFiles(assignments);
+    await this.attachTopicAllocations(assignments);
     return assignments;
   }
 }

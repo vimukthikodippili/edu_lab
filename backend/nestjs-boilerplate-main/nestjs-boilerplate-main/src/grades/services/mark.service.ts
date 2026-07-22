@@ -6,9 +6,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { MarkEntity, MarkStatus } from '../entities/mark.entity';
+import { MarkTopicScoreEntity } from '../entities/mark-topic-score.entity';
 import { AssessmentEntity } from '../entities/assessment.entity';
+import { AssessmentTopicAllocationEntity } from '../entities/assessment-topic-allocation.entity';
 import {
   StudentEntity,
   StudentStatus,
@@ -17,6 +19,13 @@ import { TeacherSubjectClassRequirementEntity } from '../../teacher-subject-requ
 import { BulkUpsertMarksDto } from '../dto/bulk-upsert-marks.dto';
 import { MarksSubmittedEvent } from '../events/marks-submitted.event';
 import { MaterialsCheckService } from './materials-check.service';
+
+export interface MarkTopicScoreRow {
+  subjectTopicId: string;
+  title: string;
+  maxMarks: number;
+  score: number | null;
+}
 
 export interface MarkRosterRow {
   studentId: string;
@@ -27,6 +36,7 @@ export interface MarkRosterRow {
   score: number | null;
   maxScore: number;
   status: MarkStatus | null;
+  topicScores: MarkTopicScoreRow[];
 }
 
 @Injectable()
@@ -34,14 +44,19 @@ export class MarkService {
   constructor(
     @InjectRepository(MarkEntity)
     private readonly markRepo: Repository<MarkEntity>,
+    @InjectRepository(MarkTopicScoreEntity)
+    private readonly topicScoreRepo: Repository<MarkTopicScoreEntity>,
     @InjectRepository(AssessmentEntity)
     private readonly assessmentRepo: Repository<AssessmentEntity>,
+    @InjectRepository(AssessmentTopicAllocationEntity)
+    private readonly allocationRepo: Repository<AssessmentTopicAllocationEntity>,
     @InjectRepository(StudentEntity)
     private readonly studentRepo: Repository<StudentEntity>,
     @InjectRepository(TeacherSubjectClassRequirementEntity)
     private readonly requirementRepo: Repository<TeacherSubjectClassRequirementEntity>,
     private readonly eventEmitter: EventEmitter2,
     private readonly materialsCheckService: MaterialsCheckService,
+    private readonly dataSource: DataSource,
   ) {}
 
   private async assertAuthorized(
@@ -66,6 +81,21 @@ export class MarkService {
     }
   }
 
+  /** Batch-loads this assessment's topic allocations, sorted the same as the subject's
+   * own topic order — the column order the marks-entry grid renders. Mirrors the
+   * attach-after-load convention used throughout (e.g. AssignmentsService.attachTopicAllocations),
+   * duplicated locally rather than shared since MarkService doesn't depend on AssessmentService. */
+  private async loadTopicAllocations(
+    assessmentId: string,
+  ): Promise<AssessmentTopicAllocationEntity[]> {
+    const allocations = await this.allocationRepo.find({
+      where: { assessmentId },
+    });
+    return allocations.sort(
+      (a, b) => a.subjectTopic.order - b.subjectTopic.order,
+    );
+  }
+
   async findForAssessment(
     assessmentId: string,
     teacherId: string,
@@ -79,6 +109,9 @@ export class MarkService {
     }
     await this.assertAuthorized(assessment, teacherId, isPrivileged);
 
+    const allocations = await this.loadTopicAllocations(assessmentId);
+    assessment.topicAllocations = allocations;
+
     const students = await this.studentRepo.find({
       where: {
         classSectionId: assessment.classSectionId,
@@ -90,8 +123,25 @@ export class MarkService {
     const marks = await this.markRepo.findBy({ assessmentId });
     const markMap = new Map(marks.map((m) => [m.studentId, m]));
 
+    const markIds = marks.map((m) => m.id);
+    const topicScores = markIds.length
+      ? await this.topicScoreRepo.findBy({ markId: In(markIds) })
+      : [];
+    const topicScoresByMarkId = new Map<string, MarkTopicScoreEntity[]>();
+    for (const ts of topicScores) {
+      const list = topicScoresByMarkId.get(ts.markId) ?? [];
+      list.push(ts);
+      topicScoresByMarkId.set(ts.markId, list);
+    }
+
     const roster: MarkRosterRow[] = students.map((s) => {
       const mark = markMap.get(s.id);
+      const scoreByTopicId = new Map(
+        (mark ? topicScoresByMarkId.get(mark.id) ?? [] : []).map((ts) => [
+          ts.subjectTopicId,
+          Number(ts.score),
+        ]),
+      );
       return {
         studentId: s.id,
         firstName: s.firstName,
@@ -101,6 +151,12 @@ export class MarkService {
         score: mark?.score != null ? Number(mark.score) : null,
         maxScore: assessment.totalMarks,
         status: mark?.status ?? null,
+        topicScores: allocations.map((a) => ({
+          subjectTopicId: a.subjectTopicId,
+          title: a.subjectTopic.title,
+          maxMarks: a.maxMarks,
+          score: scoreByTopicId.get(a.subjectTopicId) ?? null,
+        })),
       };
     });
 
@@ -135,19 +191,90 @@ export class MarkService {
       }
     }
 
-    const violations = dto.entries
-      .filter((e) => e.score > assessment.totalMarks)
-      .map((e) => ({
-        studentId: e.studentId,
-        score: e.score,
-        maxScore: assessment.totalMarks,
-      }));
+    // A topic-tracked assessment (every assessment created since the Topic Mark
+    // Allocation story) uses per-topic entry with an auto-computed total; an assessment
+    // that predates topic allocations (zero rows here) keeps the original flat-score flow
+    // untouched, so existing marks entered before this feature never break.
+    const allocations = await this.loadTopicAllocations(dto.assessmentId);
+    const isTopicTracked = allocations.length > 0;
+    const maxMarksByTopicId = new Map(
+      allocations.map((a) => [a.subjectTopicId, a.maxMarks]),
+    );
+
+    const violations: {
+      studentId: string;
+      subjectTopicId?: string;
+      score: number;
+      maxScore: number;
+    }[] = [];
+    const computedScoreByStudentId = new Map<string, number>();
+
+    for (const entry of dto.entries) {
+      if (isTopicTracked) {
+        if (entry.score !== undefined) {
+          throw new UnprocessableEntityException(
+            'This assessment uses topic-based marks — the total is computed automatically from topic scores and cannot be submitted directly.',
+          );
+        }
+        if (!entry.topicScores || entry.topicScores.length === 0) {
+          throw new UnprocessableEntityException(
+            `Provide at least one topic mark for student ${entry.studentId}.`,
+          );
+        }
+        const seenTopicIds = new Set<string>();
+        let total = 0;
+        for (const ts of entry.topicScores) {
+          if (seenTopicIds.has(ts.subjectTopicId)) {
+            throw new UnprocessableEntityException(
+              `Duplicate topic in the marks entry for student ${entry.studentId}.`,
+            );
+          }
+          seenTopicIds.add(ts.subjectTopicId);
+
+          const maxMarks = maxMarksByTopicId.get(ts.subjectTopicId);
+          if (maxMarks === undefined) {
+            throw new UnprocessableEntityException(
+              `Topic ${ts.subjectTopicId} is not allocated marks for this assessment.`,
+            );
+          }
+          if (ts.score > maxMarks) {
+            violations.push({
+              studentId: entry.studentId,
+              subjectTopicId: ts.subjectTopicId,
+              score: ts.score,
+              maxScore: maxMarks,
+            });
+          }
+          total += ts.score;
+        }
+        computedScoreByStudentId.set(entry.studentId, total);
+      } else {
+        if (entry.topicScores !== undefined) {
+          throw new UnprocessableEntityException(
+            'This assessment has no topic allocations — submit a flat score instead.',
+          );
+        }
+        if (entry.score === undefined) {
+          throw new UnprocessableEntityException(
+            `Provide a score for student ${entry.studentId}.`,
+          );
+        }
+        if (entry.score > assessment.totalMarks) {
+          violations.push({
+            studentId: entry.studentId,
+            score: entry.score,
+            maxScore: assessment.totalMarks,
+          });
+        }
+        computedScoreByStudentId.set(entry.studentId, entry.score);
+      }
+    }
 
     if (violations.length > 0) {
       throw new UnprocessableEntityException({
         message: `${violations.length} entr${
           violations.length === 1 ? 'y exceeds' : 'ies exceed'
-        } the maximum marks of ${assessment.totalMarks}.`,
+        } the maximum marks allowed.`,
         violations,
       });
     }
@@ -168,22 +295,45 @@ export class MarkService {
       }
     }
 
-    const toSave = dto.entries.map((entry) => {
-      const record =
-        existingMap.get(entry.studentId) ??
-        this.markRepo.create({
-          studentId: entry.studentId,
-          assessmentId: dto.assessmentId,
-        });
+    // Coordinated multi-table write (Mark row + its MarkTopicScore children) needs
+    // atomicity, unlike the old single flat-score save — mirrors the
+    // dataSource.transaction(manager => ...) pattern from AssessmentService.create().
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const markRepo = manager.getRepository(MarkEntity);
+      const topicScoreRepo = manager.getRepository(MarkTopicScoreEntity);
 
-      record.score = String(entry.score);
-      record.maxScore = assessment.totalMarks;
-      record.status = dto.status;
-      record.enteredByTeacherId = teacherId;
-      return record;
+      const savedMarks: MarkEntity[] = [];
+      for (const entry of dto.entries) {
+        const record =
+          existingMap.get(entry.studentId) ??
+          markRepo.create({
+            studentId: entry.studentId,
+            assessmentId: dto.assessmentId,
+          });
+
+        record.score = String(computedScoreByStudentId.get(entry.studentId));
+        record.maxScore = assessment.totalMarks;
+        record.status = dto.status;
+        record.enteredByTeacherId = teacherId;
+        const savedMark = await markRepo.save(record);
+
+        if (isTopicTracked) {
+          await topicScoreRepo.delete({ markId: savedMark.id });
+          await topicScoreRepo.save(
+            (entry.topicScores ?? []).map((ts) =>
+              topicScoreRepo.create({
+                markId: savedMark.id,
+                subjectTopicId: ts.subjectTopicId,
+                score: String(ts.score),
+              }),
+            ),
+          );
+        }
+
+        savedMarks.push(savedMark);
+      }
+      return savedMarks;
     });
-
-    const saved = await this.markRepo.save(toSave);
 
     if (dto.status === MarkStatus.SUBMITTED) {
       this.eventEmitter.emit(

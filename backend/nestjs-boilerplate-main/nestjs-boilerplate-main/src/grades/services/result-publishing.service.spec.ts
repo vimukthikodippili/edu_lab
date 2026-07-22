@@ -5,6 +5,10 @@ import { ObjectLiteral, Repository } from 'typeorm';
 import { ResultPublishingService } from './result-publishing.service';
 import { TermResultEntity } from '../entities/term-result.entity';
 import { SubjectResultEntity } from '../entities/subject-result.entity';
+import { AssessmentEntity, AssessmentType } from '../entities/assessment.entity';
+import { MarkEntity, MarkStatus } from '../entities/mark.entity';
+import { MarkTopicScoreEntity } from '../entities/mark-topic-score.entity';
+import { AssessmentTopicAllocationEntity } from '../entities/assessment-topic-allocation.entity';
 import { ResultsPublishedEvent } from '../events/results-published.event';
 
 type MockRepo<T extends ObjectLiteral> = Partial<Record<keyof Repository<T>, jest.Mock>>;
@@ -39,11 +43,19 @@ describe('ResultPublishingService', () => {
   let service: ResultPublishingService;
   let termResultRepo: MockRepo<TermResultEntity>;
   let subjectResultRepo: MockRepo<SubjectResultEntity>;
+  let assessmentRepo: MockRepo<AssessmentEntity>;
+  let markRepo: MockRepo<MarkEntity>;
+  let topicScoreRepo: MockRepo<MarkTopicScoreEntity>;
+  let allocationRepo: MockRepo<AssessmentTopicAllocationEntity>;
   let eventEmitter: { emit: jest.Mock };
 
   beforeEach(async () => {
     termResultRepo = repoMock<TermResultEntity>();
     subjectResultRepo = repoMock<SubjectResultEntity>();
+    assessmentRepo = repoMock<AssessmentEntity>();
+    markRepo = repoMock<MarkEntity>();
+    topicScoreRepo = repoMock<MarkTopicScoreEntity>();
+    allocationRepo = repoMock<AssessmentTopicAllocationEntity>();
     eventEmitter = { emit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -51,6 +63,10 @@ describe('ResultPublishingService', () => {
         ResultPublishingService,
         { provide: getRepositoryToken(TermResultEntity), useValue: termResultRepo },
         { provide: getRepositoryToken(SubjectResultEntity), useValue: subjectResultRepo },
+        { provide: getRepositoryToken(AssessmentEntity), useValue: assessmentRepo },
+        { provide: getRepositoryToken(MarkEntity), useValue: markRepo },
+        { provide: getRepositoryToken(MarkTopicScoreEntity), useValue: topicScoreRepo },
+        { provide: getRepositoryToken(AssessmentTopicAllocationEntity), useValue: allocationRepo },
         { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();
@@ -108,6 +124,124 @@ describe('ResultPublishingService', () => {
         where: { studentId: 'student-1', termId: 1 },
         order: { createdAt: 'ASC' },
       });
+    });
+  });
+
+  describe('getPublishedAssessmentResultsForStudent', () => {
+    const makeAssessment = (overrides: Partial<AssessmentEntity> = {}): AssessmentEntity =>
+      ({
+        id: 'a1',
+        subjectId: 'subject-1',
+        termId: 1,
+        classSectionId: 1,
+        title: 'Monthly Test 1',
+        assessmentType: AssessmentType.MONTHLY_TEST,
+        scheduledDate: new Date('2026-02-01'),
+        totalMarks: 35,
+        ...overrides,
+      } as AssessmentEntity);
+
+    it('returns empty array when the term result is not published', async () => {
+      termResultRepo.findOne!.mockResolvedValue(null);
+
+      const results = await service.getPublishedAssessmentResultsForStudent('student-1', 'subject-1', 1);
+
+      expect(results).toEqual([]);
+      expect(assessmentRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('returns empty array when no subject result exists for that subject/term', async () => {
+      termResultRepo.findOne!.mockResolvedValue({ id: 'tr-1' });
+      subjectResultRepo.findOne!.mockResolvedValue(null);
+
+      const results = await service.getPublishedAssessmentResultsForStudent('student-1', 'subject-1', 1);
+
+      expect(results).toEqual([]);
+    });
+
+    it('returns empty array when the subject has no assessments', async () => {
+      termResultRepo.findOne!.mockResolvedValue({ id: 'tr-1' });
+      subjectResultRepo.findOne!.mockResolvedValue({ classSectionId: 1 });
+      assessmentRepo.find!.mockResolvedValue([]);
+
+      const results = await service.getPublishedAssessmentResultsForStudent('student-1', 'subject-1', 1);
+
+      expect(results).toEqual([]);
+      expect(markRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('returns empty array when the student has no submitted marks among those assessments', async () => {
+      termResultRepo.findOne!.mockResolvedValue({ id: 'tr-1' });
+      subjectResultRepo.findOne!.mockResolvedValue({ classSectionId: 1 });
+      assessmentRepo.find!.mockResolvedValue([makeAssessment()]);
+      markRepo.find!.mockResolvedValue([]);
+
+      const results = await service.getPublishedAssessmentResultsForStudent('student-1', 'subject-1', 1);
+
+      expect(results).toEqual([]);
+    });
+
+    it('includes a full topic breakdown for a topic-tracked assessment, with maxMarks resolved from the allocation', async () => {
+      termResultRepo.findOne!.mockResolvedValue({ id: 'tr-1' });
+      subjectResultRepo.findOne!.mockResolvedValue({ classSectionId: 1 });
+      assessmentRepo.find!.mockResolvedValue([makeAssessment({ id: 'a1', totalMarks: 35 })]);
+      markRepo.find!.mockResolvedValue([
+        { id: 'mark-1', assessmentId: 'a1', score: '30.00', maxScore: 35, status: MarkStatus.SUBMITTED },
+      ]);
+      topicScoreRepo.find!.mockResolvedValue([
+        { markId: 'mark-1', subjectTopicId: 'topic-a', score: '18.00', subjectTopic: { title: 'Algebra' } },
+        { markId: 'mark-1', subjectTopicId: 'topic-b', score: '12.00', subjectTopic: { title: 'General' } },
+      ]);
+      allocationRepo.find!.mockResolvedValue([
+        { assessmentId: 'a1', subjectTopicId: 'topic-a', maxMarks: 20 },
+        { assessmentId: 'a1', subjectTopicId: 'topic-b', maxMarks: 15 },
+      ]);
+
+      const results = await service.getPublishedAssessmentResultsForStudent('student-1', 'subject-1', 1);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].score).toBe(30);
+      expect(results[0].maxScore).toBe(35);
+      expect(results[0].topicScores).toEqual([
+        { subjectTopicId: 'topic-a', title: 'Algebra', maxMarks: 20, score: 18 },
+        { subjectTopicId: 'topic-b', title: 'General', maxMarks: 15, score: 12 },
+      ]);
+    });
+
+    it('gracefully falls back to an empty topicScores array for a legacy assessment with no topic allocations', async () => {
+      termResultRepo.findOne!.mockResolvedValue({ id: 'tr-1' });
+      subjectResultRepo.findOne!.mockResolvedValue({ classSectionId: 1 });
+      assessmentRepo.find!.mockResolvedValue([makeAssessment({ id: 'a1', totalMarks: 100 })]);
+      markRepo.find!.mockResolvedValue([
+        { id: 'mark-1', assessmentId: 'a1', score: '80.00', maxScore: 100, status: MarkStatus.SUBMITTED },
+      ]);
+      topicScoreRepo.find!.mockResolvedValue([]);
+      allocationRepo.find!.mockResolvedValue([]);
+
+      const results = await service.getPublishedAssessmentResultsForStudent('student-1', 'subject-1', 1);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].score).toBe(80);
+      expect(results[0].topicScores).toEqual([]);
+    });
+
+    it('sorts results chronologically by scheduledDate regardless of input order', async () => {
+      termResultRepo.findOne!.mockResolvedValue({ id: 'tr-1' });
+      subjectResultRepo.findOne!.mockResolvedValue({ classSectionId: 1 });
+      assessmentRepo.find!.mockResolvedValue([
+        makeAssessment({ id: 'a2', scheduledDate: new Date('2026-03-01') }),
+        makeAssessment({ id: 'a1', scheduledDate: new Date('2026-02-01') }),
+      ]);
+      markRepo.find!.mockResolvedValue([
+        { id: 'mark-2', assessmentId: 'a2', score: '10.00', maxScore: 35, status: MarkStatus.SUBMITTED },
+        { id: 'mark-1', assessmentId: 'a1', score: '20.00', maxScore: 35, status: MarkStatus.SUBMITTED },
+      ]);
+      topicScoreRepo.find!.mockResolvedValue([]);
+      allocationRepo.find!.mockResolvedValue([]);
+
+      const results = await service.getPublishedAssessmentResultsForStudent('student-1', 'subject-1', 1);
+
+      expect(results.map((r) => r.assessment.id)).toEqual(['a1', 'a2']);
     });
   });
 

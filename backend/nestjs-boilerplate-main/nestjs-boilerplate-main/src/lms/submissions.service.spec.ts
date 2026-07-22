@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { ObjectLiteral, Repository } from 'typeorm';
+import { DataSource, ObjectLiteral, Repository } from 'typeorm';
 import { SubmissionsService, computeSubmissionStatus, computeRosterStatus } from './submissions.service';
 import { SubmissionEntity } from './entities/submission.entity';
+import { SubmissionTopicMarkEntity } from './entities/submission-topic-mark.entity';
 import { AssignmentEntity } from './entities/assignment.entity';
+import { AssignmentTopicAllocationEntity } from './entities/assignment-topic-allocation.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { StudentEntity, StudentStatus } from '../students/entities/student.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
@@ -15,11 +17,15 @@ type MockRepo<T extends ObjectLiteral> = Partial<Record<keyof Repository<T>, jes
 
 const repoMock = <T extends ObjectLiteral>(): MockRepo<T> => ({
   findOne: jest.fn(),
-  find: jest.fn(),
+  find: jest.fn().mockResolvedValue([]),
   findByIds: jest.fn(),
   save: jest.fn(),
+  delete: jest.fn(),
   create: jest.fn((d: Partial<T>) => d as T),
 });
+
+const TOPIC_A = 'topic-a-uuid';
+const TOPIC_B = 'topic-b-uuid';
 
 const makeAssignment = (overrides: Partial<AssignmentEntity> = {}): AssignmentEntity =>
   ({
@@ -30,6 +36,18 @@ const makeAssignment = (overrides: Partial<AssignmentEntity> = {}): AssignmentEn
     dueDate: '2026-08-01',
     ...overrides,
   } as AssignmentEntity);
+
+const makeAllocation = (
+  overrides: Partial<AssignmentTopicAllocationEntity> = {},
+): AssignmentTopicAllocationEntity =>
+  ({
+    id: 'alloc-1',
+    assignmentId: 'assignment-1',
+    subjectTopicId: TOPIC_A,
+    maxMarks: 20,
+    subjectTopic: { id: TOPIC_A, title: 'Algebra', order: 1 },
+    ...overrides,
+  } as unknown as AssignmentTopicAllocationEntity);
 
 const makeDto = (overrides: Partial<SubmitAssignmentDto> = {}): SubmitAssignmentDto => ({
   textContent: 'My answers are attached.',
@@ -88,31 +106,51 @@ describe('computeRosterStatus', () => {
 describe('SubmissionsService', () => {
   let service: SubmissionsService;
   let submissionRepo: MockRepo<SubmissionEntity>;
+  let topicMarkRepo: MockRepo<SubmissionTopicMarkEntity>;
   let assignmentRepo: MockRepo<AssignmentEntity>;
+  let allocationRepo: MockRepo<AssignmentTopicAllocationEntity>;
   let fileRepo: MockRepo<FileEntity>;
   let studentRepo: MockRepo<StudentEntity>;
   let requirementRepo: MockRepo<TeacherSubjectClassRequirementEntity>;
+  let dataSource: { transaction: jest.Mock };
 
   beforeEach(async () => {
     submissionRepo = repoMock<SubmissionEntity>();
+    topicMarkRepo = repoMock<SubmissionTopicMarkEntity>();
     assignmentRepo = repoMock<AssignmentEntity>();
+    allocationRepo = repoMock<AssignmentTopicAllocationEntity>();
     fileRepo = repoMock<FileEntity>();
     studentRepo = repoMock<StudentEntity>();
     requirementRepo = repoMock<TeacherSubjectClassRequirementEntity>();
+    dataSource = {
+      transaction: jest.fn().mockImplementation(async (cb) =>
+        cb({
+          getRepository: (entity: unknown) =>
+            entity === SubmissionEntity ? submissionRepo : topicMarkRepo,
+        }),
+      ),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SubmissionsService,
         { provide: getRepositoryToken(SubmissionEntity), useValue: submissionRepo },
+        { provide: getRepositoryToken(AssignmentTopicAllocationEntity), useValue: allocationRepo },
+        { provide: getRepositoryToken(SubmissionTopicMarkEntity), useValue: topicMarkRepo },
         { provide: getRepositoryToken(AssignmentEntity), useValue: assignmentRepo },
         { provide: getRepositoryToken(FileEntity), useValue: fileRepo },
         { provide: getRepositoryToken(StudentEntity), useValue: studentRepo },
         { provide: getRepositoryToken(TeacherSubjectClassRequirementEntity), useValue: requirementRepo },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 
     service = module.get<SubmissionsService>(SubmissionsService);
     jest.clearAllMocks();
+    allocationRepo.find!.mockResolvedValue([]);
+    topicMarkRepo.find!.mockResolvedValue([]);
+    submissionRepo.save!.mockImplementation((s) => Promise.resolve({ ...s, id: s.id ?? 'new-submission' }));
+    topicMarkRepo.save!.mockImplementation((d) => Promise.resolve(Array.isArray(d) ? d : [d]));
   });
 
   describe('submit', () => {
@@ -210,6 +248,22 @@ describe('SubmissionsService', () => {
       const result = await service.findMineForAssignment('assignment-1', 'student-1');
 
       expect(result?.attachments).toEqual([{ id: 'file-1', path: '/f1' }]);
+    });
+
+    it('also populates topicMarks on the caller\'s own submission, for the topic result-breakdown view', async () => {
+      submissionRepo.findOne!.mockResolvedValue({
+        id: 'submission-1',
+        attachmentFileIds: [],
+      });
+      topicMarkRepo.find!.mockResolvedValue([
+        { submissionId: 'submission-1', subjectTopicId: TOPIC_A, score: '18.00', subjectTopic: { title: 'Algebra' } },
+      ]);
+
+      const result = await service.findMineForAssignment('assignment-1', 'student-1');
+
+      expect(result?.topicMarks).toEqual([
+        expect.objectContaining({ subjectTopicId: TOPIC_A, score: '18.00' }),
+      ]);
     });
   });
 
@@ -390,6 +444,105 @@ describe('SubmissionsService', () => {
       expect(result.gradedByTeacherId).toBe('teacher-1');
       expect(result.gradedAt).toBeInstanceOf(Date);
     });
+
+    describe('per-topic marks (the explicitly-requested behavior)', () => {
+      const makeSubmission = (overrides: Record<string, unknown> = {}) => ({
+        id: 'submission-1',
+        assignmentId: 'assignment-1',
+        assignment: makeAssignment(),
+        attachmentFileIds: [],
+        ...overrides,
+      });
+
+      beforeEach(() => {
+        requirementRepo.findOne!.mockResolvedValue({ id: 1 });
+        allocationRepo.find!.mockResolvedValue([
+          makeAllocation({ subjectTopicId: TOPIC_A, maxMarks: 20 }),
+          makeAllocation({
+            subjectTopicId: TOPIC_B,
+            maxMarks: 15,
+            subjectTopic: { id: TOPIC_B, title: 'Geometry', order: 2 } as never,
+          }),
+        ]);
+      });
+
+      it('computes an auto total as the sum of topic scores, independent of grade/feedback', async () => {
+        submissionRepo.findOne!.mockResolvedValue(makeSubmission());
+
+        const result = await service.grade('submission-1', 'assignment-1', 'teacher-1', false, {
+          grade: 'A',
+          topicScores: [
+            { subjectTopicId: TOPIC_A, score: 18 },
+            { subjectTopicId: TOPIC_B, score: 12 },
+          ],
+        });
+
+        expect(result.grade).toBe('A');
+        expect(result.totalScore).toBe('30');
+        expect(topicMarkRepo.delete).toHaveBeenCalledWith({ submissionId: 'submission-1' });
+        const savedTopicMarks = (topicMarkRepo.save as jest.Mock).mock.calls[0][0];
+        expect(savedTopicMarks).toEqual([
+          expect.objectContaining({ subjectTopicId: TOPIC_A, score: '18' }),
+          expect.objectContaining({ subjectTopicId: TOPIC_B, score: '12' }),
+        ]);
+      });
+
+      it('rejects a cell exceeding that topic\'s max allocation', async () => {
+        submissionRepo.findOne!.mockResolvedValue(makeSubmission());
+
+        await expect(
+          service.grade('submission-1', 'assignment-1', 'teacher-1', false, {
+            topicScores: [{ subjectTopicId: TOPIC_A, score: 25 }],
+          }),
+        ).rejects.toThrow(UnprocessableEntityException);
+        expect(submissionRepo.save).not.toHaveBeenCalled();
+      });
+
+      it('rejects a duplicate topic in the marks entry', async () => {
+        submissionRepo.findOne!.mockResolvedValue(makeSubmission());
+
+        await expect(
+          service.grade('submission-1', 'assignment-1', 'teacher-1', false, {
+            topicScores: [
+              { subjectTopicId: TOPIC_A, score: 10 },
+              { subjectTopicId: TOPIC_A, score: 5 },
+            ],
+          }),
+        ).rejects.toThrow(UnprocessableEntityException);
+      });
+
+      it('rejects a topic not allocated for this assignment', async () => {
+        submissionRepo.findOne!.mockResolvedValue(makeSubmission());
+
+        await expect(
+          service.grade('submission-1', 'assignment-1', 'teacher-1', false, {
+            topicScores: [{ subjectTopicId: 'not-allocated', score: 5 }],
+          }),
+        ).rejects.toThrow(UnprocessableEntityException);
+      });
+
+      it('rejects an empty topicScores array', async () => {
+        submissionRepo.findOne!.mockResolvedValue(makeSubmission());
+
+        await expect(
+          service.grade('submission-1', 'assignment-1', 'teacher-1', false, {
+            topicScores: [],
+          }),
+        ).rejects.toThrow(UnprocessableEntityException);
+      });
+
+      it('rejects topic marks for an assignment with zero topic allocations', async () => {
+        allocationRepo.find!.mockResolvedValue([]);
+        submissionRepo.findOne!.mockResolvedValue(makeSubmission());
+
+        await expect(
+          service.grade('submission-1', 'assignment-1', 'teacher-1', false, {
+            topicScores: [{ subjectTopicId: TOPIC_A, score: 5 }],
+          }),
+        ).rejects.toThrow(UnprocessableEntityException);
+        expect(submissionRepo.save).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('getForGuardianChild', () => {
@@ -413,6 +566,32 @@ describe('SubmissionsService', () => {
       expect(result.find((r) => r.assignment.id === 'a-1')?.grade).toBe('A');
       expect(result.find((r) => r.assignment.id === 'a-2')?.status).toBe('pending');
       expect(result.find((r) => r.assignment.id === 'a-2')?.grade).toBeNull();
+    });
+
+    it('also includes totalScore and a per-topic breakdown when the assignment used topic allocation', async () => {
+      assignmentRepo.find!.mockResolvedValue([makeAssignment({ id: 'a-1', dueDate: '2026-08-01' })]);
+      submissionRepo.find!.mockResolvedValue([
+        {
+          id: 'submission-1',
+          assignmentId: 'a-1',
+          submittedAt: new Date('2026-07-30T10:00:00Z'),
+          grade: 'A',
+          feedback: 'Great job.',
+          totalScore: '18.00',
+        },
+      ]);
+      allocationRepo.find!.mockResolvedValue([makeAllocation({ assignmentId: 'a-1', maxMarks: 20 })]);
+      topicMarkRepo.find!.mockResolvedValue([
+        { submissionId: 'submission-1', subjectTopicId: TOPIC_A, score: '18.00' },
+      ]);
+
+      const result = await service.getForGuardianChild('student-1', 1);
+
+      const row = result.find((r) => r.assignment.id === 'a-1');
+      expect(row?.totalScore).toBe(18);
+      expect(row?.topicMarks).toEqual([
+        expect.objectContaining({ subjectTopicId: TOPIC_A, title: 'Algebra', maxMarks: 20, score: 18 }),
+      ]);
     });
 
     it('returns an empty array when the class section has no assignments', async () => {

@@ -46,7 +46,7 @@ function StatusBadge({ status }: { status: 'draft' | 'submitted' | null }) {
   )
 }
 
-// ─── Roster row ───────────────────────────────────────────────────────────────
+// ─── Roster row — legacy (no topic allocations on this assessment) ────────────
 
 function MarkRosterRowItem({
   index,
@@ -102,6 +102,79 @@ function MarkRosterRowItem({
   )
 }
 
+// ─── Roster row — topic-tracked (one input column per topic + a computed total) ──
+
+function TopicMarkRosterRowItem({
+  index,
+  row,
+  values,
+  onChange,
+}: {
+  index: number
+  row: MarkRosterRow
+  values: Record<string, string>
+  onChange: (studentId: string, subjectTopicId: string, v: string) => void
+}) {
+  const locked = row.status === 'submitted'
+
+  let total = 0
+  let hasAny = false
+  const cellInvalid: Record<string, boolean> = {}
+  row.topicScores.forEach((topic) => {
+    const raw = values[topic.subjectTopicId] ?? ''
+    if (raw.trim() === '') return
+    const n = Number(raw)
+    if (Number.isNaN(n)) return
+    hasAny = true
+    total += n
+    cellInvalid[topic.subjectTopicId] = n > topic.maxMarks
+  })
+
+  return (
+    <tr style={{ verticalAlign: 'middle' }}>
+      <td className="text-muted small ps-3">{index + 1}</td>
+      <td>
+        <div className="fw-semibold small">
+          {row.lastName}, {row.firstName}
+        </div>
+        <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+          {row.admissionNumber}
+        </div>
+      </td>
+      {row.topicScores.map((topic) => {
+        const value = values[topic.subjectTopicId] ?? ''
+        const isInvalid = cellInvalid[topic.subjectTopicId] === true
+        return (
+          <td key={topic.subjectTopicId}>
+            <div className="d-flex align-items-center gap-1">
+              <input
+                type="number"
+                className={`form-control form-control-sm ${isInvalid ? 'is-invalid' : ''}`}
+                style={{ maxWidth: 76 }}
+                min={0}
+                max={topic.maxMarks}
+                step="0.5"
+                value={value}
+                disabled={locked}
+                onChange={(e) => onChange(row.studentId, topic.subjectTopicId, e.target.value)}
+              />
+              <span className="text-muted small">/ {topic.maxMarks}</span>
+            </div>
+          </td>
+        )
+      })}
+      <td>
+        <span className="fw-bold" style={{ color: hasAny ? '#3730a3' : '#94a3b8' }}>
+          {hasAny ? total : '—'}
+        </span>
+      </td>
+      <td>
+        <StatusBadge status={row.status} />
+      </td>
+    </tr>
+  )
+}
+
 // ─── Main page inner component ────────────────────────────────────────────────
 
 function MarksEntryContent() {
@@ -110,6 +183,8 @@ function MarksEntryContent() {
   const [selectedTermId, setSelectedTermId] = useState<number | null>(null)
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(null)
   const [localScores, setLocalScores] = useState<Record<string, string>>({})
+  // studentId -> subjectTopicId -> raw input value — only used for a topic-tracked assessment.
+  const [topicLocalScores, setTopicLocalScores] = useState<Record<string, Record<string, string>>>({})
 
   const { data: terms = [], isLoading: termsLoading } = useAcademicTerms()
   const { data: assessments = [], isLoading: assessmentsLoading } = useMyAssessments(selectedTermId)
@@ -122,6 +197,7 @@ function MarksEntryContent() {
 
   const roster = marksData?.roster ?? []
   const assessment = marksData?.assessment
+  const isTopicTracked = (assessment?.topicAllocations?.length ?? 0) > 0
   const { data: materialsStatus } = useMaterialsCheckStatus(
     assessment?.requiresMaterialsCheck ? selectedAssessmentId : null,
   )
@@ -147,10 +223,17 @@ function MarksEntryContent() {
   // Sync local state when roster data actually changes
   useEffect(() => {
     const map: Record<string, string> = {}
+    const topicMap: Record<string, Record<string, string>> = {}
     roster.forEach((r) => {
       map[r.studentId] = r.score !== null ? String(r.score) : ''
+      const rowTopicMap: Record<string, string> = {}
+      r.topicScores.forEach((t) => {
+        rowTopicMap[t.subjectTopicId] = t.score !== null ? String(t.score) : ''
+      })
+      topicMap[r.studentId] = rowTopicMap
     })
     setLocalScores(map)
+    setTopicLocalScores(topicMap)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUpdatedAt])
 
@@ -158,26 +241,61 @@ function MarksEntryContent() {
     setLocalScores((prev) => ({ ...prev, [studentId]: value }))
   }
 
-  const enteredCount = Object.values(localScores).filter((v) => v.trim() !== '').length
+  const handleTopicScoreChange = (studentId: string, subjectTopicId: string, value: string) => {
+    setTopicLocalScores((prev) => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], [subjectTopicId]: value },
+    }))
+  }
+
+  const enteredCount = isTopicTracked
+    ? roster.filter((r) =>
+        Object.values(topicLocalScores[r.studentId] ?? {}).some((v) => v.trim() !== ''),
+      ).length
+    : Object.values(localScores).filter((v) => v.trim() !== '').length
   const totalCount = roster.length
   const allSubmitted = roster.length > 0 && roster.every((r) => r.status === 'submitted')
 
-  const buildEntries = () =>
-    roster
+  const buildEntries = () => {
+    if (isTopicTracked) {
+      return roster
+        .filter((r) => r.status !== 'submitted')
+        .map((r) => {
+          const topicScores = Object.entries(topicLocalScores[r.studentId] ?? {})
+            .filter(([, v]) => v.trim() !== '')
+            .map(([subjectTopicId, v]) => ({ subjectTopicId, score: Number(v) }))
+          return { studentId: r.studentId, topicScores }
+        })
+        .filter((e) => e.topicScores.length > 0)
+    }
+    return roster
       .filter((r) => r.status !== 'submitted' && localScores[r.studentId]?.trim() !== '')
       .map((r) => ({
         studentId: r.studentId,
         score: Number(localScores[r.studentId]),
       }))
+  }
 
-  const hasInvalidScore = () =>
-    roster.some((r) => {
+  const hasInvalidScore = () => {
+    if (isTopicTracked) {
+      return roster.some((r) => {
+        if (r.status === 'submitted') return false
+        return r.topicScores.some((topic) => {
+          const v = topicLocalScores[r.studentId]?.[topic.subjectTopicId]
+          if (!v || v.trim() === '') return false
+          const n = Number(v)
+          return !Number.isNaN(n) && n > topic.maxMarks
+        })
+      })
+    }
+    return roster.some((r) => {
       if (r.status === 'submitted') return false
       const v = localScores[r.studentId]
       if (!v || v.trim() === '') return false
       const n = Number(v)
       return !Number.isNaN(n) && n > r.maxScore
     })
+  }
 
   const handleSave = (status: 'draft' | 'submitted') => {
     if (hasInvalidScore()) {
@@ -382,20 +500,41 @@ function MarksEntryContent() {
                       #
                     </th>
                     <th className="fw-semibold text-muted small">Student</th>
-                    <th className="fw-semibold text-muted small">Score</th>
+                    {isTopicTracked ? (
+                      <>
+                        {(roster[0]?.topicScores ?? []).map((topic) => (
+                          <th key={topic.subjectTopicId} className="fw-semibold text-muted small">
+                            {topic.title}
+                          </th>
+                        ))}
+                        <th className="fw-semibold text-muted small">Total</th>
+                      </>
+                    ) : (
+                      <th className="fw-semibold text-muted small">Score</th>
+                    )}
                     <th className="fw-semibold text-muted small">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {roster.map((row, idx) => (
-                    <MarkRosterRowItem
-                      key={row.studentId}
-                      index={idx}
-                      row={row}
-                      value={localScores[row.studentId] ?? ''}
-                      onChange={handleScoreChange}
-                    />
-                  ))}
+                  {isTopicTracked
+                    ? roster.map((row, idx) => (
+                        <TopicMarkRosterRowItem
+                          key={row.studentId}
+                          index={idx}
+                          row={row}
+                          values={topicLocalScores[row.studentId] ?? {}}
+                          onChange={handleTopicScoreChange}
+                        />
+                      ))
+                    : roster.map((row, idx) => (
+                        <MarkRosterRowItem
+                          key={row.studentId}
+                          index={idx}
+                          row={row}
+                          value={localScores[row.studentId] ?? ''}
+                          onChange={handleScoreChange}
+                        />
+                      ))}
                 </tbody>
               </table>
             </div>

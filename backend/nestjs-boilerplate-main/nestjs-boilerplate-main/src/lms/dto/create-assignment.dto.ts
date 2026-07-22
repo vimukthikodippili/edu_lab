@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMinSize,
   IsArray,
   IsDateString,
   IsInt,
@@ -8,9 +9,22 @@ import {
   IsString,
   IsUUID,
   Length,
+  Max,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class AssignmentTopicAllocationDto {
+  @IsUUID()
+  subjectTopicId: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  maxMarks: number;
+}
 
 export class CreateAssignmentDto {
   @ApiProperty({ example: 1 })
@@ -44,4 +58,12 @@ export class CreateAssignmentDto {
   @IsArray()
   @IsUUID('4', { each: true })
   attachmentFileIds?: string[];
+
+  /** Assignment.totalMarks is computed as the sum of these — there is deliberately no
+   * separate totalMarks field on this DTO, so a manual total cannot be supplied at all. */
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => AssignmentTopicAllocationDto)
+  topicAllocations: AssignmentTopicAllocationDto[];
 }

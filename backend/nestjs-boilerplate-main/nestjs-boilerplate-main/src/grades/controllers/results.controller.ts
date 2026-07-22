@@ -228,6 +228,27 @@ export class ResultsController {
     );
   }
 
+  @Get('published/assessments')
+  @Roles(RoleEnum.student, RoleEnum.guardian)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Get a student's published per-assessment topic breakdown for one subject — student/guardian portal only",
+  })
+  async getPublishedAssessmentResults(
+    @Query('studentId') studentId: string,
+    @Query('subjectId') subjectId: string,
+    @Query('termId') termId: string,
+    @Request() req: { user: { id: unknown; role?: { id?: number } } },
+  ) {
+    const resolvedStudentId = await this.assertCanViewPublishedResults(req, studentId);
+    return this.resultPublishingService.getPublishedAssessmentResultsForStudent(
+      resolvedStudentId,
+      subjectId,
+      Number(termId),
+    );
+  }
+
   @Post('publish')
   @Roles(RoleEnum.admin, RoleEnum.principal)
   @HttpCode(HttpStatus.OK)

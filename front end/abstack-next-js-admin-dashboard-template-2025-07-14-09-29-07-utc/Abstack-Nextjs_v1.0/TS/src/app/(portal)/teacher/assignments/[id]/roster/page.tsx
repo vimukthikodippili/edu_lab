@@ -50,21 +50,55 @@ function GradePanel({
 }) {
   const [grade, setGrade] = useState(row.grade ?? '')
   const [feedback, setFeedback] = useState(row.feedback ?? '')
+  const [topicValues, setTopicValues] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {}
+    row.topicMarks.forEach((t) => {
+      map[t.subjectTopicId] = t.score !== null ? String(t.score) : ''
+    })
+    return map
+  })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
   const gradeMutation = useGradeSubmission(assignmentId)
+  const isTopicTracked = row.topicMarks.length > 0
+
+  let topicTotal = 0
+  let hasAnyTopicValue = false
+  const topicCellInvalid: Record<string, boolean> = {}
+  row.topicMarks.forEach((topic) => {
+    const raw = topicValues[topic.subjectTopicId] ?? ''
+    if (raw.trim() === '') return
+    const n = Number(raw)
+    if (Number.isNaN(n)) return
+    hasAnyTopicValue = true
+    topicTotal += n
+    topicCellInvalid[topic.subjectTopicId] = n > topic.maxMarks
+  })
+  const hasInvalidTopicCell = Object.values(topicCellInvalid).some(Boolean)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     if (!row.submissionId) return
+    if (hasInvalidTopicCell) {
+      setError('Fix the highlighted topic marks before saving.')
+      return
+    }
+
+    const topicScores = isTopicTracked
+      ? Object.entries(topicValues)
+          .filter(([, v]) => v.trim() !== '')
+          .map(([subjectTopicId, v]) => ({ subjectTopicId, score: Number(v) }))
+      : []
+
     try {
       await gradeMutation.mutateAsync({
         submissionId: row.submissionId,
         payload: {
           grade: grade.trim() || undefined,
           feedback: feedback.trim() || undefined,
+          topicScores: topicScores.length > 0 ? topicScores : undefined,
         },
       })
       setSuccess(true)
@@ -79,7 +113,7 @@ function GradePanel({
 
   return (
     <tr>
-      <td colSpan={5} className="p-0">
+      <td colSpan={6} className="p-0">
         <div className="p-3" style={{ background: '#f8fafc' }}>
           {row.textContent && (
             <div className="mb-2">
@@ -111,6 +145,44 @@ function GradePanel({
               </div>
             )}
             {error && <div className="alert alert-danger py-2 small">{error}</div>}
+
+            {isTopicTracked && (
+              <div className="mb-3">
+                <span className="text-muted small fw-semibold d-block mb-2">Topic marks</span>
+                <div className="d-flex flex-wrap gap-3 align-items-end">
+                  {row.topicMarks.map((topic) => {
+                    const value = topicValues[topic.subjectTopicId] ?? ''
+                    const isInvalid = topicCellInvalid[topic.subjectTopicId] === true
+                    return (
+                      <div key={topic.subjectTopicId}>
+                        <label className="form-label small mb-1">{topic.title}</label>
+                        <div className="d-flex align-items-center gap-1">
+                          <input
+                            type="number"
+                            className={`form-control form-control-sm ${isInvalid ? 'is-invalid' : ''}`}
+                            style={{ width: 76 }}
+                            min={0}
+                            max={topic.maxMarks}
+                            step="0.5"
+                            value={value}
+                            onChange={(e) =>
+                              setTopicValues((prev) => ({ ...prev, [topic.subjectTopicId]: e.target.value }))
+                            }
+                          />
+                          <span className="text-muted small">/ {topic.maxMarks}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div>
+                    <span className="text-muted small d-block mb-1">Total</span>
+                    <span className="fw-bold" style={{ color: hasAnyTopicValue ? '#3730a3' : '#94a3b8' }}>
+                      {hasAnyTopicValue ? topicTotal : '—'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="row g-2 align-items-end">
               <div className="col-md-2">
@@ -171,6 +243,17 @@ function RosterTableRow({ assignmentId, row }: { assignmentId: string; row: Rost
             <span className="badge rounded-pill px-2 py-1" style={{ background: '#ede9fe', color: '#6d28d9' }}>{row.grade}</span>
           ) : (
             <span className="text-muted">—</span>
+          )}
+        </td>
+        <td className="small">
+          {row.topicMarks.length > 0 ? (
+            row.totalScore !== null ? (
+              <span className="fw-semibold" style={{ color: '#3730a3' }}>{row.totalScore}</span>
+            ) : (
+              <span className="text-muted">—</span>
+            )
+          ) : (
+            <span className="text-muted">n/a</span>
           )}
         </td>
         <td className="text-end">
@@ -267,6 +350,7 @@ function TeacherRosterContent({ assignmentId }: { assignmentId: string }) {
                 <th className="small text-muted">Admission No.</th>
                 <th className="small text-muted">Status</th>
                 <th className="small text-muted">Grade</th>
+                <th className="small text-muted">Total</th>
                 <th className="small text-muted text-end">Action</th>
               </tr>
             </thead>

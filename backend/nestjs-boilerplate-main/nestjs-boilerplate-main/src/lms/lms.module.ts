@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssignmentEntity } from './entities/assignment.entity';
+import { AssignmentTopicAllocationEntity } from './entities/assignment-topic-allocation.entity';
 import { SubmissionEntity } from './entities/submission.entity';
+import { SubmissionTopicMarkEntity } from './entities/submission-topic-mark.entity';
 import { LiveSessionEntity } from './entities/live-session.entity';
 import { LiveSessionAttendanceEntity } from './entities/live-session-attendance.entity';
 import { StudentEntity } from '../students/entities/student.entity';
@@ -21,12 +23,15 @@ import { LiveKitEgressService } from './livekit-egress.service';
 import { LiveAttendanceService } from './live-attendance.service';
 import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
+import { SubjectTopicsModule } from '../subject-topics/subject-topics.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       AssignmentEntity,
+      AssignmentTopicAllocationEntity,
       SubmissionEntity,
+      SubmissionTopicMarkEntity,
       LiveSessionEntity,
       LiveSessionAttendanceEntity,
       StudentEntity,
@@ -38,6 +43,7 @@ import { StaffModule } from '../staff/staff.module';
     ]),
     UsersModule,
     StaffModule,
+    SubjectTopicsModule,
   ],
   providers: [
     AssignmentsService,

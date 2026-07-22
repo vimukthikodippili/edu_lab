@@ -5,9 +5,11 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { SubmissionEntity } from './entities/submission.entity';
+import { SubmissionTopicMarkEntity } from './entities/submission-topic-mark.entity';
 import { AssignmentEntity } from './entities/assignment.entity';
+import { AssignmentTopicAllocationEntity } from './entities/assignment-topic-allocation.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { StudentEntity, StudentStatus } from '../students/entities/student.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
@@ -38,6 +40,15 @@ export interface GuardianChildAssignmentRow {
   submittedAt: Date | null;
   grade: string | null;
   feedback: string | null;
+  totalScore: number | null;
+  topicMarks: RosterTopicMarkRow[];
+}
+
+export interface RosterTopicMarkRow {
+  subjectTopicId: string;
+  title: string;
+  maxMarks: number;
+  score: number | null;
 }
 
 export interface RosterRow {
@@ -53,6 +64,8 @@ export interface RosterRow {
   grade: string | null;
   feedback: string | null;
   gradedAt: Date | null;
+  totalScore: number | null;
+  topicMarks: RosterTopicMarkRow[];
 }
 
 /**
@@ -87,6 +100,12 @@ export class SubmissionsService {
     @InjectRepository(AssignmentEntity)
     private readonly assignmentRepo: Repository<AssignmentEntity>,
 
+    @InjectRepository(AssignmentTopicAllocationEntity)
+    private readonly allocationRepo: Repository<AssignmentTopicAllocationEntity>,
+
+    @InjectRepository(SubmissionTopicMarkEntity)
+    private readonly topicMarkRepo: Repository<SubmissionTopicMarkEntity>,
+
     @InjectRepository(FileEntity)
     private readonly fileRepo: Repository<FileEntity>,
 
@@ -95,6 +114,8 @@ export class SubmissionsService {
 
     @InjectRepository(TeacherSubjectClassRequirementEntity)
     private readonly requirementRepo: Repository<TeacherSubjectClassRequirementEntity>,
+
+    private readonly dataSource: DataSource,
   ) {}
 
   private async assertAuthorized(
@@ -113,6 +134,36 @@ export class SubmissionsService {
         'You are not assigned to teach this subject for this class section.',
       );
     }
+  }
+
+  /** Batch-loads this assignment's topic allocations, sorted by the subject's own topic
+   * order — duplicated locally rather than shared, matching AssignmentsService's own
+   * private copy of the same query (this service doesn't depend on AssignmentsService). */
+  private async loadTopicAllocations(
+    assignmentId: string,
+  ): Promise<AssignmentTopicAllocationEntity[]> {
+    const allocations = await this.allocationRepo.find({
+      where: { assignmentId },
+    });
+    return allocations.sort(
+      (a, b) => a.subjectTopic.order - b.subjectTopic.order,
+    );
+  }
+
+  private async attachTopicMarks(submissions: SubmissionEntity[]): Promise<void> {
+    if (submissions.length === 0) return;
+    const topicMarks = await this.topicMarkRepo.find({
+      where: { submissionId: In(submissions.map((s) => s.id)) },
+    });
+    const bySubmissionId = new Map<string, SubmissionTopicMarkEntity[]>();
+    for (const tm of topicMarks) {
+      const list = bySubmissionId.get(tm.submissionId) ?? [];
+      list.push(tm);
+      bySubmissionId.set(tm.submissionId, list);
+    }
+    submissions.forEach((s) => {
+      s.topicMarks = bySubmissionId.get(s.id) ?? [];
+    });
   }
 
   private async attachFiles(submissions: SubmissionEntity[]): Promise<void> {
@@ -187,6 +238,7 @@ export class SubmissionsService {
     const submission = await this.submissionRepo.findOne({ where: { assignmentId, studentId } });
     if (submission) {
       await this.attachFiles([submission]);
+      await this.attachTopicMarks([submission]);
     }
     return submission;
   }
@@ -225,6 +277,9 @@ export class SubmissionsService {
       isPrivileged,
     );
 
+    const allocations = await this.loadTopicAllocations(assignmentId);
+    assignment.topicAllocations = allocations;
+
     const students = await this.studentRepo.find({
       where: { classSectionId: assignment.classSectionId, status: StudentStatus.ACTIVE },
       order: { lastName: 'ASC', firstName: 'ASC' },
@@ -232,11 +287,18 @@ export class SubmissionsService {
 
     const submissions = await this.submissionRepo.find({ where: { assignmentId } });
     await this.attachFiles(submissions);
+    await this.attachTopicMarks(submissions);
     const submissionByStudentId = new Map(submissions.map((s) => [s.studentId, s]));
 
     const roster: RosterRow[] = students.map((s) => {
       const submission = submissionByStudentId.get(s.id);
       const { status, submittedAt } = computeRosterStatus(submission, assignment.dueDate);
+      const scoreByTopicId = new Map(
+        (submission?.topicMarks ?? []).map((tm) => [
+          tm.subjectTopicId,
+          Number(tm.score),
+        ]),
+      );
       return {
         studentId: s.id,
         firstName: s.firstName,
@@ -250,6 +312,14 @@ export class SubmissionsService {
         grade: submission?.grade ?? null,
         feedback: submission?.feedback ?? null,
         gradedAt: submission?.gradedAt ?? null,
+        totalScore:
+          submission?.totalScore != null ? Number(submission.totalScore) : null,
+        topicMarks: allocations.map((a) => ({
+          subjectTopicId: a.subjectTopicId,
+          title: a.subjectTopic.title,
+          maxMarks: a.maxMarks,
+          score: scoreByTopicId.get(a.subjectTopicId) ?? null,
+        })),
       };
     });
 
@@ -278,11 +348,70 @@ export class SubmissionsService {
       isPrivileged,
     );
 
-    if (dto.grade === undefined && dto.feedback === undefined) {
+    if (
+      dto.grade === undefined &&
+      dto.feedback === undefined &&
+      dto.topicScores === undefined
+    ) {
       throw new UnprocessableEntityException({
         status: 422,
-        errors: { grade: 'Provide a grade or feedback before saving.' },
+        errors: { grade: 'Provide a grade, feedback, or topic marks before saving.' },
       });
+    }
+
+    // Per-topic marks are independent of the free-text grade/feedback — a teacher can
+    // set either, both, or neither in a single save.
+    if (dto.topicScores !== undefined) {
+      const allocations = await this.loadTopicAllocations(assignmentId);
+      if (allocations.length === 0) {
+        throw new UnprocessableEntityException(
+          'This assignment has no topic allocations — topic marks are not available for it.',
+        );
+      }
+      if (dto.topicScores.length === 0) {
+        throw new UnprocessableEntityException('Provide at least one topic mark.');
+      }
+      const maxMarksByTopicId = new Map(
+        allocations.map((a) => [a.subjectTopicId, a.maxMarks]),
+      );
+
+      const violations: { subjectTopicId: string; score: number; maxScore: number }[] = [];
+      const seenTopicIds = new Set<string>();
+      let total = 0;
+      for (const ts of dto.topicScores) {
+        if (seenTopicIds.has(ts.subjectTopicId)) {
+          throw new UnprocessableEntityException(
+            'Duplicate topic in the marks entry.',
+          );
+        }
+        seenTopicIds.add(ts.subjectTopicId);
+
+        const maxMarks = maxMarksByTopicId.get(ts.subjectTopicId);
+        if (maxMarks === undefined) {
+          throw new UnprocessableEntityException(
+            `Topic ${ts.subjectTopicId} is not allocated marks for this assignment.`,
+          );
+        }
+        if (ts.score > maxMarks) {
+          violations.push({
+            subjectTopicId: ts.subjectTopicId,
+            score: ts.score,
+            maxScore: maxMarks,
+          });
+        }
+        total += ts.score;
+      }
+
+      if (violations.length > 0) {
+        throw new UnprocessableEntityException({
+          message: `${violations.length} topic mark${
+            violations.length === 1 ? '' : 's'
+          } exceed${violations.length === 1 ? 's' : ''} the allocated maximum.`,
+          violations,
+        });
+      }
+
+      submission.totalScore = String(total);
     }
 
     if (dto.grade !== undefined) submission.grade = dto.grade;
@@ -290,8 +419,32 @@ export class SubmissionsService {
     submission.gradedByTeacherId = teacherId;
     submission.gradedAt = new Date();
 
-    const saved = await this.submissionRepo.save(submission);
+    // Coordinated multi-table write (Submission row + its TopicMark children) needs
+    // atomicity — mirrors AssessmentService.create()'s transaction pattern.
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const submissionRepo = manager.getRepository(SubmissionEntity);
+      const topicMarkRepo = manager.getRepository(SubmissionTopicMarkEntity);
+
+      const savedSubmission = await submissionRepo.save(submission);
+
+      if (dto.topicScores !== undefined) {
+        await topicMarkRepo.delete({ submissionId: savedSubmission.id });
+        await topicMarkRepo.save(
+          dto.topicScores.map((ts) =>
+            topicMarkRepo.create({
+              submissionId: savedSubmission.id,
+              subjectTopicId: ts.subjectTopicId,
+              score: String(ts.score),
+            }),
+          ),
+        );
+      }
+
+      return savedSubmission;
+    });
+
     await this.attachFiles([saved]);
+    await this.attachTopicMarks([saved]);
     return saved;
   }
 
@@ -308,17 +461,40 @@ export class SubmissionsService {
     const submissions = await this.submissionRepo.find({
       where: { studentId, assignmentId: In(assignments.map((a) => a.id)) },
     });
+    await this.attachTopicMarks(submissions);
     const submissionByAssignmentId = new Map(submissions.map((s) => [s.assignmentId, s]));
+
+    const allAllocations = await this.allocationRepo.find({
+      where: { assignmentId: In(assignments.map((a) => a.id)) },
+    });
+    const allocationsByAssignmentId = new Map<string, AssignmentTopicAllocationEntity[]>();
+    for (const alloc of allAllocations) {
+      const list = allocationsByAssignmentId.get(alloc.assignmentId) ?? [];
+      list.push(alloc);
+      allocationsByAssignmentId.set(alloc.assignmentId, list);
+    }
 
     return assignments.map((a) => {
       const submission = submissionByAssignmentId.get(a.id);
       const { status, submittedAt } = computeRosterStatus(submission, a.dueDate);
+      const allocations = allocationsByAssignmentId.get(a.id) ?? [];
+      const scoreByTopicId = new Map(
+        (submission?.topicMarks ?? []).map((tm) => [tm.subjectTopicId, Number(tm.score)]),
+      );
       return {
         assignment: a,
         status,
         submittedAt,
         grade: submission?.grade ?? null,
         feedback: submission?.feedback ?? null,
+        totalScore:
+          submission?.totalScore != null ? Number(submission.totalScore) : null,
+        topicMarks: allocations.map((alloc) => ({
+          subjectTopicId: alloc.subjectTopicId,
+          title: alloc.subjectTopic.title,
+          maxMarks: alloc.maxMarks,
+          score: scoreByTopicId.get(alloc.subjectTopicId) ?? null,
+        })),
       };
     });
   }

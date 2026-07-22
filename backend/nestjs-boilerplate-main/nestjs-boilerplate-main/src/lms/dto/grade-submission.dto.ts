@@ -1,5 +1,24 @@
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, Length } from 'class-validator';
+import {
+  IsArray,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+
+export class TopicScoreEntryDto {
+  @IsUUID()
+  subjectTopicId: string;
+
+  @IsNumber()
+  @Min(0)
+  score: number;
+}
 
 export class GradeSubmissionDto {
   @ApiPropertyOptional({ example: 'A' })
@@ -13,4 +32,13 @@ export class GradeSubmissionDto {
   @IsString()
   @Length(1, 3000)
   feedback?: string;
+
+  /** Only accepted when the assignment has topic allocations. The total is computed
+   * automatically as the sum of these — there is deliberately no separate total field. */
+  @ApiPropertyOptional({ type: [TopicScoreEntryDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TopicScoreEntryDto)
+  topicScores?: TopicScoreEntryDto[];
 }

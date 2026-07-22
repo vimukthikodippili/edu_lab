@@ -1,13 +1,16 @@
 'use client'
 import { useState } from 'react'
-import { BarChart2, GraduationCap } from 'lucide-react'
+import { BarChart2, ChevronDown, ChevronRight, GraduationCap } from 'lucide-react'
 import RoleGuard from '@/components/wrappers/RoleGuard'
 import { ROLES } from '@/lib/auth/roles'
 import { useMyStudent } from '@/features/students/hooks/useMyStudent'
 import { useAcademicTerms } from '@/features/grades/hooks/useAcademicTerms'
 import { usePublishedTermResult } from '@/features/grades/hooks/usePublishedTermResult'
 import { usePublishedSubjectResults } from '@/features/grades/hooks/usePublishedSubjectResults'
+import { usePublishedAssessmentResults } from '@/features/grades/hooks/usePublishedAssessmentResults'
 import { useSubjects } from '@/features/subjects/hooks/useSubjects'
+import { TopicScoreChips } from '@/features/grades/components/TopicScoreChips'
+import type { SubjectResult } from '@/types/sims/grades'
 
 function GradeBadge({ letter }: { letter: string | null }) {
   if (!letter) return <span className="text-muted">—</span>
@@ -16,6 +19,68 @@ function GradeBadge({ letter }: { letter: string | null }) {
     <span className={`badge ${isGood ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'} border`}>
       {letter}
     </span>
+  )
+}
+
+// ─── Subject row — click to expand into a per-assessment topic breakdown ───────
+
+function SubjectResultRow({
+  sr,
+  subjectName,
+  termId,
+}: {
+  sr: SubjectResult
+  subjectName: string
+  termId: number | null
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const { data: assessmentResults = [], isLoading } = usePublishedAssessmentResults(
+    expanded ? termId : null,
+    expanded ? sr.subjectId : null,
+  )
+
+  return (
+    <>
+      <tr
+        onClick={() => setExpanded((v) => !v)}
+        style={{ cursor: 'pointer' }}
+      >
+        <td className="small fw-semibold d-flex align-items-center gap-1">
+          {expanded ? <ChevronDown size={14} className="text-muted" /> : <ChevronRight size={14} className="text-muted" />}
+          {subjectName}
+        </td>
+        <td className="small text-center">{sr.totalScore} / {sr.totalMaxScore}</td>
+        <td className="small text-center">{sr.percentage != null ? `${sr.percentage}%` : '—'}</td>
+        <td className="text-center"><GradeBadge letter={sr.letterGrade} /></td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={4} className="p-0">
+            <div className="p-3" style={{ background: '#f8fafc' }}>
+              {isLoading ? (
+                <div className="text-muted small">Loading…</div>
+              ) : assessmentResults.length === 0 ? (
+                <div className="text-muted small">No individual assessment results yet.</div>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {assessmentResults.map((ar) => (
+                    <div key={ar.assessment.id} className="d-flex flex-wrap align-items-center gap-2">
+                      <span className="small fw-semibold" style={{ minWidth: 140 }}>
+                        {ar.assessment.title}
+                      </span>
+                      <span className="small text-muted" style={{ minWidth: 60 }}>
+                        {ar.score}/{ar.maxScore}
+                      </span>
+                      <TopicScoreChips items={ar.topicScores} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
@@ -143,12 +208,12 @@ function StudentGradesContent() {
                 </thead>
                 <tbody>
                   {subjectResults.map((sr) => (
-                    <tr key={sr.id}>
-                      <td className="small fw-semibold">{subjectNameById.get(sr.subjectId) ?? sr.subjectId}</td>
-                      <td className="small text-center">{sr.totalScore} / {sr.totalMaxScore}</td>
-                      <td className="small text-center">{sr.percentage != null ? `${sr.percentage}%` : '—'}</td>
-                      <td className="text-center"><GradeBadge letter={sr.letterGrade} /></td>
-                    </tr>
+                    <SubjectResultRow
+                      key={sr.id}
+                      sr={sr}
+                      subjectName={subjectNameById.get(sr.subjectId) ?? sr.subjectId}
+                      termId={activeTermId}
+                    />
                   ))}
                 </tbody>
               </table>

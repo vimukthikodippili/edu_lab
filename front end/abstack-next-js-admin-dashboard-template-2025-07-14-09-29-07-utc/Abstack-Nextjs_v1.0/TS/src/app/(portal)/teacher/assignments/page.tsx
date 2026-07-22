@@ -8,6 +8,9 @@ import { useMyTeachingAssignments } from '@/features/teacher-subject-requirement
 import { useCreateAssignment } from '@/features/lms/hooks/useCreateAssignment'
 import { useMyAssignments } from '@/features/lms/hooks/useMyAssignments'
 import { useUploadFile } from '@/features/staff/hooks/useUploadFile'
+import TopicAllocationEditor, {
+  type TopicAllocation,
+} from '@/features/subject-topics/components/TopicAllocationEditor'
 import type { Assignment } from '@/features/lms/types'
 
 // ─── Create Assignment Form ───────────────────────────────────────────────────
@@ -25,6 +28,7 @@ function CreateAssignmentForm() {
   const [instructions, setInstructions] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [attachmentFileIds, setAttachmentFileIds] = useState<{ id: string; name: string }[]>([])
+  const [topicAllocations, setTopicAllocations] = useState<TopicAllocation[]>([])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
@@ -65,6 +69,10 @@ function CreateAssignmentForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (topicAllocations.length === 0) {
+      setError('Allocate at least one topic a mark before creating the assignment.')
+      return
+    }
     try {
       await createMutation.mutateAsync({
         classSectionId: Number(classSectionId),
@@ -73,6 +81,7 @@ function CreateAssignmentForm() {
         instructions,
         dueDate,
         attachmentFileIds: attachmentFileIds.map((f) => f.id),
+        topicAllocations,
       })
       setSuccess(true)
       setClassSectionId('')
@@ -81,6 +90,7 @@ function CreateAssignmentForm() {
       setInstructions('')
       setDueDate('')
       setAttachmentFileIds([])
+      setTopicAllocations([])
       setTimeout(() => setSuccess(false), 2500)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -234,13 +244,19 @@ function CreateAssignmentForm() {
               ))}
             </div>
           )}
+
+          {subjectId && (
+            <div className="mt-3">
+              <TopicAllocationEditor subjectId={subjectId} onAllocationsChange={setTopicAllocations} />
+            </div>
+          )}
         </div>
         <div className="card-footer border-0 px-4 pb-4 pt-0 bg-transparent">
           <button
             type="submit"
             className="btn text-white fw-semibold px-4"
             style={{ background: 'linear-gradient(135deg,#0ea5e9,#6366f1)' }}
-            disabled={createMutation.isPending || uploadMutation.isPending}
+            disabled={createMutation.isPending || uploadMutation.isPending || topicAllocations.length === 0}
           >
             {createMutation.isPending ? 'Creating…' : 'Create Assignment'}
           </button>

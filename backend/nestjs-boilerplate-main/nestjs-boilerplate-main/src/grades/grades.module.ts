@@ -4,12 +4,15 @@ import { AcademicTermEntity } from './entities/academic-term.entity';
 import { TermAssessmentPlanEntity } from './entities/term-assessment-plan.entity';
 import { AssessmentEntity } from './entities/assessment.entity';
 import { MarkEntity } from './entities/mark.entity';
+import { MarkTopicScoreEntity } from './entities/mark-topic-score.entity';
 import { GradingBandEntity } from './entities/grading-band.entity';
 import { SubjectResultEntity } from './entities/subject-result.entity';
 import { TermResultEntity } from './entities/term-result.entity';
 import { StudentGradeTrendEntity } from './entities/student-grade-trend.entity';
 import { AcademicPatternFlagEntity } from './entities/academic-pattern-flag.entity';
 import { AssessmentMaterialsCheckEntity } from './entities/assessment-materials-check.entity';
+import { AssessmentTopicAllocationEntity } from './entities/assessment-topic-allocation.entity';
+import { TopicWeaknessFlagEntity } from './entities/topic-weakness-flag.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { AttendanceRecordEntity } from '../attendance/entities/attendance-record.entity';
 import { StaffEntity } from '../staff/entities/staff.entity';
@@ -31,6 +34,7 @@ import { ResultsQueryService } from './services/results-query.service';
 import { ResultPublishingService } from './services/result-publishing.service';
 import { ReportCardPdfService } from './services/report-card-pdf.service';
 import { GradeTrendService } from './services/grade-trend.service';
+import { TopicWeaknessService } from './services/topic-weakness.service';
 import { ResultComputationListener } from './listeners/result-computation.listener';
 import { ReportCardGenerationListener } from './listeners/report-card-generation.listener';
 import { AcademicTermsController } from './controllers/academic-terms.controller';
@@ -41,9 +45,11 @@ import { MaterialsCheckController } from './controllers/materials-check.controll
 import { GradingBandController } from './controllers/grading-band.controller';
 import { ResultsController } from './controllers/results.controller';
 import { GradeTrendController } from './controllers/grade-trend.controller';
+import { TopicWeaknessController } from './controllers/topic-weakness.controller';
 import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
 import { NotificationModule } from '../notification/notification.module';
+import { SubjectTopicsModule } from '../subject-topics/subject-topics.module';
 
 @Module({
   imports: [
@@ -52,6 +58,7 @@ import { NotificationModule } from '../notification/notification.module';
       TermAssessmentPlanEntity,
       AssessmentEntity,
       MarkEntity,
+      MarkTopicScoreEntity,
       SubjectEntity,
       StaffEntity,
       ClassSectionEntity,
@@ -66,12 +73,15 @@ import { NotificationModule } from '../notification/notification.module';
       StudentGradeTrendEntity,
       AcademicPatternFlagEntity,
       AssessmentMaterialsCheckEntity,
+      AssessmentTopicAllocationEntity,
+      TopicWeaknessFlagEntity,
       AttendanceRecordEntity,
       FileEntity,
     ]),
     UsersModule,
     StaffModule,
     NotificationModule,
+    SubjectTopicsModule,
   ],
   providers: [
     AcademicTermsService,
@@ -85,6 +95,7 @@ import { NotificationModule } from '../notification/notification.module';
     ResultPublishingService,
     ReportCardPdfService,
     GradeTrendService,
+    TopicWeaknessService,
     ResultComputationListener,
     ReportCardGenerationListener,
   ],
@@ -97,6 +108,7 @@ import { NotificationModule } from '../notification/notification.module';
     GradingBandController,
     ResultsController,
     GradeTrendController,
+    TopicWeaknessController,
   ],
   exports: [
     AcademicTermsService,

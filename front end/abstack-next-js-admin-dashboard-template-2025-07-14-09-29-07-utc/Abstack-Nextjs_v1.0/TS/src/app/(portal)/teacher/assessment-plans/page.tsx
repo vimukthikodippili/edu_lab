@@ -6,6 +6,9 @@ import { ROLES } from '@/lib/auth/roles'
 import { useAcademicTerms } from '@/features/grades/hooks/useAcademicTerms'
 import { useMySubjectPlans } from '@/features/grades/hooks/useMySubjectPlans'
 import { useCreateAssessment } from '@/features/grades/hooks/useCreateAssessment'
+import TopicAllocationEditor, {
+  type TopicAllocation,
+} from '@/features/subject-topics/components/TopicAllocationEditor'
 import type { SubjectPlanSummary, AssessmentType } from '@/types/sims/grades'
 import { ASSESSMENT_TYPE_LABELS } from '@/types/sims/grades'
 
@@ -48,7 +51,7 @@ function AddAssessmentModal({
   const [title, setTitle] = useState('')
   const [assessmentType, setAssessmentType] = useState<AssessmentType>('monthly_test')
   const [scheduledDate, setScheduledDate] = useState('')
-  const [totalMarks, setTotalMarks] = useState(100)
+  const [topicAllocations, setTopicAllocations] = useState<TopicAllocation[]>([])
   const [requiresMaterialsCheck, setRequiresMaterialsCheck] = useState(false)
   const [instructions, setInstructions] = useState('')
   const [error, setError] = useState('')
@@ -59,6 +62,10 @@ function AddAssessmentModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (topicAllocations.length === 0) {
+      setError('Allocate at least one topic a mark before creating the assessment.')
+      return
+    }
     try {
       await createMutation.mutateAsync({
         subjectId: summary.subjectId,
@@ -67,7 +74,7 @@ function AddAssessmentModal({
         title,
         assessmentType,
         scheduledDate,
-        totalMarks,
+        topicAllocations,
         sectionHeadOverride: false,
         requiresMaterialsCheck,
         instructions: instructions.trim() || undefined,
@@ -149,30 +156,22 @@ function AddAssessmentModal({
                 </select>
               </div>
 
-              <div className="row g-3">
-                <div className="col-md-7">
-                  <label className="form-label fw-semibold small">Scheduled Date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    value={scheduledDate}
-                    onChange={(e) => setScheduledDate(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="col-md-5">
-                  <label className="form-label fw-semibold small">Total Marks</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={totalMarks}
-                    onChange={(e) => setTotalMarks(Number(e.target.value))}
-                    min={1}
-                    max={1000}
-                    required
-                  />
-                </div>
+              <div className="mb-3">
+                <label className="form-label fw-semibold small">Scheduled Date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  required
+                />
               </div>
+
+              <TopicAllocationEditor
+                subjectId={summary.subjectId}
+                onAllocationsChange={setTopicAllocations}
+                showQuestionType
+              />
 
               <div className="form-check mt-3">
                 <input
@@ -208,7 +207,7 @@ function AddAssessmentModal({
                 type="submit"
                 className="btn text-white fw-semibold px-4"
                 style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)' }}
-                disabled={createMutation.isPending || success}
+                disabled={createMutation.isPending || success || topicAllocations.length === 0}
               >
                 {createMutation.isPending ? 'Creating…' : 'Create Assessment'}
               </button>

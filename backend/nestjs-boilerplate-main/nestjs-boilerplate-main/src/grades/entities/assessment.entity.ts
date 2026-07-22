@@ -12,6 +12,7 @@ import { SubjectEntity } from '../../subjects/entities/subject.entity';
 import { AcademicTermEntity } from './academic-term.entity';
 import { ClassSectionEntity } from '../../students/entities/class-section.entity';
 import { StaffEntity } from '../../staff/entities/staff.entity';
+import { AssessmentTopicAllocationEntity } from './assessment-topic-allocation.entity';
 
 export enum AssessmentType {
   MONTHLY_TEST = 'monthly_test',
@@ -65,6 +66,11 @@ export class AssessmentEntity extends EntityRelationalHelper {
   // a structured multi-criterion schema; marks stay a single flat score, as everywhere else.
   @Column({ type: 'text', nullable: true })
   instructions: string | null;
+
+  // Virtual — populated by AssessmentService after loading (not a DB column), same convention
+  // as AssignmentEntity.attachments. Not a real ORM relation, to avoid a circular eager-load
+  // pair with AssessmentTopicAllocationEntity's own relation back to this entity.
+  topicAllocations?: AssessmentTopicAllocationEntity[];
 
   @ManyToOne(() => SubjectEntity, { nullable: false, eager: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'subjectId' })

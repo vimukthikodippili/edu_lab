@@ -11,6 +11,7 @@ import {
 import { EntityRelationalHelper } from '../../utils/relational-entity-helper';
 import { AssignmentEntity } from './assignment.entity';
 import { StudentEntity } from '../../students/entities/student.entity';
+import { SubmissionTopicMarkEntity } from './submission-topic-mark.entity';
 
 @Index(['assignmentId', 'studentId'], { unique: true })
 @Entity({ name: 'assignment_submission' })
@@ -47,6 +48,14 @@ export class SubmissionEntity extends EntityRelationalHelper {
 
   @Column({ type: 'uuid', nullable: true })
   gradedByTeacherId: string | null;
+
+  // Nullable — set only when the teacher grades using per-topic marks; a submission
+  // graded purely with the free-text `grade` field (e.g. "A") never gets one.
+  @Column({ type: 'numeric', precision: 6, scale: 2, nullable: true })
+  totalScore: string | null;
+
+  // Virtual — populated by SubmissionsService after loading, same convention as `attachments`.
+  topicMarks?: SubmissionTopicMarkEntity[];
 
   @ManyToOne(() => AssignmentEntity, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'assignmentId' })

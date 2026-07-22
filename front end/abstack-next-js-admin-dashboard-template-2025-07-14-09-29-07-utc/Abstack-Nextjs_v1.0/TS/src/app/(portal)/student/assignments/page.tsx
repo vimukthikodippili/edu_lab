@@ -9,6 +9,7 @@ import { useSubmissionStatuses } from '@/features/lms/hooks/useSubmissionStatuse
 import { useMySubmission } from '@/features/lms/hooks/useMySubmission'
 import { useSubmitAssignment } from '@/features/lms/hooks/useSubmitAssignment'
 import { useUploadFile } from '@/features/staff/hooks/useUploadFile'
+import { TopicScoreChips } from '@/features/grades/components/TopicScoreChips'
 import type { Assignment, SubmissionStatusValue } from '@/features/lms/types'
 
 type ApiError = { response?: { data?: { message?: string; errors?: Record<string, string> } } }
@@ -120,6 +121,32 @@ function SubmissionPanel({ assignmentId, onClose }: { assignmentId: string; onCl
       {submissionLoading ? (
         <div className="text-muted small">Loading your submission…</div>
       ) : (
+        <>
+          {(mySubmission?.grade || mySubmission?.feedback || (mySubmission?.topicMarks?.length ?? 0) > 0) && (
+            <div className="rounded-3 p-3 mb-3" style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
+              <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                <span className="text-muted small fw-semibold">Your grade:</span>
+                {mySubmission?.grade ? (
+                  <span className="badge rounded-pill px-3 py-2 fw-bold" style={{ background: '#ede9fe', color: '#6d28d9' }}>
+                    {mySubmission.grade}
+                  </span>
+                ) : (
+                  <span className="text-muted small">Not graded yet</span>
+                )}
+                {mySubmission?.totalScore != null && (
+                  <span className="small text-muted">
+                    ({mySubmission.totalScore}/{mySubmission.topicMarks.reduce((sum, t) => sum + t.maxMarks, 0)})
+                  </span>
+                )}
+              </div>
+              {mySubmission?.feedback && (
+                <p className="small mb-2" style={{ color: '#475569' }}>{mySubmission.feedback}</p>
+              )}
+              {(mySubmission?.topicMarks?.length ?? 0) > 0 && (
+                <TopicScoreChips items={mySubmission!.topicMarks} />
+              )}
+            </div>
+          )}
         <form onSubmit={handleSubmit}>
           {success && (
             <div className="alert alert-success py-2 small d-flex align-items-center gap-2">
@@ -172,6 +199,7 @@ function SubmissionPanel({ assignmentId, onClose }: { assignmentId: string; onCl
             </div>
           </div>
         </form>
+        </>
       )}
     </div>
   )

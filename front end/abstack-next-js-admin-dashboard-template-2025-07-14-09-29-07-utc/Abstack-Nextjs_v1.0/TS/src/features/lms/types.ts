@@ -1,3 +1,11 @@
+export interface AssignmentTopicAllocation {
+  id: string
+  assignmentId: string
+  subjectTopicId: string
+  maxMarks: number
+  subjectTopic: { id: string; title: string }
+}
+
 export interface Assignment {
   id: string
   classSectionId: number
@@ -7,6 +15,8 @@ export interface Assignment {
   dueDate: string
   attachmentFileIds: string[]
   attachments: { id: string; path: string }[]
+  totalMarks: number | null
+  topicAllocations: AssignmentTopicAllocation[]
   createdByTeacherId: string
   classSection: { id: number; name: string }
   subject: { id: string; name: string; code: string }
@@ -22,6 +32,7 @@ export interface CreateAssignmentPayload {
   instructions: string
   dueDate: string
   attachmentFileIds?: string[]
+  topicAllocations: { subjectTopicId: string; maxMarks: number }[]
 }
 
 export interface Submission {
@@ -35,6 +46,8 @@ export interface Submission {
   grade: string | null
   feedback: string | null
   gradedAt: string | null
+  totalScore: number | null
+  topicMarks: RosterTopicMarkRow[]
   createdAt: string
   updatedAt: string
 }
@@ -54,6 +67,13 @@ export interface SubmitAssignmentPayload {
 
 export type RosterStatusValue = 'submitted' | 'late' | 'missing' | 'pending'
 
+export interface RosterTopicMarkRow {
+  subjectTopicId: string
+  title: string
+  maxMarks: number
+  score: number | null
+}
+
 export interface RosterRow {
   studentId: string
   firstName: string
@@ -67,6 +87,8 @@ export interface RosterRow {
   grade: string | null
   feedback: string | null
   gradedAt: string | null
+  totalScore: number | null
+  topicMarks: RosterTopicMarkRow[]
 }
 
 export interface AssignmentRoster {
@@ -77,6 +99,7 @@ export interface AssignmentRoster {
 export interface GradeSubmissionPayload {
   grade?: string
   feedback?: string
+  topicScores?: { subjectTopicId: string; score: number }[]
 }
 
 export interface GuardianChildAssignmentRow {
@@ -85,6 +108,8 @@ export interface GuardianChildAssignmentRow {
   submittedAt: string | null
   grade: string | null
   feedback: string | null
+  totalScore: number | null
+  topicMarks: RosterTopicMarkRow[]
 }
 
 export type SessionStatusValue = 'scheduled' | 'live' | 'ended'

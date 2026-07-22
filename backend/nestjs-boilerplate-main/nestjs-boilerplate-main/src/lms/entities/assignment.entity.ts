@@ -11,6 +11,7 @@ import { EntityRelationalHelper } from '../../utils/relational-entity-helper';
 import { SubjectEntity } from '../../subjects/entities/subject.entity';
 import { ClassSectionEntity } from '../../students/entities/class-section.entity';
 import { StaffEntity } from '../../staff/entities/staff.entity';
+import { AssignmentTopicAllocationEntity } from './assignment-topic-allocation.entity';
 
 @Entity({ name: 'assignment' })
 export class AssignmentEntity extends EntityRelationalHelper {
@@ -37,6 +38,14 @@ export class AssignmentEntity extends EntityRelationalHelper {
 
   // Virtual — populated by AssignmentsService after loading (not a DB column)
   attachments?: { id: string; path: string }[];
+
+  // Nullable — pre-existing assignments created before topic allocation existed genuinely
+  // have no total; every assignment created through the current form always has one.
+  @Column({ type: 'int', nullable: true })
+  totalMarks: number | null;
+
+  // Virtual — populated by AssignmentsService after loading, same convention as `attachments`.
+  topicAllocations?: AssignmentTopicAllocationEntity[];
 
   @Column({ type: 'uuid' })
   createdByTeacherId: string;

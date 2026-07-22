@@ -38,6 +38,23 @@ export const ASSESSMENT_TYPE_LABELS: Record<AssessmentType, string> = {
   other: 'Other',
 }
 
+export type QuestionType = 'mcq' | 'structured' | 'essay'
+
+export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
+  mcq: 'MCQ',
+  structured: 'Structured',
+  essay: 'Essay',
+}
+
+export interface AssessmentTopicAllocation {
+  id: string
+  assessmentId: string
+  subjectTopicId: string
+  maxMarks: number
+  questionType: QuestionType
+  subjectTopic: { id: string; title: string }
+}
+
 export interface Assessment {
   id: string
   subjectId: string
@@ -47,6 +64,7 @@ export interface Assessment {
   assessmentType: AssessmentType
   scheduledDate: string
   totalMarks: number
+  topicAllocations: AssessmentTopicAllocation[]
   createdByTeacherId: string
   sectionHeadOverride: boolean
   overrideApprovedById: string | null
@@ -61,6 +79,13 @@ export interface Assessment {
 
 export type MarkStatus = 'draft' | 'submitted'
 
+export interface MarkTopicScoreRow {
+  subjectTopicId: string
+  title: string
+  maxMarks: number
+  score: number | null
+}
+
 export interface MarkRosterRow {
   studentId: string
   firstName: string
@@ -70,6 +95,7 @@ export interface MarkRosterRow {
   score: number | null
   maxScore: number
   status: MarkStatus | null
+  topicScores: MarkTopicScoreRow[]
 }
 
 export interface MarksForAssessmentResponse {
@@ -77,9 +103,15 @@ export interface MarksForAssessmentResponse {
   roster: MarkRosterRow[]
 }
 
+export interface BulkMarkTopicScoreEntryPayload {
+  subjectTopicId: string
+  score: number
+}
+
 export interface BulkMarkEntryPayload {
   studentId: string
-  score: number
+  score?: number
+  topicScores?: BulkMarkTopicScoreEntryPayload[]
 }
 
 export interface BulkMarkPayload {
@@ -107,6 +139,35 @@ export interface SubjectResult {
   percentage: number | null
   letterGrade: string | null
   isComplete: boolean
+}
+
+export interface PublishedAssessmentTopicScoreRow {
+  subjectTopicId: string
+  title: string
+  maxMarks: number
+  score: number
+}
+
+export interface PublishedAssessmentResultRow {
+  assessment: {
+    id: string
+    title: string
+    assessmentType: AssessmentType
+    scheduledDate: string
+    totalMarks: number
+  }
+  score: number
+  maxScore: number
+  topicScores: PublishedAssessmentTopicScoreRow[]
+}
+
+export interface TopicWeaknessRow {
+  subjectTopicId: string
+  title: string
+  isWeak: boolean
+  studentAverage: number
+  classAverage: number
+  computedAt: string
 }
 
 export interface TermResult {

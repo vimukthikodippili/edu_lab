@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/lib/api/axios'
 import type { Assessment, AssessmentType } from '@/types/sims/grades'
+import type { TopicAllocation } from '@/features/subject-topics/components/TopicAllocationEditor'
 
 interface CreateAssessmentPayload {
   subjectId: string
@@ -9,7 +10,7 @@ interface CreateAssessmentPayload {
   title: string
   assessmentType: AssessmentType
   scheduledDate: string
-  totalMarks: number
+  topicAllocations: TopicAllocation[]
   sectionHeadOverride?: boolean
   requiresMaterialsCheck?: boolean
   instructions?: string

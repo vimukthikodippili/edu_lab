@@ -5,6 +5,7 @@ import RoleGuard from '@/components/wrappers/RoleGuard'
 import { ROLES } from '@/lib/auth/roles'
 import { useMyGuardianProfile } from '@/features/students/hooks/useMyGuardianProfile'
 import { useChildAssignments } from '@/features/lms/hooks/useChildAssignments'
+import { TopicScoreChips } from '@/features/grades/components/TopicScoreChips'
 import type { RosterStatusValue } from '@/features/lms/types'
 
 const STATUS_CONFIG: Record<RosterStatusValue, { label: string; bg: string; color: string; icon: typeof CheckCircle }> = {
@@ -124,6 +125,11 @@ function GuardianAssignmentsContent() {
                     <p className="small mt-2 mb-0" style={{ color: '#475569' }}>
                       <strong>Teacher feedback:</strong> {row.feedback}
                     </p>
+                  )}
+                  {row.topicMarks.length > 0 && (
+                    <div className="mt-2">
+                      <TopicScoreChips items={row.topicMarks} />
+                    </div>
                   )}
                 </div>
                 {row.grade && (
