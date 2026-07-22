@@ -7,7 +7,7 @@ import { TeacherSubjectClassRequirementEntity } from './entities/teacher-subject
 import { StaffEntity, StaffStatus } from '../staff/entities/staff.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
-import { GradeEntity, GradeStage } from '../students/entities/grade.entity';
+import { GradeEntity } from '../students/entities/grade.entity';
 import { SchoolCalendarConfigService } from '../school-calendar-config/school-calendar-config.service';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -21,11 +21,10 @@ const repoMock = <T>() => ({
   createQueryBuilder: jest.fn(),
 });
 
-const makeGrade = (stage: GradeStage): GradeEntity =>
-  ({ id: 1, level: 10, name: 'Grade 10', stage } as GradeEntity);
+const makeGrade = (): GradeEntity => ({ id: 1, level: 10, name: 'Grade 10' } as GradeEntity);
 
-const makeSection = (stage = GradeStage.SENIOR_SECONDARY): ClassSectionEntity =>
-  ({ id: 1, name: 'A', academicYear: '2026', gradeId: 1, grade: makeGrade(stage) } as ClassSectionEntity);
+const makeSection = (): ClassSectionEntity =>
+  ({ id: 1, name: 'A', academicYear: '2026', gradeId: 1, grade: makeGrade() } as ClassSectionEntity);
 
 const makeStaff = (): StaffEntity =>
   ({ id: 'teacher-uuid', firstName: 'T', lastName: 'P', status: StaffStatus.ACTIVE } as StaffEntity);
@@ -73,7 +72,7 @@ describe('TeacherSubjectRequirementsService', () => {
     subjectRepo = repoMock<SubjectEntity>() as any;
     classSectionRepo = repoMock<ClassSectionEntity>() as any;
     calendarSvc = {
-      findByStage: jest.fn(),
+      findByGradeLevel: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -140,9 +139,9 @@ describe('TeacherSubjectRequirementsService', () => {
       classSectionRepo.findOne.mockResolvedValue(makeSection());
       repo.findOne.mockResolvedValue(null); // no duplicate
       // Calendar config: 40 total slots
-      calendarSvc.findByStage.mockResolvedValue({
+      calendarSvc.findByGradeLevel.mockResolvedValue({
         id: 1,
-        gradeStage: 'senior_secondary',
+        gradeStageId: 'stage-senior-secondary', gradeStage: { id: 'stage-senior-secondary', stageName: 'Senior Secondary', fromGrade: 10, toGrade: 11, ordering: 2 },
         workingDaysPerWeek: 5,
         periodsPerDay: 8,
         totalWeeklySlots: 40,
@@ -168,9 +167,9 @@ describe('TeacherSubjectRequirementsService', () => {
       subjectRepo.findOne.mockResolvedValue(makeSubject());
       classSectionRepo.findOne.mockResolvedValue(makeSection());
       repo.findOne.mockResolvedValue(null);
-      calendarSvc.findByStage.mockResolvedValue({
+      calendarSvc.findByGradeLevel.mockResolvedValue({
         id: 1,
-        gradeStage: 'senior_secondary',
+        gradeStageId: 'stage-senior-secondary', gradeStage: { id: 'stage-senior-secondary', stageName: 'Senior Secondary', fromGrade: 10, toGrade: 11, ordering: 2 },
         workingDaysPerWeek: 5,
         periodsPerDay: 8,
         totalWeeklySlots: 40,
@@ -198,9 +197,9 @@ describe('TeacherSubjectRequirementsService', () => {
     it('throws 422 when updated value would push classSectionId over totalWeeklySlots', async () => {
       repo.findOne.mockResolvedValue(makeReq({ id: 1, periodsPerWeek: 5 }));
       classSectionRepo.findOne.mockResolvedValue(makeSection());
-      calendarSvc.findByStage.mockResolvedValue({
+      calendarSvc.findByGradeLevel.mockResolvedValue({
         id: 1,
-        gradeStage: 'senior_secondary',
+        gradeStageId: 'stage-senior-secondary', gradeStage: { id: 'stage-senior-secondary', stageName: 'Senior Secondary', fromGrade: 10, toGrade: 11, ordering: 2 },
         workingDaysPerWeek: 5,
         periodsPerDay: 8,
         totalWeeklySlots: 40,
@@ -222,9 +221,9 @@ describe('TeacherSubjectRequirementsService', () => {
   describe('findByClassSection', () => {
     it('returns correct allocatedPeriods and availablePeriods', async () => {
       classSectionRepo.findOne.mockResolvedValue(makeSection());
-      calendarSvc.findByStage.mockResolvedValue({
+      calendarSvc.findByGradeLevel.mockResolvedValue({
         id: 1,
-        gradeStage: 'senior_secondary',
+        gradeStageId: 'stage-senior-secondary', gradeStage: { id: 'stage-senior-secondary', stageName: 'Senior Secondary', fromGrade: 10, toGrade: 11, ordering: 2 },
         workingDaysPerWeek: 5,
         periodsPerDay: 8,
         totalWeeklySlots: 40,

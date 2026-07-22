@@ -35,9 +35,24 @@ import {
   Compass,
   ListChecks,
   Video,
+  Radio,
+  Trophy,
+  Settings2,
+  Send,
+  FlaskConical,
 } from 'lucide-react'
 
 export const MENU_ITEMS: MenuItemType[] = [
+
+  // ─── Shared (every role) ──────────────────────────────────────────────────
+
+  {
+    key: 'public-sports-board',
+    label: 'Sports Board',
+    icon: Trophy,
+    url: '/sports/public-board',
+    allowedRoles: Object.values(ROLES),
+  },
 
   // ─── System Admin ─────────────────────────────────────────────────────────
 
@@ -53,6 +68,55 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: LayoutDashboard,
     url: '/admin',
     allowedRoles: [ROLES.SYSTEM_ADMIN],
+  },
+  {
+    key: 'admin-settings',
+    label: 'School Settings',
+    icon: Settings,
+    url: '/admin/settings',
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+  },
+  {
+    key: 'admin-sports',
+    label: 'Sport Setup',
+    icon: Trophy,
+    url: '/admin/sports',
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'admin-sport-types',
+    label: 'Sport Types',
+    icon: Settings2,
+    url: '/admin/sport-types',
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'admin-labs',
+    label: 'Lab Setup',
+    icon: FlaskConical,
+    url: '/admin/labs',
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+  },
+  {
+    key: 'admin-lab-types',
+    label: 'Lab Types',
+    icon: Settings2,
+    url: '/admin/lab-types',
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+  },
+  {
+    key: 'labs-directory',
+    label: 'Lab Directory',
+    icon: FlaskConical,
+    url: '/admin/labs/directory',
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD, ROLES.TEACHER],
+  },
+  {
+    key: 'admin-lab-overview',
+    label: 'Lab Overview',
+    icon: BarChart2,
+    url: '/admin/lab-overview',
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
   },
   {
     key: 'students',
@@ -103,6 +167,13 @@ export const MENU_ITEMS: MenuItemType[] = [
         key: 'al-streams',
         label: 'A/L Streams',
         url: '/admin/academic/streams',
+        parentKey: 'academic-setup',
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
+      {
+        key: 'grade-stages',
+        label: 'Grade Stages',
+        url: '/admin/academic/grade-stages',
         parentKey: 'academic-setup',
         allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
       },
@@ -273,6 +344,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.PRINCIPAL],
   },
   {
+    key: 'principal-targeted-message',
+    label: 'Targeted Message',
+    icon: Send,
+    url: '/principal/targeted-message',
+    allowedRoles: [ROLES.PRINCIPAL],
+  },
+  {
     key: 'principal-security-audit',
     label: 'Release Audit Log',
     icon: ClipboardList,
@@ -285,6 +363,20 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: Activity,
     url: '/principal/teacher-performance',
     allowedRoles: [ROLES.PRINCIPAL, ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'principal-live-class-monitor',
+    label: 'Live Class Monitor',
+    icon: Radio,
+    url: '/principal/live-class-monitor',
+    allowedRoles: [ROLES.PRINCIPAL, ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'principal-sports-dashboard',
+    label: 'Sports Dashboard',
+    icon: Award,
+    url: '/principal/sports-dashboard',
+    allowedRoles: [ROLES.PRINCIPAL, ROLES.SYSTEM_ADMIN],
   },
 
   // ─── Section Head ─────────────────────────────────────────────────────────
@@ -402,6 +494,20 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: BookOpen,
     url: '/teacher/syllabus/units',
     allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+  },
+  {
+    key: 'teacher-subject-topics',
+    label: 'Subject Topics',
+    icon: ListChecks,
+    url: '/teacher/subjects/topics',
+    allowedRoles: [ROLES.TEACHER],
+  },
+  {
+    key: 'teacher-sports',
+    label: 'My Sports Teams',
+    icon: Trophy,
+    url: '/teacher/sports',
+    allowedRoles: [ROLES.TEACHER],
   },
   {
     key: 'teacher-lesson-plan',
@@ -534,6 +640,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.STUDENT],
   },
   {
+    key: 'student-lab-reports',
+    label: 'My Lab Reports',
+    icon: FlaskConical,
+    url: '/student/lab-reports',
+    allowedRoles: [ROLES.STUDENT],
+  },
+  {
     key: 'student-live-classes',
     label: 'Live Online Classes',
     icon: Video,
@@ -559,6 +672,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'Self-Discovery',
     icon: Compass,
     url: '/student/self-discovery',
+    allowedRoles: [ROLES.STUDENT],
+  },
+  {
+    key: 'student-sports',
+    label: 'My Sports Performance',
+    icon: Trophy,
+    url: '/student/sports',
     allowedRoles: [ROLES.STUDENT],
   },
 
@@ -593,10 +713,31 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.GUARDIAN],
   },
   {
+    key: 'guardian-lab-reports',
+    label: 'Lab Reports',
+    icon: FlaskConical,
+    url: '/guardian/lab-reports',
+    allowedRoles: [ROLES.GUARDIAN],
+  },
+  {
+    key: 'guardian-grades',
+    label: 'Grades',
+    icon: BarChart2,
+    url: '/guardian/grades',
+    allowedRoles: [ROLES.GUARDIAN],
+  },
+  {
     key: 'guardian-wellbeing',
     label: 'Wellbeing Updates',
     icon: Heart,
     url: '/guardian/wellbeing',
+    allowedRoles: [ROLES.GUARDIAN],
+  },
+  {
+    key: 'guardian-sports',
+    label: 'Sports Performance',
+    icon: Trophy,
+    url: '/guardian/sports',
     allowedRoles: [ROLES.GUARDIAN],
   },
 

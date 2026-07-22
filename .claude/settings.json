@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(cd \"g:\\\\edu_lab\\\\edu_lab\\\\front end\\\\abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc\\\\Abstack-Nextjs_v1.0\\\\TS\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -match \"staff\" } | Select-Object -First 20)"
+      "PowerShell(cd \"g:\\\\edu_lab\\\\edu_lab\\\\front end\\\\abstack-next-js-admin-dashboard-template-2025-07-14-09-29-07-utc\\\\Abstack-Nextjs_v1.0\\\\TS\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -match \"staff\" } | Select-Object -First 20)",
+      "Bash(curl -s http://localhost:5000/api/v1/labs -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
+      "Bash(node -pe \"JSON.stringify\\(JSON.parse\\(require\\('fs'\\).readFileSync\\(0\\)\\).map\\(l=>\\({id:l.id,name:l.name,labInChargeId:l.labInChargeId}\\)\\),null,2\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5000/api/v1/labs)"
     ]
   }
 }

@@ -13,7 +13,7 @@ export interface TimetableEntry {
     id: number
     name: string
     academicYear: string
-    grade: { id: number; level: number; name: string; stage: string }
+    grade: { id: number; level: number; name: string }
   }
   teacher: { id: string; firstName: string; lastName: string; employeeNumber: string }
   subject: { id: string; code: string; name: string; category: { id: number; name: string } }

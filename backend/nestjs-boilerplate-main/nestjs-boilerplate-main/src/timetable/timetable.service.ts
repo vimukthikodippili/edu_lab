@@ -11,7 +11,8 @@ import { TimetableEntryEntity, TimetableEntryStatus } from './entities/timetable
 import { TimetableRecordEntity } from './entities/timetable-record.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
-import { GradeStage } from '../students/entities/grade.entity';
+import { GradeStageEntity } from '../students/entities/grade-stage.entity';
+import { GradeStageService, resolveStageFromList } from '../students/grade-stage.service';
 import { SchoolCalendarConfigService } from '../school-calendar-config/school-calendar-config.service';
 import { GenerateTimetableDto } from './dto/generate-timetable.dto';
 import { UpdateTimetableEntryDto } from './dto/update-timetable-entry.dto';
@@ -58,7 +59,7 @@ interface Slot {
 interface RequirementRow {
   req: TeacherSubjectClassRequirementEntity;
   section: ClassSectionEntity;
-  stage: GradeStage;
+  stage: GradeStageEntity | null;
 }
 
 export interface FinalizeResult {
@@ -83,6 +84,7 @@ export class TimetableService {
     private readonly classSectionRepo: Repository<ClassSectionEntity>,
 
     private readonly calendarSvc: SchoolCalendarConfigService,
+    private readonly gradeStageService: GradeStageService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -142,15 +144,16 @@ export class TimetableService {
     const sectionMap = new Map<number, ClassSectionEntity>();
     for (const s of sections) sectionMap.set(s.id, s);
 
-    // 4. Load all calendar configs
+    // 4. Load all calendar configs + grade stages (batched once, not per-row)
     const configs = await this.calendarSvc.findAll();
-    const configMap = new Map<GradeStage, { workingDaysPerWeek: number; periodsPerDay: number }>();
+    const configMap = new Map<string, { workingDaysPerWeek: number; periodsPerDay: number }>();
     for (const c of configs) {
-      configMap.set(c.gradeStage as GradeStage, {
+      configMap.set(c.gradeStageId, {
         workingDaysPerWeek: c.workingDaysPerWeek,
         periodsPerDay: c.periodsPerDay,
       });
     }
+    const gradeStages = await this.gradeStageService.findAll();
 
     // 5. Delete existing entries for this academic year + scope
     const deleteWhere: Record<string, unknown> = { academicYear: dto.academicYear };
@@ -167,7 +170,7 @@ export class TimetableService {
     // 6. Build requirement rows with section + stage attached
     const rows: RequirementRow[] = requirements.map((req) => {
       const section = sectionMap.get(req.classSectionId)!;
-      return { req, section, stage: section.grade.stage as GradeStage };
+      return { req, section, stage: resolveStageFromList(gradeStages, section.grade.level) };
     });
 
     // 7. Run greedy algorithm
@@ -355,7 +358,7 @@ export class TimetableService {
 
   private runGreedy(
     rows: RequirementRow[],
-    configMap: Map<GradeStage, { workingDaysPerWeek: number; periodsPerDay: number }>,
+    configMap: Map<string, { workingDaysPerWeek: number; periodsPerDay: number }>,
     academicYear: string,
   ): { entries: Partial<TimetableEntryEntity>[]; conflicts: ConflictRecord[] } {
     // Default grid if no config for a stage
@@ -372,7 +375,7 @@ export class TimetableService {
     const sorted = [...rows].sort((a, b) => b.req.periodsPerWeek - a.req.periodsPerWeek);
 
     for (const { req, section, stage } of sorted) {
-      const cfg = configMap.get(stage) ?? DEFAULT_CFG;
+      const cfg = (stage ? configMap.get(stage.id) : undefined) ?? DEFAULT_CFG;
 
       // All possible slots for this stage's grid
       const allSlots: Slot[] = [];

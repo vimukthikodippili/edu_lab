@@ -11,7 +11,6 @@ import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { LeaveRequestEntity, LeaveStatus } from '../leave/entities/leave-request.entity';
 import { SchoolCalendarConfigService } from '../school-calendar-config/school-calendar-config.service';
-import { GradeStage } from '../students/entities/grade.entity';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,7 +26,6 @@ const makeGrade = () => ({
   id: 1,
   level: 6,
   name: 'Grade 6',
-  stage: GradeStage.JUNIOR_SECONDARY,
 });
 
 const makeSection = (): ClassSectionEntity =>
@@ -35,7 +33,8 @@ const makeSection = (): ClassSectionEntity =>
 
 const makeCalendarConfig = (workingDaysPerWeek = 5) => ({
   id: 1,
-  gradeStage: 'junior_secondary',
+  gradeStageId: 'stage-junior-secondary',
+  gradeStage: { id: 'stage-junior-secondary', stageName: 'Junior Secondary', fromGrade: 6, toGrade: 9, ordering: 1 },
   workingDaysPerWeek,
   periodsPerDay: 8,
   totalWeeklySlots: workingDaysPerWeek * 8,
@@ -61,7 +60,7 @@ describe('AttendanceService', () => {
     classSectionRepo = repoMock<ClassSectionEntity>() as any;
     requirementRepo = repoMock<TeacherSubjectClassRequirementEntity>() as any;
     leaveRepo = repoMock<LeaveRequestEntity>() as any;
-    calendarSvc = { findByStage: jest.fn(), findAll: jest.fn() } as any;
+    calendarSvc = { findByGradeLevel: jest.fn(), findAll: jest.fn() } as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -95,7 +94,7 @@ describe('AttendanceService', () => {
       };
 
       classSectionRepo.findOne.mockResolvedValue(makeSection());
-      calendarSvc.findByStage.mockResolvedValue(makeCalendarConfig(5) as any);
+      calendarSvc.findByGradeLevel.mockResolvedValue(makeCalendarConfig(5) as any);
       holidayRepo.findOne.mockResolvedValue(null);
       attendanceRepo.findBy.mockResolvedValue([]);
       attendanceRepo.create.mockImplementation((d) => d as AttendanceRecordEntity);
@@ -119,7 +118,7 @@ describe('AttendanceService', () => {
       };
 
       classSectionRepo.findOne.mockResolvedValue(makeSection());
-      calendarSvc.findByStage.mockResolvedValue(makeCalendarConfig(5) as any);
+      calendarSvc.findByGradeLevel.mockResolvedValue(makeCalendarConfig(5) as any);
       // 2026-07-05 is a Sunday — weekend block fires before holiday check
       // Use a Monday date but mock holiday to test holiday path
       const holidayDto = { ...dto, date: '2026-07-06' }; // Monday July 6
@@ -146,7 +145,7 @@ describe('AttendanceService', () => {
       };
 
       classSectionRepo.findOne.mockResolvedValue(makeSection());
-      calendarSvc.findByStage.mockResolvedValue(makeCalendarConfig(5) as any);
+      calendarSvc.findByGradeLevel.mockResolvedValue(makeCalendarConfig(5) as any);
       holidayRepo.findOne.mockResolvedValue({
         id: 1,
         date: new Date('2026-07-06'),
@@ -177,7 +176,7 @@ describe('AttendanceService', () => {
       ({ ...makeSection(), classTeacherStaffId: 'class-teacher-uuid' }) as ClassSectionEntity;
 
     beforeEach(() => {
-      calendarSvc.findByStage.mockResolvedValue(makeCalendarConfig(5) as any);
+      calendarSvc.findByGradeLevel.mockResolvedValue(makeCalendarConfig(5) as any);
       holidayRepo.findOne.mockResolvedValue(null);
       attendanceRepo.findBy.mockResolvedValue([]);
       attendanceRepo.create.mockImplementation((d) => d as AttendanceRecordEntity);

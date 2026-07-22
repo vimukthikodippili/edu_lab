@@ -9,7 +9,6 @@ import { Repository } from 'typeorm';
 import { StaffEntity, StaffStatus } from '../staff/entities/staff.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
-import { GradeStage } from '../students/entities/grade.entity';
 import { SchoolCalendarConfigService } from '../school-calendar-config/school-calendar-config.service';
 import { TeacherSubjectClassRequirementEntity } from './entities/teacher-subject-class-requirement.entity';
 import { CreateRequirementDto } from './dto/create-requirement.dto';
@@ -48,7 +47,7 @@ export class TeacherSubjectRequirementsService {
 
     let totalWeeklySlots: number | null = null;
     try {
-      const config = await this.calendarSvc.findByStage(section.grade.stage as GradeStage);
+      const config = await this.calendarSvc.findByGradeLevel(section.grade.level);
       totalWeeklySlots = config.totalWeeklySlots;
     } catch {
       // No calendar config for this stage — return null so UI can inform user
@@ -178,7 +177,7 @@ export class TeacherSubjectRequirementsService {
   ): Promise<void> {
     let totalWeeklySlots: number | null = null;
     try {
-      const config = await this.calendarSvc.findByStage(section.grade.stage as GradeStage);
+      const config = await this.calendarSvc.findByGradeLevel(section.grade.level);
       totalWeeklySlots = config.totalWeeklySlots;
     } catch {
       // No calendar config — skip allocation check

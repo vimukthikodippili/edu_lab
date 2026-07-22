@@ -14,7 +14,6 @@ import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { LeaveRequestEntity, LeaveStatus } from '../leave/entities/leave-request.entity';
 import { SchoolCalendarConfigService } from '../school-calendar-config/school-calendar-config.service';
-import { GradeStage } from '../students/entities/grade.entity';
 import { BulkMarkAttendanceDto } from './dto/bulk-mark-attendance.dto';
 import { AbsenceMarkedEvent } from './events/absence-marked.event';
 
@@ -158,9 +157,7 @@ export class AttendanceService {
       throw new NotFoundException(`Class section ${classSectionId} not found.`);
     }
 
-    const config = await this.calendarConfigService.findByStage(
-      section.grade.stage as GradeStage,
-    );
+    const config = await this.calendarConfigService.findByGradeLevel(section.grade.level);
 
     const dateObj = new Date(date + 'T00:00:00Z');
     const dayOfWeek = dateObj.getUTCDay(); // 0=Sun, 6=Sat

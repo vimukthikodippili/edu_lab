@@ -12,6 +12,7 @@ import { useUnlockTimetable } from '@/features/timetable/hooks/useUnlockTimetabl
 import { useClassSections } from '@/features/teacher-subject-requirements/hooks/useClassSections'
 import { useStaff } from '@/features/staff/hooks/useStaff'
 import { useNotificationContext } from '@/context/useNotificationContext'
+import { GradeStageBadge } from '@/features/grade-stages/components/GradeStageBadge'
 import type { ClassSection } from '@/features/teacher-subject-requirements/types'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
@@ -280,7 +281,7 @@ function ClassTimetablePanel({ classSectionId, academicYear }: { classSectionId:
           <div className="d-flex align-items-center gap-2 flex-wrap">
             <h6 className="mb-0 fw-bold">{section.grade.name} · Section {section.name}</h6>
             <span className="badge bg-light text-secondary border">{section.academicYear}</span>
-            <span className="badge bg-light text-muted border">{section.grade.stage.replace(/_/g, ' ')}</span>
+            <GradeStageBadge level={section.grade.level} />
             {isLocked && (
               <span className="badge" style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
                 Finalized

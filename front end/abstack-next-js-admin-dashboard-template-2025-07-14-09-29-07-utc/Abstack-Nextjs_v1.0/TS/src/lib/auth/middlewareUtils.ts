@@ -26,6 +26,13 @@ export function isStaticAsset(pathname: string): boolean {
 export const SHARED_PATH_PREFIXES = [
   '/security/gate-terminal',
   '/security/incidents',
+  '/principal/live-class-monitor',
+  '/principal/sports-dashboard',
+  '/admin/settings',
+  '/admin/sports',
+  '/admin/labs',
+  '/admin/lab-types',
+  '/admin/lab-overview',
 ]
 
 export function getRoleFromPath(pathname: string): Role | null {

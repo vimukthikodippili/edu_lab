@@ -194,7 +194,10 @@ export class EnrollmentsService {
         throw new UnprocessableEntityException(`Cannot assign inactive stream`);
       }
 
-      if (student.grade?.stage !== 'collegiate') {
+      // A/L streams apply to Grades 12-13 — a fixed fact of the Sri Lankan curriculum
+      // structure, checked numerically rather than by stage name so it stays correct even if
+      // a school renames or reconfigures its grade stages.
+      if (!student.grade || student.grade.level < 12) {
         throw new UnprocessableEntityException(
           'Stream assignment is only valid for Grade 12–13 (A/L) students',
         );

@@ -10,6 +10,7 @@ import { useStaff } from '@/features/staff/hooks/useStaff'
 import { AllocationBar } from '@/features/teacher-subject-requirements/components/AllocationBar'
 import { RequirementRow } from '@/features/teacher-subject-requirements/components/RequirementRow'
 import { AddRequirementForm } from '@/features/teacher-subject-requirements/components/AddRequirementForm'
+import { GradeStageBadge } from '@/features/grade-stages/components/GradeStageBadge'
 import type { ClassSection } from '@/features/teacher-subject-requirements/types'
 import type { StaffMember } from '@/features/staff/types'
 
@@ -312,9 +313,7 @@ function RequirementsPanel({
             {classSection.grade.name} · Section {classSection.name}
           </h6>
           <span className="badge bg-light text-secondary border">{classSection.academicYear}</span>
-          <span className="badge bg-light text-muted border">
-            {classSection.grade.stage.replace(/_/g, ' ')}
-          </span>
+          <GradeStageBadge level={classSection.grade.level} />
         </div>
         <ClassTeacherControl classSection={classSection} staffOptions={staffOptions} />
       </div>

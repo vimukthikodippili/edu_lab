@@ -25,7 +25,9 @@ export function SubjectEnrollmentSection({ student }: Props) {
   const removeEnrollment = useRemoveEnrollment(student.id)
   const assignStream = useAssignStream(student.id)
 
-  const isCollegiate = student.grade?.stage === 'collegiate'
+  // A/L streams apply to Grades 12-13 — checked numerically (mirrors the backend rule) so it
+  // stays correct regardless of what a school names its top grade stage.
+  const isCollegiate = (student.grade?.level ?? 0) >= 12
 
   const handleRemove = async (subjectId: string) => {
     if (!confirm('Remove this subject from the student\'s enrollment?')) return

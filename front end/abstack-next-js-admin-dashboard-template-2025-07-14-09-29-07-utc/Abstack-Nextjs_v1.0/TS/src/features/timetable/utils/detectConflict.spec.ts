@@ -8,7 +8,7 @@ const makeEntry = (overrides: Partial<TimetableEntry> & Pick<TimetableEntry, 'id
   subjectId: 'subject-uuid',
   roomNumber: null,
   generatedAt: '2026-01-01T00:00:00Z',
-  classSection: { id: 1, name: 'A', academicYear: '2026', grade: { id: 1, level: 1, name: 'Grade 1', stage: 'primary' } },
+  classSection: { id: 1, name: 'A', academicYear: '2026', grade: { id: 1, level: 1, name: 'Grade 1' } },
   teacher: { id: 'teacher-uuid', firstName: 'Nimal', lastName: 'Perera', employeeNumber: 'T001' },
   subject: { id: 'subject-uuid', code: 'MATH', name: 'Mathematics', category: { id: 1, name: 'mathematics' } },
   ...overrides,

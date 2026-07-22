@@ -8,7 +8,9 @@ import { TimetableEntryEntity, TimetableEntryStatus } from './entities/timetable
 import { TimetableRecordEntity } from './entities/timetable-record.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
-import { GradeEntity, GradeStage } from '../students/entities/grade.entity';
+import { GradeEntity } from '../students/entities/grade.entity';
+import { GradeStageEntity } from '../students/entities/grade-stage.entity';
+import { GradeStageService } from '../students/grade-stage.service';
 import { StaffEntity, StaffStatus } from '../staff/entities/staff.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { SchoolCalendarConfigService } from '../school-calendar-config/school-calendar-config.service';
@@ -26,11 +28,20 @@ const repoMock = <T>() => ({
   createQueryBuilder: jest.fn(),
 });
 
-const makeGrade = (stage = GradeStage.SENIOR_SECONDARY): GradeEntity =>
-  ({ id: 1, level: 10, name: 'Grade 10', stage } as GradeEntity);
+const makeGrade = (): GradeEntity => ({ id: 1, level: 10, name: 'Grade 10' } as GradeEntity);
 
 const makeSection = (id = 1): ClassSectionEntity =>
   ({ id, name: 'A', academicYear: '2026', gradeId: 1, grade: makeGrade() } as ClassSectionEntity);
+
+const SENIOR_SECONDARY_STAGE: GradeStageEntity = {
+  id: 'stage-senior-secondary',
+  stageName: 'Senior Secondary',
+  fromGrade: 10,
+  toGrade: 11,
+  ordering: 2,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 const makeStaff = (id = 'teacher-uuid'): StaffEntity =>
   ({ id, firstName: 'Test', lastName: 'Teacher', status: StaffStatus.ACTIVE } as StaffEntity);
@@ -72,7 +83,8 @@ const makeEntry = (
 
 const makeCalendarConfig = (workingDaysPerWeek = 5, periodsPerDay = 8) => ({
   id: 1,
-  gradeStage: 'senior_secondary',
+  gradeStageId: SENIOR_SECONDARY_STAGE.id,
+  gradeStage: SENIOR_SECONDARY_STAGE,
   workingDaysPerWeek,
   periodsPerDay,
   totalWeeklySlots: workingDaysPerWeek * periodsPerDay,
@@ -102,6 +114,7 @@ describe('TimetableService', () => {
   let requirementRepo: jest.Mocked<Repository<TeacherSubjectClassRequirementEntity>>;
   let classSectionRepo: jest.Mocked<Repository<ClassSectionEntity>>;
   let calendarSvc: jest.Mocked<SchoolCalendarConfigService>;
+  let gradeStageService: jest.Mocked<GradeStageService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
 
   beforeEach(async () => {
@@ -109,7 +122,8 @@ describe('TimetableService', () => {
     recordRepo = repoMock<TimetableRecordEntity>() as any;
     requirementRepo = repoMock<TeacherSubjectClassRequirementEntity>() as any;
     classSectionRepo = repoMock<ClassSectionEntity>() as any;
-    calendarSvc = { findAll: jest.fn(), findByStage: jest.fn() } as any;
+    calendarSvc = { findAll: jest.fn(), findByGradeLevel: jest.fn() } as any;
+    gradeStageService = { findAll: jest.fn().mockResolvedValue([SENIOR_SECONDARY_STAGE]) } as any;
     eventEmitter = { emit: jest.fn() } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -120,6 +134,7 @@ describe('TimetableService', () => {
         { provide: getRepositoryToken(TeacherSubjectClassRequirementEntity), useValue: requirementRepo },
         { provide: getRepositoryToken(ClassSectionEntity), useValue: classSectionRepo },
         { provide: SchoolCalendarConfigService, useValue: calendarSvc },
+        { provide: GradeStageService, useValue: gradeStageService },
         { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();

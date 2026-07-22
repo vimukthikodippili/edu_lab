@@ -8,7 +8,6 @@ export interface ClassSection {
     id: number
     level: number
     name: string
-    stage: string
   }
   classTeacherStaffId: string | null
 }

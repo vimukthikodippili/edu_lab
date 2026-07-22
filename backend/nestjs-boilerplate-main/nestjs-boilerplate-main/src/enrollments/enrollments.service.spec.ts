@@ -75,7 +75,7 @@ const makeStudent = (overrides: Partial<StudentEntity> = {}): StudentEntity =>
     admissionNumber: 'SIMS/2026/00001',
     firstName: 'Nimal',
     lastName: 'Perera',
-    grade: { id: 1, name: '10', stage: 'senior_secondary' } as any,
+    grade: { id: 1, name: '10', level: 10 } as any,
     gradeId: 1,
     streamId: null,
     stream: null,
@@ -275,7 +275,7 @@ describe('EnrollmentsService', () => {
 
       // Set mocks AFTER buildService re-creates the repos
       studentRepo.findOne.mockResolvedValue(
-        makeStudent({ id: studentId, grade: { id: 12, stage: 'collegiate' } as any }),
+        makeStudent({ id: studentId, grade: { id: 12, level: 12 } as any }),
       );
       streamRepo.findOne.mockResolvedValue(makeStream({ id: 2 }));
       enrollmentRepo.find.mockResolvedValue([]);
@@ -291,7 +291,7 @@ describe('EnrollmentsService', () => {
 
     it('throws 422 for non-collegiate student', async () => {
       studentRepo.findOne.mockResolvedValue(
-        makeStudent({ grade: { id: 10, stage: 'senior_secondary' } as any }),
+        makeStudent({ grade: { id: 10, level: 10 } as any }),
       );
       streamRepo.findOne.mockResolvedValue(makeStream());
 
@@ -302,7 +302,7 @@ describe('EnrollmentsService', () => {
 
     it('throws 422 for inactive stream', async () => {
       studentRepo.findOne.mockResolvedValue(
-        makeStudent({ grade: { id: 12, stage: 'collegiate' } as any }),
+        makeStudent({ grade: { id: 12, level: 12 } as any }),
       );
       streamRepo.findOne.mockResolvedValue(makeStream({ isActive: false }));
 

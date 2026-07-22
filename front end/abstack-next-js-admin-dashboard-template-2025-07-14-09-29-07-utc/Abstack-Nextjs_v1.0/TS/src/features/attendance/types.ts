@@ -26,6 +26,5 @@ export interface MyClassSection {
     id: number
     level: number
     name: string
-    stage: string
   }
 }

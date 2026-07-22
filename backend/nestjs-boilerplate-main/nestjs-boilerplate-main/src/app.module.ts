@@ -55,15 +55,28 @@ import { MoodCheckInModule } from './mood-check-in/mood-check-in.module';
 import { TeacherTasksModule } from './teacher-tasks/teacher-tasks.module';
 import freePeriodConfig from './teacher-tasks/config/free-period.config';
 import gradeTrendConfig from './grades/config/grade-trend.config';
+import topicWeaknessConfig from './grades/config/topic-weakness.config';
 import { TeacherPerformanceModule } from './teacher-performance/teacher-performance.module';
 import { CareerModule } from './career/career.module';
 import { LmsModule } from './lms/lms.module';
+import { SchoolSettingsModule } from './school-settings/school-settings.module';
+import { LiveClassMonitorModule } from './live-class-monitor/live-class-monitor.module';
+import { LateAlertModule } from './late-alert/late-alert.module';
+import { SubjectTopicsModule } from './subject-topics/subject-topics.module';
+import { SportsModule } from './sports/sports.module';
+import { LabsModule } from './labs/labs.module';
+import { EquipmentModule } from './equipment/equipment.module';
+import { SessionEquipmentModule } from './session-equipment/session-equipment.module';
+import { ExperimentLogModule } from './experiment-log/experiment-log.module';
+import { LabReportsModule } from './lab-reports/lab-reports.module';
+import { LabOverviewModule } from './lab-overview/lab-overview.module';
 import teacherPerformanceConfig from './teacher-performance/config/teacher-performance.config';
 import wellbeingCaseConfig from './counselor/config/wellbeing-case.config';
 import counselorNoteConfig from './counselor/config/counselor-note.config';
 import liveSessionConfig from './lms/config/live-session.config';
 import livekitConfig from './lms/config/livekit.config';
 import livekitEgressConfig from './lms/config/livekit-egress.config';
+import sportsAnalysisConfig from './sports/config/sports-analysis.config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MongooseConfigService } from './database/mongoose-config.service';
@@ -99,12 +112,14 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
         lessonPlanConfig,
         freePeriodConfig,
         gradeTrendConfig,
+        topicWeaknessConfig,
         teacherPerformanceConfig,
         wellbeingCaseConfig,
         counselorNoteConfig,
         liveSessionConfig,
         livekitConfig,
         livekitEgressConfig,
+        sportsAnalysisConfig,
       ],
       envFilePath: ['.env'],
     }),
@@ -174,6 +189,17 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     TeacherPerformanceModule,
     CareerModule,
     LmsModule,
+    SchoolSettingsModule,
+    LiveClassMonitorModule,
+    LateAlertModule,
+    SubjectTopicsModule,
+    SportsModule,
+    LabsModule,
+    EquipmentModule,
+    SessionEquipmentModule,
+    ExperimentLogModule,
+    LabReportsModule,
+    LabOverviewModule,
   ],
 })
 export class AppModule {}

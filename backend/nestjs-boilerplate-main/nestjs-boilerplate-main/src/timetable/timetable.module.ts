@@ -12,6 +12,7 @@ import { SchoolCalendarConfigModule } from '../school-calendar-config/school-cal
 import { NotificationModule } from '../notification/notification.module';
 import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
+import { StudentsModule } from '../students/students.module';
 import { TimetableService } from './timetable.service';
 import { TimetableController } from './timetable.controller';
 import { SubstituteService } from './substitute.service';
@@ -34,6 +35,7 @@ import { SubstituteSuggestionListener } from './listeners/substitute-suggestion.
     NotificationModule,
     UsersModule,
     StaffModule,
+    StudentsModule,
   ],
   providers: [TimetableService, SubstituteService, SubstituteSuggestionListener],
   controllers: [TimetableController, SubstituteController],

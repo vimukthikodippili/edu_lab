@@ -9,12 +9,14 @@ import { MailConfig } from '../mail/config/mail-config.type';
 import { LessonPlanConfig } from '../lesson-plan/config/lesson-plan-config.type';
 import { FreePeriodConfig } from '../teacher-tasks/config/free-period-config.type';
 import { GradeTrendConfig } from '../grades/config/grade-trend-config.type';
+import { TopicWeaknessConfig } from '../grades/config/topic-weakness-config.type';
 import { TeacherPerformanceConfig } from '../teacher-performance/config/teacher-performance-config.type';
 import { WellbeingCaseConfig } from '../counselor/config/wellbeing-case-config.type';
 import { CounselorNoteConfig } from '../counselor/config/counselor-note-config.type';
 import { LiveSessionConfig } from '../lms/config/live-session-config.type';
 import { LiveKitConfig } from '../lms/config/livekit-config.type';
 import { LiveKitEgressConfig } from '../lms/config/livekit-egress-config.type';
+import { SportsAnalysisConfig } from '../sports/config/sports-analysis-config.type';
 
 export type AllConfigType = {
   app: AppConfig;
@@ -28,10 +30,12 @@ export type AllConfigType = {
   lessonPlan: LessonPlanConfig;
   freePeriod: FreePeriodConfig;
   gradeTrend: GradeTrendConfig;
+  topicWeakness: TopicWeaknessConfig;
   teacherPerformance: TeacherPerformanceConfig;
   wellbeingCase: WellbeingCaseConfig;
   counselorNote: CounselorNoteConfig;
   liveSession: LiveSessionConfig;
   livekit: LiveKitConfig;
   livekitEgress: LiveKitEgressConfig;
+  sportsAnalysis: SportsAnalysisConfig;
 };
