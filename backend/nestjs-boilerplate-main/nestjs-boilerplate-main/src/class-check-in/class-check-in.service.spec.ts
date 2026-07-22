@@ -11,6 +11,7 @@ import {
 } from './entities/class-check-in.entity';
 import { TimetableEntryEntity } from '../timetable/entities/timetable-entry.entity';
 import { ClassRoomEntity } from '../class-rooms/entities/class-room.entity';
+import { StudentEntity } from '../students/entities/student.entity';
 
 const teacherId = 'staff-uuid';
 
@@ -23,6 +24,7 @@ describe('ClassCheckInService', () => {
   let checkInRepo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; find: jest.Mock };
   let timetableRepo: { findOne: jest.Mock };
   let classRoomRepo: { findOne: jest.Mock };
+  let studentRepo: { find: jest.Mock };
   let configService: { get: jest.Mock };
 
   beforeEach(async () => {
@@ -34,6 +36,7 @@ describe('ClassCheckInService', () => {
     };
     timetableRepo = { findOne: jest.fn().mockResolvedValue(null) };
     classRoomRepo = { findOne: jest.fn().mockResolvedValue(null) };
+    studentRepo = { find: jest.fn().mockResolvedValue([]) };
     configService = {
       get: jest.fn().mockImplementation((key: string) => {
         const map: Record<string, unknown> = {
@@ -50,6 +53,7 @@ describe('ClassCheckInService', () => {
         { provide: getRepositoryToken(ClassCheckInEntity), useValue: checkInRepo },
         { provide: getRepositoryToken(TimetableEntryEntity), useValue: timetableRepo },
         { provide: getRepositoryToken(ClassRoomEntity), useValue: classRoomRepo },
+        { provide: getRepositoryToken(StudentEntity), useValue: studentRepo },
         { provide: ConfigService, useValue: configService },
       ],
     }).compile();
@@ -117,6 +121,78 @@ describe('ClassCheckInService', () => {
       const result = await service.getActiveEntryForTeacher(teacherId);
 
       expect(result?.alreadyCheckedIn).toBe(true);
+    });
+  });
+
+  describe('getCurrentClassRoster', () => {
+    it('returns a null timetableEntry and empty roster when there is no active period right now', async () => {
+      jest.setSystemTime(new Date(2026, 0, 5, 7, 0)); // before school start
+      const result = await service.getCurrentClassRoster(teacherId);
+      expect(result).toEqual({ timetableEntry: null, students: [] });
+      expect(studentRepo.find).not.toHaveBeenCalled();
+    });
+
+    it("returns the current period's roster with each student's medicalNotes", async () => {
+      timetableRepo.findOne.mockResolvedValue({
+        id: 10,
+        teacherId,
+        day: 1,
+        period: 3,
+        classSectionId: 27,
+        subjectId: 'subject-uuid-1',
+        subject: { name: 'Mathematics' },
+        classSection: { name: '9C' },
+      });
+      checkInRepo.findOne.mockResolvedValue(null);
+      studentRepo.find.mockResolvedValue([
+        {
+          id: 'student-1',
+          firstName: 'A',
+          lastName: 'One',
+          admissionNumber: 'A1',
+          medicalNotes: 'Severe peanut allergy.',
+        },
+        {
+          id: 'student-2',
+          firstName: 'B',
+          lastName: 'Two',
+          admissionNumber: 'A2',
+          medicalNotes: null,
+        },
+      ]);
+
+      const result = await service.getCurrentClassRoster(teacherId);
+
+      expect(result.timetableEntry).toEqual({
+        id: 10,
+        period: 3,
+        subjectId: 'subject-uuid-1',
+        subjectName: 'Mathematics',
+        classSectionId: 27,
+        classSectionName: '9C',
+      });
+      expect(result.students).toHaveLength(2);
+      expect(result.students[0].medicalNotes).toBe('Severe peanut allergy.');
+      expect(result.students[1].medicalNotes).toBeNull();
+    });
+
+    it('scopes the roster query to the active period\'s own class section only', async () => {
+      timetableRepo.findOne.mockResolvedValue({
+        id: 10,
+        teacherId,
+        day: 1,
+        period: 3,
+        classSectionId: 27,
+        subjectId: 'subject-uuid-1',
+        subject: { name: 'Mathematics' },
+        classSection: { name: '9C' },
+      });
+
+      await service.getCurrentClassRoster(teacherId);
+
+      expect(studentRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ classSectionId: 27 }) }),
+      );
     });
   });
 

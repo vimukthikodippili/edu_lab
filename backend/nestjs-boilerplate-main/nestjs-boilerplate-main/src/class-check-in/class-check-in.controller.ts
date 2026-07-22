@@ -64,6 +64,13 @@ export class ClassCheckInController {
     };
   }
 
+  @Get('current-class-roster')
+  @Roles(RoleEnum.teacher)
+  async getCurrentClassRoster(@Request() req: { user: { id: string } }) {
+    const staffId = await this.resolveStaffId(req.user.id);
+    return this.classCheckInService.getCurrentClassRoster(staffId);
+  }
+
   @Post()
   @Roles(RoleEnum.teacher)
   @HttpCode(HttpStatus.CREATED)

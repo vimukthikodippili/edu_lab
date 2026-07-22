@@ -13,6 +13,26 @@ export interface CheckInStatus {
   timetableEntry: CheckInTimetableEntry | null
 }
 
+export interface CurrentClassRosterStudent {
+  id: string
+  firstName: string
+  lastName: string
+  admissionNumber: string
+  medicalNotes: string | null
+}
+
+export interface CurrentClassRoster {
+  timetableEntry: {
+    id: number
+    period: number
+    subjectId: string
+    subjectName: string
+    classSectionId: number
+    classSectionName: string
+  } | null
+  students: CurrentClassRosterStudent[]
+}
+
 export interface ClassCheckInRecord {
   id: string
   timetableEntryId: number

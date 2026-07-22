@@ -14,11 +14,32 @@ import {
 } from './entities/class-check-in.entity';
 import { TimetableEntryEntity } from '../timetable/entities/timetable-entry.entity';
 import { ClassRoomEntity } from '../class-rooms/entities/class-room.entity';
+import { StudentEntity, StudentStatus } from '../students/entities/student.entity';
 import { AllConfigType } from '../config/config.type';
 
 export interface ActiveEntryStatus {
   entry: TimetableEntryEntity;
   alreadyCheckedIn: boolean;
+}
+
+export interface CurrentClassRosterStudent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  admissionNumber: string;
+  medicalNotes: string | null;
+}
+
+export interface CurrentClassRoster {
+  timetableEntry: {
+    id: number;
+    period: number;
+    subjectId: string;
+    subjectName: string;
+    classSectionId: number;
+    classSectionName: string;
+  } | null;
+  students: CurrentClassRosterStudent[];
 }
 
 @Injectable()
@@ -32,6 +53,9 @@ export class ClassCheckInService {
 
     @InjectRepository(ClassRoomEntity)
     private readonly classRoomRepo: Repository<ClassRoomEntity>,
+
+    @InjectRepository(StudentEntity)
+    private readonly studentRepo: Repository<StudentEntity>,
 
     private readonly configService: ConfigService<AllConfigType>,
   ) {}
@@ -72,6 +96,43 @@ export class ClassCheckInService {
     });
 
     return { entry, alreadyCheckedIn: !!existingCheckIn };
+  }
+
+  /** The teacher's simple pre-class summary: the roster for whichever period she's
+   * currently checked into, plus each student's medicalNotes (already-modeled, non-clinical
+   * free text — never the counselor/wellbeing pipeline, which stays teacher-write-only
+   * elsewhere). Access is inherently scoped to "the class this teacher is in right now." */
+  async getCurrentClassRoster(teacherId: string): Promise<CurrentClassRoster> {
+    const status = await this.getActiveEntryForTeacher(teacherId);
+    if (!status) {
+      return { timetableEntry: null, students: [] };
+    }
+
+    const students = await this.studentRepo.find({
+      where: {
+        classSectionId: status.entry.classSectionId,
+        status: StudentStatus.ACTIVE,
+      },
+      order: { lastName: 'ASC', firstName: 'ASC' },
+    });
+
+    return {
+      timetableEntry: {
+        id: status.entry.id,
+        period: status.entry.period,
+        subjectId: status.entry.subjectId,
+        subjectName: status.entry.subject.name,
+        classSectionId: status.entry.classSectionId,
+        classSectionName: status.entry.classSection.name,
+      },
+      students: students.map((s) => ({
+        id: s.id,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        admissionNumber: s.admissionNumber,
+        medicalNotes: s.medicalNotes,
+      })),
+    };
   }
 
   async checkIn(teacherId: string): Promise<ClassCheckInEntity> {
