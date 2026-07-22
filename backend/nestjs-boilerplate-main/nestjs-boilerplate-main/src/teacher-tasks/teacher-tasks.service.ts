@@ -8,6 +8,7 @@ import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-require
 import { TimetableEntryEntity } from '../timetable/entities/timetable-entry.entity';
 import { LessonPlanService } from '../lesson-plan/lesson-plan.service';
 import { ClassDiaryService } from '../class-diary/class-diary.service';
+import { ExperimentLogService } from '../experiment-log/experiment-log.service';
 import { AllConfigType } from '../config/config.type';
 
 export interface UngradedMarkTask {
@@ -33,6 +34,13 @@ export interface MissingDiaryTask {
   classSectionName: string;
 }
 
+export interface MissingExperimentLogTask {
+  labBookingId: string;
+  periodNumber: number;
+  subjectName: string | null;
+  classSectionName: string | null;
+}
+
 export interface FreePeriodStatus {
   isFreePeriod: boolean;
   currentPeriod: number | null;
@@ -40,6 +48,7 @@ export interface FreePeriodStatus {
     ungradedMarks: UngradedMarkTask[];
     behindScheduleLessons: BehindScheduleLessonTask[];
     missingDiaryEntries: MissingDiaryTask[];
+    missingExperimentLogs: MissingExperimentLogTask[];
   } | null;
 }
 
@@ -60,6 +69,7 @@ export class TeacherTasksService {
 
     private readonly lessonPlanService: LessonPlanService,
     private readonly classDiaryService: ClassDiaryService,
+    private readonly experimentLogService: ExperimentLogService,
     private readonly configService: ConfigService<AllConfigType>,
   ) {}
 
@@ -101,17 +111,18 @@ export class TeacherTasksService {
       };
     }
 
-    const [ungradedMarks, behindScheduleLessons, missingDiaryEntries] =
+    const [ungradedMarks, behindScheduleLessons, missingDiaryEntries, missingExperimentLogs] =
       await Promise.all([
         this.getUngradedMarks(staffId),
         this.getBehindScheduleLessons(staffId),
         this.getMissingDiaryEntries(staffId),
+        this.getMissingExperimentLogs(staffId),
       ]);
 
     return {
       isFreePeriod: true,
       currentPeriod,
-      tasks: { ungradedMarks, behindScheduleLessons, missingDiaryEntries },
+      tasks: { ungradedMarks, behindScheduleLessons, missingDiaryEntries, missingExperimentLogs },
     };
   }
 
@@ -187,6 +198,22 @@ export class TeacherTasksService {
         period: entry.period,
         subjectName: entry.subject.name,
         classSectionName: entry.classSection.name,
+      }));
+  }
+
+  private async getMissingExperimentLogs(
+    staffId: string,
+  ): Promise<MissingExperimentLogTask[]> {
+    const today = new Date().toISOString().split('T')[0];
+    const missing = await this.experimentLogService.getMissingLogsForDate(today);
+
+    return missing
+      .filter((booking) => booking.teacherId === staffId)
+      .map((booking) => ({
+        labBookingId: booking.id,
+        periodNumber: booking.periodNumber,
+        subjectName: booking.subject?.name ?? null,
+        classSectionName: booking.classSection?.name ?? null,
       }));
   }
 }

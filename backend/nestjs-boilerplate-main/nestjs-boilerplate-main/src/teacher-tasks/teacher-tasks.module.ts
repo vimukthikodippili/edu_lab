@@ -8,6 +8,7 @@ import { TeacherTasksService } from './teacher-tasks.service';
 import { TeacherTasksController } from './teacher-tasks.controller';
 import { LessonPlanModule } from '../lesson-plan/lesson-plan.module';
 import { ClassDiaryModule } from '../class-diary/class-diary.module';
+import { ExperimentLogModule } from '../experiment-log/experiment-log.module';
 import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
 
@@ -21,6 +22,7 @@ import { StaffModule } from '../staff/staff.module';
     ]),
     LessonPlanModule,
     ClassDiaryModule,
+    ExperimentLogModule,
     UsersModule,
     StaffModule,
   ],

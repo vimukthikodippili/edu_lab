@@ -9,6 +9,7 @@ import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-require
 import { TimetableEntryEntity } from '../timetable/entities/timetable-entry.entity';
 import { LessonPlanService } from '../lesson-plan/lesson-plan.service';
 import { ClassDiaryService } from '../class-diary/class-diary.service';
+import { ExperimentLogService } from '../experiment-log/experiment-log.service';
 
 const staffId = 'staff-uuid';
 
@@ -21,6 +22,7 @@ describe('TeacherTasksService', () => {
   let timetableRepo: { findOne: jest.Mock };
   let lessonPlanService: { findEntries: jest.Mock };
   let classDiaryService: { getMissingEntriesForDate: jest.Mock };
+  let experimentLogService: { getMissingLogsForDate: jest.Mock };
   let configService: { get: jest.Mock };
 
   beforeEach(async () => {
@@ -30,6 +32,7 @@ describe('TeacherTasksService', () => {
     timetableRepo = { findOne: jest.fn().mockResolvedValue(null) };
     lessonPlanService = { findEntries: jest.fn().mockResolvedValue([]) };
     classDiaryService = { getMissingEntriesForDate: jest.fn().mockResolvedValue([]) };
+    experimentLogService = { getMissingLogsForDate: jest.fn().mockResolvedValue([]) };
     configService = {
       get: jest.fn().mockImplementation((key: string) => {
         const map: Record<string, unknown> = {
@@ -49,6 +52,7 @@ describe('TeacherTasksService', () => {
         { provide: getRepositoryToken(TimetableEntryEntity), useValue: timetableRepo },
         { provide: LessonPlanService, useValue: lessonPlanService },
         { provide: ClassDiaryService, useValue: classDiaryService },
+        { provide: ExperimentLogService, useValue: experimentLogService },
         { provide: ConfigService, useValue: configService },
       ],
     }).compile();
@@ -104,6 +108,9 @@ describe('TeacherTasksService', () => {
       classDiaryService.getMissingEntriesForDate.mockResolvedValue([
         { id: 5, teacherId: staffId, period: 2, subject: { name: 'Science' }, classSection: { name: '9A' } },
       ]);
+      experimentLogService.getMissingLogsForDate.mockResolvedValue([
+        { id: 'booking-1', teacherId: staffId, periodNumber: 3, subject: { name: 'Chemistry' }, classSection: { name: '10B' } },
+      ]);
 
       const result = await service.getFreePeriodStatus(staffId);
 
@@ -112,6 +119,13 @@ describe('TeacherTasksService', () => {
       expect(result.tasks?.ungradedMarks[0].draftMarkCount).toBe(2);
       expect(result.tasks?.behindScheduleLessons).toHaveLength(1);
       expect(result.tasks?.missingDiaryEntries).toHaveLength(1);
+      expect(result.tasks?.missingExperimentLogs).toHaveLength(1);
+      expect(result.tasks?.missingExperimentLogs[0]).toEqual({
+        labBookingId: 'booking-1',
+        periodNumber: 3,
+        subjectName: 'Chemistry',
+        classSectionName: '10B',
+      });
     });
 
     it('combines all three sources correctly when only some categories have pending items', async () => {
@@ -142,6 +156,19 @@ describe('TeacherTasksService', () => {
 
       expect(result.tasks?.missingDiaryEntries).toHaveLength(1);
       expect(result.tasks?.missingDiaryEntries[0].timetableEntryId).toBe(5);
+    });
+
+    it("excludes another teacher's missing experiment logs (per-staffId scoping)", async () => {
+      timetableRepo.findOne.mockResolvedValue(null);
+      experimentLogService.getMissingLogsForDate.mockResolvedValue([
+        { id: 'booking-1', teacherId: staffId, periodNumber: 2, subject: { name: 'Chemistry' }, classSection: { name: '10B' } },
+        { id: 'booking-2', teacherId: 'someone-else', periodNumber: 3, subject: { name: 'Biology' }, classSection: { name: '10B' } },
+      ]);
+
+      const result = await service.getFreePeriodStatus(staffId);
+
+      expect(result.tasks?.missingExperimentLogs).toHaveLength(1);
+      expect(result.tasks?.missingExperimentLogs[0].labBookingId).toBe('booking-1');
     });
   });
 });
