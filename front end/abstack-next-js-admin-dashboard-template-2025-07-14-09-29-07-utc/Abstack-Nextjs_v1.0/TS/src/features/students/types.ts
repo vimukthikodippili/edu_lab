@@ -11,13 +11,11 @@ export type GuardianRelationship =
 
 export type StudentGender = 'male' | 'female' | 'other'
 export type StudentStatus = 'active' | 'transferred' | 'graduated' | 'withdrawn'
-export type GradeStage = 'primary' | 'junior_secondary' | 'senior_secondary' | 'collegiate'
 
 export interface Grade {
   id: number
   level: number
   name: string
-  stage: GradeStage
 }
 
 export interface ClassSection {

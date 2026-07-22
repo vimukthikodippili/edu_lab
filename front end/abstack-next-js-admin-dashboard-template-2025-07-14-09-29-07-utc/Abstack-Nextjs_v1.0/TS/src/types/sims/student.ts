@@ -10,7 +10,6 @@ export type {
   GuardianRelationship,
   StudentGender,
   StudentStatus,
-  GradeStage,
   EnrollmentFormValues,
   GuardianFormValues,
 } from '@/features/students/types'

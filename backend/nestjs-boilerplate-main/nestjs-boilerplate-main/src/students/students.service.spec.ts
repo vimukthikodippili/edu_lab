@@ -6,7 +6,7 @@ import { StudentsService } from './students.service';
 import { StudentEntity, StudentGender, StudentStatus } from './entities/student.entity';
 import { GuardianEntity, GuardianRelationship } from './entities/guardian.entity';
 import { StudentGuardianEntity } from './entities/student-guardian.entity';
-import { GradeEntity, GradeStage } from './entities/grade.entity';
+import { GradeEntity } from './entities/grade.entity';
 import { ClassSectionEntity } from './entities/class-section.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { StaffEntity } from '../staff/entities/staff.entity';
@@ -22,7 +22,6 @@ const mockGrade: GradeEntity = {
   id: 6,
   level: 6,
   name: 'Grade 6',
-  stage: GradeStage.JUNIOR_SECONDARY,
 };
 
 const mockSection: ClassSectionEntity = {

@@ -5,16 +5,16 @@ import { UnprocessableEntityException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { StudentPromotionService } from './student-promotion.service';
 import { StudentEntity, StudentStatus } from '../entities/student.entity';
-import { GradeEntity, GradeStage } from '../entities/grade.entity';
+import { GradeEntity } from '../entities/grade.entity';
 import { ClassSectionEntity } from '../entities/class-section.entity';
 import {
   EnrollmentOutcome,
   StudentEnrollmentHistoryEntity,
 } from '../entities/student-enrollment-history.entity';
 
-const grade6 = { id: 6, level: 6, name: 'Grade 6', stage: GradeStage.JUNIOR_SECONDARY } as GradeEntity;
-const grade7 = { id: 7, level: 7, name: 'Grade 7', stage: GradeStage.JUNIOR_SECONDARY } as GradeEntity;
-const grade13 = { id: 13, level: 13, name: 'Grade 13', stage: 'collegiate' } as unknown as GradeEntity;
+const grade6 = { id: 6, level: 6, name: 'Grade 6' } as GradeEntity;
+const grade7 = { id: 7, level: 7, name: 'Grade 7' } as GradeEntity;
+const grade13 = { id: 13, level: 13, name: 'Grade 13' } as GradeEntity;
 
 const sectionA6 = { id: 1, name: 'A', academicYear: '2026', gradeId: 6, grade: grade6 } as ClassSectionEntity;
 const sectionA7 = { id: 2, name: 'A', academicYear: '2027', gradeId: 7, grade: grade7 } as ClassSectionEntity;
