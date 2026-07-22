@@ -71,4 +71,30 @@ export class NotificationController {
   ) {
     return this.service.markReadForGuardian(id, guardianId);
   }
+
+  // ── Student notifications ──────────────────────────────────────────────────
+
+  @ApiOperation({ summary: 'List notifications for a student' })
+  @ApiQuery({ name: 'studentId', type: String, description: 'Student UUID' })
+  @Get('student')
+  listForStudent(@Query('studentId', ParseUUIDPipe) studentId: string) {
+    return this.service.findForStudent(studentId);
+  }
+
+  @ApiOperation({ summary: 'Get unread notification count for a student' })
+  @ApiQuery({ name: 'studentId', type: String, description: 'Student UUID' })
+  @Get('student/unread-count')
+  studentUnreadCount(@Query('studentId', ParseUUIDPipe) studentId: string) {
+    return this.service.getStudentUnreadCount(studentId).then((count) => ({ count }));
+  }
+
+  @ApiOperation({ summary: 'Mark a student notification as read' })
+  @Patch('student/:id/read')
+  @HttpCode(HttpStatus.OK)
+  markStudentRead(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('studentId', ParseUUIDPipe) studentId: string,
+  ) {
+    return this.service.markReadForStudent(id, studentId);
+  }
 }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { InAppNotificationEntity } from './entities/in-app-notification.entity';
 import { GuardianNotificationEntity } from './entities/guardian-notification.entity';
+import { StudentNotificationEntity } from './entities/student-notification.entity';
 import { NotificationService } from './notification.service';
 import { NotificationHandler } from './notification.handler';
 import { NotificationController } from './notification.controller';
@@ -16,6 +17,7 @@ import { ClassSectionEntity } from '../students/entities/class-section.entity';
     TypeOrmModule.forFeature([
       InAppNotificationEntity,
       GuardianNotificationEntity,
+      StudentNotificationEntity,
       StudentEntity,
       ClassSectionEntity,
     ]),
