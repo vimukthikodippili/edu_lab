@@ -2,44 +2,27 @@
 import React, { useState, useEffect } from 'react'
 import { CalendarDays, Clock, Zap } from 'lucide-react'
 import { useUpsertCalendarConfig } from '../hooks/useUpsertCalendarConfig'
-import type { GradeStage, SchoolCalendarConfig } from '../types'
+import type { SchoolCalendarConfig } from '../types'
 
-const STAGE_META: Record<
-  GradeStage,
-  { label: string; grades: string; gradient: string; icon: string }
-> = {
-  primary: {
-    label: 'Primary',
-    grades: 'Grades 1–5',
-    gradient: 'linear-gradient(135deg, #20c997 0%, #0ca678 100%)',
-    icon: '🎒',
-  },
-  junior_secondary: {
-    label: 'Junior Secondary',
-    grades: 'Grades 6–9',
-    gradient: 'linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%)',
-    icon: '📚',
-  },
-  senior_secondary: {
-    label: 'Senior Secondary',
-    grades: 'Grades 10–11',
-    gradient: 'linear-gradient(135deg, #6f42c1 0%, #4e2d89 100%)',
-    icon: '🔬',
-  },
-  collegiate: {
-    label: 'Collegiate (A/L)',
-    grades: 'Grades 12–13',
-    gradient: 'linear-gradient(135deg, #fd7e14 0%, #e05d00 100%)',
-    icon: '🏆',
-  },
-}
+// Stage names are now admin-defined, not a fixed 4-value enum — a small rotating palette by
+// display position (not by name) keeps each card visually distinct without hardcoding what a
+// school calls its stages.
+const STAGE_PALETTE = [
+  { gradient: 'linear-gradient(135deg, #20c997 0%, #0ca678 100%)', icon: '🎒' },
+  { gradient: 'linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%)', icon: '📚' },
+  { gradient: 'linear-gradient(135deg, #6f42c1 0%, #4e2d89 100%)', icon: '🔬' },
+  { gradient: 'linear-gradient(135deg, #fd7e14 0%, #e05d00 100%)', icon: '🏆' },
+]
 
 interface Props {
   config: SchoolCalendarConfig
 }
 
 export function CalendarConfigCard({ config }: Props) {
-  const meta = STAGE_META[config.gradeStage as GradeStage]
+  const meta = STAGE_PALETTE[config.gradeStage.ordering % STAGE_PALETTE.length]
+  const gradeRange = config.gradeStage.fromGrade === config.gradeStage.toGrade
+    ? `Grade ${config.gradeStage.fromGrade}`
+    : `Grades ${config.gradeStage.fromGrade}–${config.gradeStage.toGrade}`
 
   const [days, setDays] = useState(config.workingDaysPerWeek)
   const [periods, setPeriods] = useState(config.periodsPerDay)
@@ -57,7 +40,7 @@ export function CalendarConfigCard({ config }: Props) {
   const isUnchanged =
     days === config.workingDaysPerWeek && periods === config.periodsPerDay
 
-  const upsert = useUpsertCalendarConfig(config.gradeStage as GradeStage)
+  const upsert = useUpsertCalendarConfig(config.gradeStageId)
 
   const handleSave = async () => {
     setErrorMsg('')
@@ -85,9 +68,9 @@ export function CalendarConfigCard({ config }: Props) {
         <div className="d-flex align-items-center justify-content-between">
           <div className="text-white">
             <div className="fw-bold fs-6">
-              {meta.icon} {meta.label}
+              {meta.icon} {config.gradeStage.stageName}
             </div>
-            <div className="small opacity-75">{meta.grades}</div>
+            <div className="small opacity-75">{gradeRange}</div>
           </div>
           {saved && (
             <span className="badge bg-white text-success fw-semibold">

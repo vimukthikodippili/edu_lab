@@ -12,6 +12,7 @@ import { FileEntity } from '../files/infrastructure/persistence/relational/entit
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { UpdateStaffRolesDto } from './dto/update-staff-roles.dto';
+import { UpdateSectionHeadRangeDto } from './dto/update-section-head-range.dto';
 import { QueryStaffDto } from './dto/query-staff.dto';
 import { UsersService } from '../users/users.service';
 import { RoleEnum } from '../roles/roles.enum';
@@ -319,6 +320,21 @@ export class StaffService {
       hasAccount: !!user,
       roleId: user?.role?.id ? Number(user.role.id) : null,
     };
+  }
+
+  async updateSectionHeadRange(
+    id: string,
+    dto: UpdateSectionHeadRangeDto,
+  ): Promise<StaffEntity> {
+    if (dto.sectionHeadGradeTo < dto.sectionHeadGradeFrom) {
+      throw new UnprocessableEntityException(
+        'sectionHeadGradeTo must be greater than or equal to sectionHeadGradeFrom.',
+      );
+    }
+    const staff = await this.findById(id);
+    staff.sectionHeadGradeFrom = dto.sectionHeadGradeFrom;
+    staff.sectionHeadGradeTo = dto.sectionHeadGradeTo;
+    return this.staffRepository.save(staff);
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────

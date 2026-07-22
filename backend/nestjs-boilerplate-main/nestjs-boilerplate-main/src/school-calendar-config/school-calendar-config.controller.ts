@@ -3,7 +3,7 @@ import {
   Controller,
   Get,
   Param,
-  ParseEnumPipe,
+  ParseUUIDPipe,
   Put,
   UseGuards,
 } from '@nestjs/common';
@@ -12,7 +12,6 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RolesGuard } from '../roles/roles.guard';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
-import { GradeStage } from '../students/entities/grade.entity';
 import { SchoolCalendarConfigService } from './school-calendar-config.service';
 import { UpsertCalendarConfigDto } from './dto/upsert-calendar-config.dto';
 
@@ -28,17 +27,17 @@ export class SchoolCalendarConfigController {
     return this.svc.findAll();
   }
 
-  @Get(':stage')
-  findByStage(@Param('stage', new ParseEnumPipe(GradeStage)) stage: GradeStage) {
-    return this.svc.findByStage(stage);
+  @Get(':gradeStageId')
+  findByStageId(@Param('gradeStageId', new ParseUUIDPipe({ version: '4' })) gradeStageId: string) {
+    return this.svc.findByStageId(gradeStageId);
   }
 
-  @Put(':stage')
+  @Put(':gradeStageId')
   @Roles(RoleEnum.admin, RoleEnum.principal)
   upsert(
-    @Param('stage', new ParseEnumPipe(GradeStage)) stage: GradeStage,
+    @Param('gradeStageId', new ParseUUIDPipe({ version: '4' })) gradeStageId: string,
     @Body() dto: UpsertCalendarConfigDto,
   ) {
-    return this.svc.upsert(stage, dto);
+    return this.svc.upsert(gradeStageId, dto);
   }
 }

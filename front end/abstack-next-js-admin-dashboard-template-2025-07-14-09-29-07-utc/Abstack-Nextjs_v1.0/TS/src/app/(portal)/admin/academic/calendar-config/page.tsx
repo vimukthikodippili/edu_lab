@@ -3,8 +3,6 @@ import { Settings } from 'lucide-react'
 import { useCalendarConfigs } from '@/features/school-calendar-config/hooks/useCalendarConfigs'
 import { CalendarConfigCard } from '@/features/school-calendar-config/components/CalendarConfigCard'
 
-const STAGE_ORDER = ['primary', 'junior_secondary', 'senior_secondary', 'collegiate'] as const
-
 function SkeletonCard() {
   return (
     <div className="card border-0 shadow-sm h-100">
@@ -39,10 +37,8 @@ function SkeletonCard() {
 export default function CalendarConfigPage() {
   const { data: configs, isLoading, isError } = useCalendarConfigs()
 
-  // Sort API result into canonical stage order
-  const sorted = configs
-    ? STAGE_ORDER.map((s) => configs.find((c) => c.gradeStage === s)).filter(Boolean)
-    : []
+  // The API already returns one row per grade stage, in the stages' own display order
+  const sorted = configs ?? []
 
   return (
     <div className="container-fluid px-4 py-4">
@@ -82,13 +78,11 @@ export default function CalendarConfigPage() {
                 <SkeletonCard />
               </div>
             ))
-          : sorted.map((config) =>
-              config ? (
-                <div key={config.gradeStage} className="col">
-                  <CalendarConfigCard config={config} />
-                </div>
-              ) : null,
-            )}
+          : sorted.map((config) => (
+              <div key={config.gradeStageId} className="col">
+                <CalendarConfigCard config={config} />
+              </div>
+            ))}
       </div>
     </div>
   )

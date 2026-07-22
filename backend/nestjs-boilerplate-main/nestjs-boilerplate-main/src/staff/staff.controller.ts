@@ -27,6 +27,7 @@ import { QueryStaffDto } from './dto/query-staff.dto';
 import { UsersService } from '../users/users.service';
 import { SetStaffPasswordDto } from './dto/set-staff-password.dto';
 import { ChangeSystemRoleDto } from './dto/change-system-role.dto';
+import { UpdateSectionHeadRangeDto } from './dto/update-section-head-range.dto';
 
 @ApiTags('Staff')
 @ApiBearerAuth()
@@ -152,5 +153,18 @@ export class StaffController {
     @Body() dto: ChangeSystemRoleDto,
   ) {
     return this.staffService.changeSystemRole(id, dto.roleId);
+  }
+
+  @Patch(':id/section-head-range')
+  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set the grade range a Section Head staff member is responsible for' })
+  @ApiParam({ name: 'id', description: 'Staff UUID' })
+  @ApiResponse({ status: 404, description: 'Staff not found.' })
+  updateSectionHeadRange(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: UpdateSectionHeadRangeDto,
+  ) {
+    return this.staffService.updateSectionHeadRange(id, dto);
   }
 }

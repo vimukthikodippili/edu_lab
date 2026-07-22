@@ -70,6 +70,14 @@ export class StaffEntity extends EntityRelationalHelper {
   @Column({ type: 'enum', enum: StaffStatus, default: StaffStatus.ACTIVE })
   status: StaffStatus;
 
+  /** Grade range this staff member is responsible for as a Section Head — only meaningful
+   * when their portal login role is section_head; null otherwise. */
+  @Column({ type: 'int', nullable: true })
+  sectionHeadGradeFrom: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  sectionHeadGradeTo: number | null;
+
   @Column({ type: 'uuid', nullable: true })
   photoId: string | null;
 

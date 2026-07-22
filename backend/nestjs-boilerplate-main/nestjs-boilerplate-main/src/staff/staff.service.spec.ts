@@ -319,6 +319,38 @@ describe('StaffService', () => {
     });
   });
 
+  describe('updateSectionHeadRange', () => {
+    beforeEach(async () => {
+      await buildModule();
+    });
+
+    it('persists the grade-range columns onto the staff record', async () => {
+      staffRepo.findOne.mockResolvedValue(makeStaff());
+      staffRepo.save.mockImplementation((data: any) => Promise.resolve(data));
+
+      const result = await service.updateSectionHeadRange(STAFF_ID, {
+        sectionHeadGradeFrom: 6,
+        sectionHeadGradeTo: 9,
+      });
+
+      expect(staffRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ sectionHeadGradeFrom: 6, sectionHeadGradeTo: 9 }),
+      );
+      expect(result.sectionHeadGradeFrom).toBe(6);
+      expect(result.sectionHeadGradeTo).toBe(9);
+    });
+
+    it('rejects a range where gradeTo is less than gradeFrom', async () => {
+      await expect(
+        service.updateSectionHeadRange(STAFF_ID, {
+          sectionHeadGradeFrom: 9,
+          sectionHeadGradeTo: 6,
+        }),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(staffRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
   // ─── findMany — search and filter ──────────────────────────────────────────
 
   describe('findMany — search and filter', () => {

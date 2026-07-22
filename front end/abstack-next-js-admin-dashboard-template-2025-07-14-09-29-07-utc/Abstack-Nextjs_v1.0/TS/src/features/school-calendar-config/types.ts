@@ -1,8 +1,7 @@
-export type GradeStage = 'primary' | 'junior_secondary' | 'senior_secondary' | 'collegiate'
-
 export interface SchoolCalendarConfig {
   id: number
-  gradeStage: GradeStage
+  gradeStageId: string
+  gradeStage: { id: string; stageName: string; fromGrade: number; toGrade: number; ordering: number }
   workingDaysPerWeek: number
   periodsPerDay: number
   totalWeeklySlots: number
