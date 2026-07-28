@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import {
   CounselorCaseEntity,
+  CounselorCasePriority,
   CounselorCaseStatus,
   CounselorCaseTriggerType,
 } from './entities/counselor-case.entity';
@@ -69,6 +70,38 @@ export class CounselorCaseService {
       where: status ? { status } : {},
       order: { createdAt: 'DESC' },
     });
+  }
+
+  /** MHA-122. Unlike createCaseIfNeeded (which no-ops on an existing open case), this always
+   * updates triggerSummary on an existing open mha_safety_flag case for the student, since each
+   * call represents a new session's flag — the summary should reflect the most recent trigger.
+   * MHA-133 — AC #4. Always sets priority: URGENT (create and update-existing branches alike) —
+   * distinct from `status`, which stays OPEN/CLOSED per its own independent lifecycle. */
+  async upsertSafetyFlagCase(
+    studentId: string,
+    triggerSummary: string,
+  ): Promise<CounselorCaseEntity> {
+    const existing = await this.caseRepo.findOne({
+      where: {
+        studentId,
+        triggerType: CounselorCaseTriggerType.MHA_SAFETY_FLAG,
+        status: CounselorCaseStatus.OPEN,
+      },
+    });
+    if (existing) {
+      existing.triggerSummary = triggerSummary;
+      existing.priority = CounselorCasePriority.URGENT;
+      return this.caseRepo.save(existing);
+    }
+    return this.caseRepo.save(
+      this.caseRepo.create({
+        studentId,
+        triggerType: CounselorCaseTriggerType.MHA_SAFETY_FLAG,
+        triggerSummary,
+        status: CounselorCaseStatus.OPEN,
+        priority: CounselorCasePriority.URGENT,
+      }),
+    );
   }
 
   async closeCase(id: string, staffId: string): Promise<CounselorCaseEntity> {

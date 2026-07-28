@@ -61,7 +61,13 @@ export class AttendanceController {
   }
 
   @Get('class-sections')
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.teacher)
+  @Roles(
+    RoleEnum.admin,
+    RoleEnum.principal,
+    RoleEnum.teacher,
+    RoleEnum.counselor,
+    RoleEnum.school_psychologist,
+  )
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get all class sections (for report filters)' })
   async getAllClassSections() {

@@ -1,13 +1,16 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Settings, Save } from 'lucide-react'
+import Link from 'next/link'
+import { Settings, Save, Table2, ChevronRight } from 'lucide-react'
 import RoleGuard from '@/components/wrappers/RoleGuard'
 import { ROLES } from '@/lib/auth/roles'
+import { useAuthStore } from '@/stores/authStore'
 import { useNotificationContext } from '@/context/useNotificationContext'
 import { useSchoolSettings } from '@/features/school-settings/hooks/useSchoolSettings'
 import { useUpdateSchoolSettings } from '@/features/school-settings/hooks/useUpdateSchoolSettings'
 
 function SchoolSettingsContent() {
+  const { user } = useAuthStore()
   const { showNotification } = useNotificationContext()
   const { data, isLoading } = useSchoolSettings()
   const updateSettings = useUpdateSchoolSettings()
@@ -122,6 +125,28 @@ function SchoolSettingsContent() {
           </button>
         </div>
       </div>
+
+      {user?.role === ROLES.SYSTEM_ADMIN && (
+        <Link
+          href="/admin/mha/assessment-matrix"
+          className="card border-0 shadow-sm rounded-4 text-decoration-none text-body mt-3"
+          style={{ maxWidth: 480 }}
+        >
+          <div className="card-body p-4 d-flex align-items-center gap-3">
+            <div
+              className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+              style={{ width: 40, height: 40, background: '#667eea1a' }}
+            >
+              <Table2 size={18} style={{ color: '#667eea' }} />
+            </div>
+            <div className="flex-grow-1">
+              <div className="fw-semibold small">Recommended Assessment Matrix</div>
+              <div className="text-muted small">View, print, or export the MHA age-band guidance matrix</div>
+            </div>
+            <ChevronRight size={16} className="text-muted" />
+          </div>
+        </Link>
+      )}
     </div>
   )
 }

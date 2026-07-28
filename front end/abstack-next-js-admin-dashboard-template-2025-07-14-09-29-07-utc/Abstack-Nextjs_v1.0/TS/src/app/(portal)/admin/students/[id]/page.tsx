@@ -13,6 +13,9 @@ import { useMarkAsLeaving } from '@/features/students/hooks/useMarkAsLeaving'
 import { useStudentDocumentsReview } from '@/features/students/hooks/useStudentDocumentsReview'
 import { useGenerateStudentDocument } from '@/features/students/hooks/useGenerateStudentDocument'
 import { useLinkStudentAccount } from '@/features/students/hooks/useLinkStudentAccount'
+import MHAConsentPanel from '@/features/mha-consent/components/MHAConsentPanel'
+import MhaSessionHistoryPanel from '@/features/mha-session/components/MhaSessionHistoryPanel'
+import { StudentTimelinePanel } from '@/features/students/components/StudentTimelinePanel'
 import apiClient from '@/lib/api/axios'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNotificationContext } from '@/context/useNotificationContext'
@@ -378,7 +381,7 @@ export default function StudentDetailPage({ params }: Props) {
   }
 
   return (
-    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD, ROLES.TEACHER]}>
+    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD, ROLES.TEACHER, ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST]}>
       <div className="container-fluid">
 
         {/* Breadcrumb */}
@@ -547,6 +550,22 @@ export default function StudentDetailPage({ params }: Props) {
 
         {/* Year-end notes (written by the class teacher, reviewed here) */}
         <YearEndNotesCard studentId={student.id} />
+
+        {/* Unified timeline (FR-SM-09/FR-MHA-28) — visible to everyone already allowed on this
+            page (including Teacher); mha_session events themselves are filtered server-side to
+            Counselor/SchoolPsychologist/Principal only, so this is deliberately mounted outside
+            the tighter MHA-only RoleGuard below. */}
+        <StudentTimelinePanel studentId={student.id} />
+
+        {/* MHA guardian consent — Counselor/Psychologist/Principal/Admin only (FR-MHA-30) */}
+        <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST]}>
+          <MHAConsentPanel studentId={student.id} guardians={student.guardians} />
+        </RoleGuard>
+
+        {/* MHA session history — Top Findings per past session (MHA-132, AC #61, FR-MHA-30) */}
+        <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST]}>
+          <MhaSessionHistoryPanel studentId={student.id} />
+        </RoleGuard>
 
         {/* Leaving action / document generation — admin/principal only */}
         <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>

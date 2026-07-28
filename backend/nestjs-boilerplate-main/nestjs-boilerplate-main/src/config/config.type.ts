@@ -13,6 +13,7 @@ import { TopicWeaknessConfig } from '../grades/config/topic-weakness-config.type
 import { TeacherPerformanceConfig } from '../teacher-performance/config/teacher-performance-config.type';
 import { WellbeingCaseConfig } from '../counselor/config/wellbeing-case-config.type';
 import { CounselorNoteConfig } from '../counselor/config/counselor-note-config.type';
+import { DomainResultNoteConfig } from '../domain-result/config/domain-result-note-config.type';
 import { LiveSessionConfig } from '../lms/config/live-session-config.type';
 import { LiveKitConfig } from '../lms/config/livekit-config.type';
 import { LiveKitEgressConfig } from '../lms/config/livekit-egress-config.type';
@@ -34,6 +35,7 @@ export type AllConfigType = {
   teacherPerformance: TeacherPerformanceConfig;
   wellbeingCase: WellbeingCaseConfig;
   counselorNote: CounselorNoteConfig;
+  domainResultNote: DomainResultNoteConfig;
   liveSession: LiveSessionConfig;
   livekit: LiveKitConfig;
   livekitEgress: LiveKitEgressConfig;

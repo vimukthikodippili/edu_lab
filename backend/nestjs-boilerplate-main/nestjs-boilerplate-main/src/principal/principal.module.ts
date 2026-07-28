@@ -6,6 +6,8 @@ import { FeeWaiverRequestEntity } from '../fees/entities/fee-waiver-request.enti
 import { EmergencyAlertEntity } from '../communication/entities/emergency-alert.entity';
 import { LeaveRequestEntity } from '../leave/entities/leave-request.entity';
 import { ExpenseApprovalEntity } from '../expenses/entities/expense-approval.entity';
+import { CounselorCaseEntity } from '../counselor/entities/counselor-case.entity';
+import { MhaCaseloadModule } from '../mha-caseload/mha-caseload.module';
 import { PrincipalService } from './principal.service';
 import { PrincipalController } from './principal.controller';
 
@@ -18,7 +20,9 @@ import { PrincipalController } from './principal.controller';
       EmergencyAlertEntity,
       LeaveRequestEntity,
       ExpenseApprovalEntity,
+      CounselorCaseEntity,
     ]),
+    MhaCaseloadModule,
   ],
   providers: [PrincipalService],
   controllers: [PrincipalController],

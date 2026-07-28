@@ -7,14 +7,32 @@ export type AuditAction =
   | 'record_consent'
   | 'revoke_consent'
   | 'enroll'
-  | 'manual_override';
+  | 'manual_override'
+  | 'create_session'
+  | 'update_domain'
+  | 'raise_safety_flag'
+  | 'complete_session'
+  | 'abandon_session'
+  | 'generate_summary'
+  | 'update_action'
+  | 'notify_guardian'
+  | 'complete_action'
+  | 'create_event'
+  | 'publish_event'
+  | 'cancel_event'
+  | 'add_participants';
 export type AuditTargetType =
   | 'fee_waiver'
   | 'leave'
   | 'expense'
   | 'biometric_consent'
   | 'biometric_vault'
-  | 'biometric_release_log';
+  | 'biometric_release_log'
+  | 'mha_consent'
+  | 'mha_session'
+  | 'domain_result'
+  | 'session_action'
+  | 'event';
 
 @Entity({ name: 'audit_log' })
 export class AuditLogEntity extends EntityRelationalHelper {

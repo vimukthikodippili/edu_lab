@@ -143,6 +143,7 @@ export const ENDPOINTS = {
     APPROVAL_BY_ID: (id: string) => `/principal/approvals/${id}`,
     STRATEGIC: '/principal/strategic',
     REPORTS: '/principal/reports',
+    WELLBEING_CONCERNS: '/principal/wellbeing-concerns',
   },
   BIOMETRIC: {
     VERIFY: '/biometric/verify',
@@ -289,6 +290,47 @@ export const ENDPOINTS = {
     EXPERIMENT_COVERAGE: '/lab-overview/experiment-coverage',
     LAB_REPORT_PERFORMANCE: '/lab-overview/lab-report-performance',
   },
+  DISORDER_REGISTRY: {
+    LIST: '/disorder-registry',
+    DETAIL: (id: string) => `/disorder-registry/${id}`,
+    CREATE: '/disorder-registry',
+    UPDATE: (id: string) => `/disorder-registry/${id}`,
+  },
+  ACTION_RULE: {
+    LIST: '/action-rules',
+    CREATE: '/action-rules',
+    UPDATE: (id: string) => `/action-rules/${id}`,
+  },
+  SAFETY_ALERTS: {
+    LIST: '/safety-alerts',
+  },
+  ASSESSMENT_MATRIX: {
+    LIST: '/assessment-matrix',
+    EXPORT: '/assessment-matrix/export',
+  },
+  MHA_CONSENT: {
+    STATUS: (studentId: string) => `/mha-consent/students/${studentId}`,
+    RECORD: (studentId: string) => `/mha-consent/students/${studentId}`,
+  },
+  MHA_SESSION: {
+    PREVIEW: '/mha-sessions/preview',
+    CREATE: '/mha-sessions',
+    DETAIL: (id: string) => `/mha-sessions/${id}`,
+    LIST: '/mha-sessions',
+    COMPLETE: (id: string) => `/mha-sessions/${id}/complete`,
+    SUMMARY: (id: string) => `/mha-sessions/${id}/summary`,
+    ACTION_STATUS: (sessionId: string, actionId: string) => `/mha-sessions/${sessionId}/actions/${actionId}`,
+    NOTIFY_GUARDIAN: (id: string) => `/mha-sessions/${id}/notify-guardian`,
+    CASELOAD: '/mha-sessions/caseload',
+    HISTORY: (studentId: string) => `/mha-sessions/students/${studentId}/history`,
+  },
+  DOMAIN_RESULT: {
+    LIST: (sessionId: string) => `/mha-sessions/${sessionId}/domain-results`,
+    UPDATE: (sessionId: string, id: string) => `/mha-sessions/${sessionId}/domain-results/${id}`,
+  },
+  ACADEMIC_CONTEXT: {
+    BY_STUDENT: (studentId: string) => `/students/${studentId}/academic-context`,
+  },
   SPORTS: {
     LIST: '/sports',
     DIRECTORY: '/sports/directory',
@@ -368,5 +410,22 @@ export const ENDPOINTS = {
   FILES: {
     UPLOAD: '/files/upload',
     BY_ID: (id: string) => `/files/${id}`,
+  },
+  EVENTS: {
+    LIST: '/events',
+    PUBLISHED: '/events/published',
+    CREATE: '/events',
+    DETAIL: (id: string) => `/events/${id}`,
+    PUBLISH: (id: string) => `/events/${id}/publish`,
+    CANCEL: (id: string) => `/events/${id}/cancel`,
+    REGISTER: (eventId: string) => `/events/${eventId}/register`,
+    MY_REGISTRATIONS: '/events/registrations/me',
+    CANCEL_REGISTRATION: (id: string) => `/events/registrations/${id}/cancel`,
+    CHECK_IN: (eventId: string) => `/events/${eventId}/check-in`,
+    ATTENDANCE_DASHBOARD: (eventId: string) => `/events/${eventId}/attendance-dashboard`,
+    ATTENDANCE_REPORT_PDF: (eventId: string) => `/events/${eventId}/attendance-report/pdf`,
+    PARTICIPANTS: (eventId: string) => `/events/${eventId}/participants`,
+    MY_PARTICIPATION: (eventId: string) => `/events/${eventId}/participants/me`,
+    BULK_CHECK_IN: (eventId: string, classSectionId: number) => `/events/${eventId}/participants/class/${classSectionId}/bulk-check-in`,
   },
 } as const

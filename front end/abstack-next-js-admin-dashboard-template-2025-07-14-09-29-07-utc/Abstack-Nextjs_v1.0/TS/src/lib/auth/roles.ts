@@ -9,6 +9,7 @@ export const ROLES = {
   SECURITY_OFFICER: 'security_officer',
   LIBRARIAN: 'librarian',
   ACCOUNTANT: 'accountant',
+  SCHOOL_PSYCHOLOGIST: 'school_psychologist',
 } as const
 
 export type Role = (typeof ROLES)[keyof typeof ROLES]
@@ -26,6 +27,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   security_officer: 'Security Officer',
   librarian: 'Librarian',
   accountant: 'Accountant',
+  school_psychologist: 'School Psychologist',
 }
 
 export const ROLE_HOME_PATHS: Record<Role, string> = {
@@ -39,6 +41,7 @@ export const ROLE_HOME_PATHS: Record<Role, string> = {
   security_officer: '/security',
   librarian: '/library',
   accountant: '/accounts',
+  school_psychologist: '/school-psychologist',
 }
 
 export const ROLE_PATH_PREFIXES: Record<string, Role> = {
@@ -52,6 +55,7 @@ export const ROLE_PATH_PREFIXES: Record<string, Role> = {
   '/security': ROLES.SECURITY_OFFICER,
   '/library': ROLES.LIBRARIAN,
   '/accounts': ROLES.ACCOUNTANT,
+  '/school-psychologist': ROLES.SCHOOL_PSYCHOLOGIST,
 }
 
 /** Minutes of inactivity before automatic sign-out, per role */
@@ -66,4 +70,5 @@ export const ROLE_INACTIVITY_TIMEOUT: Record<Role, number> = {
   security_officer: 15,
   librarian: 45,
   accountant: 20,
+  school_psychologist: 30,
 }

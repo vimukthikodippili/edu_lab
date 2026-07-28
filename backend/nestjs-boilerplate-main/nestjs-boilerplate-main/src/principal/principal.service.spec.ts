@@ -19,6 +19,13 @@ import {
   ExpenseCategory,
   ExpenseStatus,
 } from '../expenses/entities/expense-approval.entity';
+import {
+  CounselorCaseEntity,
+  CounselorCaseStatus,
+  CounselorCaseTriggerType,
+} from '../counselor/entities/counselor-case.entity';
+import { MhaCaseloadService } from '../mha-caseload/mha-caseload.service';
+import { CaseloadItemDto } from '../mha-caseload/dto/caseload-item.dto';
 
 // ─── Mock factories ───────────────────────────────────────────────────────────
 
@@ -50,6 +57,8 @@ let waiverRepo: MockRepo<FeeWaiverRequestEntity>;
 let alertRepo: MockRepo<EmergencyAlertEntity>;
 let leaveRepo: MockRepo<LeaveRequestEntity>;
 let expenseRepo: MockRepo<ExpenseApprovalEntity>;
+let counselorCaseRepo: MockRepo<CounselorCaseEntity>;
+let mhaCaseloadService: { getCaseload: jest.Mock };
 
 const buildModule = async (): Promise<PrincipalService> => {
   const module: TestingModule = await Test.createTestingModule({
@@ -61,11 +70,27 @@ const buildModule = async (): Promise<PrincipalService> => {
       { provide: getRepositoryToken(EmergencyAlertEntity), useValue: alertRepo },
       { provide: getRepositoryToken(LeaveRequestEntity), useValue: leaveRepo },
       { provide: getRepositoryToken(ExpenseApprovalEntity), useValue: expenseRepo },
+      { provide: getRepositoryToken(CounselorCaseEntity), useValue: counselorCaseRepo },
+      { provide: MhaCaseloadService, useValue: mhaCaseloadService },
     ],
   }).compile();
 
   return module.get<PrincipalService>(PrincipalService);
 };
+
+function caseloadRow(overrides: Partial<CaseloadItemDto> = {}): CaseloadItemDto {
+  return {
+    studentId: 'student-1',
+    studentName: 'Kasun Perera',
+    grade: '10A',
+    latestSessionId: 'session-1',
+    latestSessionDate: new Date('2026-07-01T00:00:00.000Z'),
+    highestRiskLevel: 'moderate',
+    hasPendingActions: false,
+    hasSafetyFlag: false,
+    ...overrides,
+  } as CaseloadItemDto;
+}
 
 // ─── KPI Tests ───────────────────────────────────────────────────────────────
 
@@ -79,6 +104,8 @@ describe('PrincipalService.getKpi', () => {
     alertRepo = repoMock<EmergencyAlertEntity>();
     leaveRepo = repoMock<LeaveRequestEntity>();
     expenseRepo = repoMock<ExpenseApprovalEntity>();
+    counselorCaseRepo = repoMock<CounselorCaseEntity>();
+    mhaCaseloadService = { getCaseload: jest.fn() };
 
     // Safe defaults — all channels return zero
     attendanceRepo.createQueryBuilder!.mockReturnValue(
@@ -91,6 +118,8 @@ describe('PrincipalService.getKpi', () => {
     alertRepo.createQueryBuilder!.mockReturnValue(makeQb({}, 0));
     leaveRepo.count!.mockResolvedValue(0);
     expenseRepo.count!.mockResolvedValue(0);
+    counselorCaseRepo.count!.mockResolvedValue(0);
+    mhaCaseloadService.getCaseload.mockResolvedValue([]);
 
     service = await buildModule();
   });
@@ -174,6 +203,83 @@ describe('PrincipalService.getKpi', () => {
       where: { status: ExpenseStatus.PENDING },
     });
   });
+
+  // ── 7: FR-MHA-34 wellbeing/safety-alert KPIs ──────────────────────────────
+  it('counts only high/severe caseload rows into wellbeingConcernCount', async () => {
+    mhaCaseloadService.getCaseload.mockResolvedValue([
+      caseloadRow({ studentId: 's1', highestRiskLevel: 'high' }),
+      caseloadRow({ studentId: 's2', highestRiskLevel: 'severe' }),
+      caseloadRow({ studentId: 's3', highestRiskLevel: 'moderate' }),
+      caseloadRow({ studentId: 's4', highestRiskLevel: 'low' }),
+    ]);
+
+    const kpi = await service.getKpi();
+
+    expect(kpi.wellbeingConcernCount).toBe(2);
+    expect(mhaCaseloadService.getCaseload).toHaveBeenCalledWith({});
+  });
+
+  // AI-prompt test (b) — a student whose latest session has all levels 'low' is excluded.
+  it.each([
+    ['not_assessed', false],
+    ['none', false],
+    ['low', false],
+    ['moderate', false],
+    ['high', true],
+    ['severe', true],
+  ])('highestRiskLevel=%s -> counted in wellbeingConcernCount: %s', async (level, expected) => {
+    mhaCaseloadService.getCaseload.mockResolvedValue([caseloadRow({ highestRiskLevel: level as CaseloadItemDto['highestRiskLevel'] })]);
+    const kpi = await service.getKpi();
+    expect(kpi.wellbeingConcernCount).toBe(expected ? 1 : 0);
+  });
+
+  // AI-prompt test (a) — a student with a resolved (closed) safety case is excluded from
+  // safetyAlertCount. Proven at the query-shape level: the count only ever queries OPEN cases,
+  // so a CLOSED (resolved) row structurally can never be counted, per MHA-133's own
+  // upsertSafetyFlagCase() invariant (at most one OPEN mha_safety_flag case per student).
+  it('scopes safetyAlertCount to OPEN mha_safety_flag cases only', async () => {
+    counselorCaseRepo.count!.mockResolvedValue(3);
+
+    const kpi = await service.getKpi();
+
+    expect(kpi.safetyAlertCount).toBe(3);
+    expect(counselorCaseRepo.count).toHaveBeenCalledWith({
+      where: {
+        triggerType: CounselorCaseTriggerType.MHA_SAFETY_FLAG,
+        status: CounselorCaseStatus.OPEN,
+      },
+    });
+  });
+});
+
+describe('PrincipalService.getWellbeingConcerns', () => {
+  let service: PrincipalService;
+
+  beforeEach(async () => {
+    attendanceRepo = repoMock<AttendanceRecordEntity>();
+    invoiceRepo = repoMock<InvoiceEntity>();
+    waiverRepo = repoMock<FeeWaiverRequestEntity>();
+    alertRepo = repoMock<EmergencyAlertEntity>();
+    leaveRepo = repoMock<LeaveRequestEntity>();
+    expenseRepo = repoMock<ExpenseApprovalEntity>();
+    counselorCaseRepo = repoMock<CounselorCaseEntity>();
+    mhaCaseloadService = { getCaseload: jest.fn() };
+
+    service = await buildModule();
+  });
+
+  it('maps highestRiskLevel to maxLevel and includes only high/severe rows', async () => {
+    mhaCaseloadService.getCaseload.mockResolvedValue([
+      caseloadRow({ studentId: 's1', studentName: 'Amara Silva', grade: '9B', highestRiskLevel: 'severe' }),
+      caseloadRow({ studentId: 's2', studentName: 'Nuwan Perera', grade: '10A', highestRiskLevel: 'low' }),
+    ]);
+
+    const result = await service.getWellbeingConcerns();
+
+    expect(result).toEqual([
+      { studentId: 's1', studentName: 'Amara Silva', grade: '9B', maxLevel: 'severe' },
+    ]);
+  });
 });
 
 // ─── Approval Queue Test ─────────────────────────────────────────────────────
@@ -192,6 +298,8 @@ describe('PrincipalService.getApprovalQueue', () => {
     alertRepo = repoMock<EmergencyAlertEntity>();
     leaveRepo = repoMock<LeaveRequestEntity>();
     expenseRepo = repoMock<ExpenseApprovalEntity>();
+    counselorCaseRepo = repoMock<CounselorCaseEntity>();
+    mhaCaseloadService = { getCaseload: jest.fn() };
 
     // KPI defaults (not tested here, just prevent errors)
     attendanceRepo.createQueryBuilder!.mockReturnValue(makeQb({ total: '0', attended: '0' }));
@@ -200,6 +308,8 @@ describe('PrincipalService.getApprovalQueue', () => {
     alertRepo.createQueryBuilder!.mockReturnValue(makeQb({}, 0));
     leaveRepo.count!.mockResolvedValue(0);
     expenseRepo.count!.mockResolvedValue(0);
+    counselorCaseRepo.count!.mockResolvedValue(0);
+    mhaCaseloadService.getCaseload.mockResolvedValue([]);
 
     // Queue data — one item from each source type
     waiverRepo.find!.mockResolvedValue([

@@ -29,7 +29,7 @@ export class StudentNotesController {
   }
 
   @Get(':studentId')
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.teacher, RoleEnum.counselor, RoleEnum.school_psychologist)
   async getNotes(
     @Param('studentId') studentId: string,
     @Request() req: { user: { id: string; role: { id: number } } },

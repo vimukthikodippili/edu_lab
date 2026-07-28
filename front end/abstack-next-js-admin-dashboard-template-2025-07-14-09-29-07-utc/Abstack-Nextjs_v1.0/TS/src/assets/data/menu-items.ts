@@ -40,6 +40,9 @@ import {
   Settings2,
   Send,
   FlaskConical,
+  Brain,
+  ClipboardPlus,
+  Table2,
 } from 'lucide-react'
 
 export const MENU_ITEMS: MenuItemType[] = [
@@ -119,17 +122,38 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
   },
   {
+    key: 'admin-events',
+    label: 'School Events',
+    icon: CalendarDays,
+    url: '/admin/events',
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+  },
+  {
+    key: 'mha-disorder-registry',
+    label: 'Disorder / Test Registry',
+    icon: Brain,
+    url: '/admin/mha/disorder-registry',
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.TEACHER, ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST],
+  },
+  {
+    key: 'mha-assessment-matrix',
+    label: 'Assessment Matrix',
+    icon: Table2,
+    url: '/admin/mha/assessment-matrix',
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST],
+  },
+  {
     key: 'students',
     label: 'Students',
     icon: GraduationCap,
-    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD, ROLES.TEACHER],
+    allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD, ROLES.TEACHER, ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST],
     children: [
       {
         key: 'students-list',
         label: 'All Students',
         url: '/admin/students',
         parentKey: 'students',
-        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD, ROLES.TEACHER],
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD, ROLES.TEACHER, ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST],
       },
       {
         key: 'students-enroll',
@@ -510,6 +534,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.TEACHER],
   },
   {
+    key: 'teacher-events',
+    label: 'School Events',
+    icon: CalendarDays,
+    url: '/teacher/events',
+    allowedRoles: [ROLES.TEACHER],
+  },
+  {
     key: 'teacher-lesson-plan',
     label: 'Annual Lesson Plan',
     icon: CalendarDays,
@@ -681,6 +712,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/student/sports',
     allowedRoles: [ROLES.STUDENT],
   },
+  {
+    key: 'student-events',
+    label: 'School Events',
+    icon: CalendarDays,
+    url: '/student/events',
+    allowedRoles: [ROLES.STUDENT],
+  },
 
   // ─── Guardian ─────────────────────────────────────────────────────────────
 
@@ -740,6 +778,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/guardian/sports',
     allowedRoles: [ROLES.GUARDIAN],
   },
+  {
+    key: 'guardian-events',
+    label: 'School Events',
+    icon: CalendarDays,
+    url: '/guardian/events',
+    allowedRoles: [ROLES.GUARDIAN],
+  },
 
   // ─── Counselor ────────────────────────────────────────────────────────────
 
@@ -755,6 +800,27 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: LayoutDashboard,
     url: '/counselor',
     allowedRoles: [ROLES.COUNSELOR],
+  },
+  {
+    key: 'counselor-mha-new-session',
+    label: 'New MHA Session',
+    icon: ClipboardPlus,
+    url: '/counselor/mha-sessions/new',
+    allowedRoles: [ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST],
+  },
+  {
+    key: 'counselor-mha-sessions',
+    label: 'MHA Sessions',
+    icon: ClipboardList,
+    url: '/counselor/mha-sessions',
+    allowedRoles: [ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST],
+  },
+  {
+    key: 'counselor-mha-caseload',
+    label: 'MHA Caseload',
+    icon: Users,
+    url: '/counselor/mha-caseload',
+    allowedRoles: [ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST],
   },
   {
     key: 'counselor-wellbeing',
@@ -819,6 +885,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'QR Verification',
     icon: QrCode,
     url: '/security/scan',
+    allowedRoles: [ROLES.SECURITY_OFFICER],
+  },
+  {
+    key: 'security-event-check-in',
+    label: 'Event Check-In',
+    icon: CalendarDays,
+    url: '/security/events/check-in',
     allowedRoles: [ROLES.SECURITY_OFFICER],
   },
 

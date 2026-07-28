@@ -16,7 +16,15 @@ import {
   ExpenseApprovalEntity,
   ExpenseStatus,
 } from '../expenses/entities/expense-approval.entity';
+import {
+  CounselorCaseEntity,
+  CounselorCaseStatus,
+  CounselorCaseTriggerType,
+} from '../counselor/entities/counselor-case.entity';
+import { MhaCaseloadService } from '../mha-caseload/mha-caseload.service';
+import { CaseloadItemDto } from '../mha-caseload/dto/caseload-item.dto';
 import { PrincipalKpiResponse } from './dto/principal-kpi.response';
+import { WellbeingConcernDto } from './dto/wellbeing-concern.dto';
 
 export type ApprovalItemType = 'fee_waiver' | 'leave' | 'expense';
 
@@ -51,11 +59,33 @@ export class PrincipalService {
 
     @InjectRepository(ExpenseApprovalEntity)
     private readonly expenseRepo: Repository<ExpenseApprovalEntity>,
+
+    @InjectRepository(CounselorCaseEntity)
+    private readonly counselorCaseRepo: Repository<CounselorCaseEntity>,
+
+    private readonly mhaCaseloadService: MhaCaseloadService,
   ) {}
 
+  /** FR-MHA-34/AC #92. Reuses MhaCaseloadService's `highestRiskLevel` (already defined as "max
+   * across the student's LATEST completed session's RiskSummary rows" — exactly this AC's
+   * definition), filtered to High/Severe. Backs both getKpi()'s count and getWellbeingConcerns()'s
+   * list — computed once per call site, not twice. */
+  private async getWellbeingConcernRows(): Promise<CaseloadItemDto[]> {
+    const caseload = await this.mhaCaseloadService.getCaseload({});
+    return caseload.filter((r) => r.highestRiskLevel === 'high' || r.highestRiskLevel === 'severe');
+  }
+
   async getKpi(): Promise<PrincipalKpiResponse> {
-    const [attendanceRaw, feeRaw, pendingWaivers, activeAlerts, pendingLeave, pendingExpenses] =
-      await Promise.all([
+    const [
+      attendanceRaw,
+      feeRaw,
+      pendingWaivers,
+      activeAlerts,
+      pendingLeave,
+      pendingExpenses,
+      wellbeingRows,
+      safetyAlertCount,
+    ] = await Promise.all([
         this.attendanceRepo
           .createQueryBuilder('ar')
           .select('COUNT(*)', 'total')
@@ -82,6 +112,19 @@ export class PrincipalService {
         this.leaveRepo.count({ where: { status: LeaveStatus.PENDING } }),
 
         this.expenseRepo.count({ where: { status: ExpenseStatus.PENDING } }),
+
+        this.getWellbeingConcernRows(),
+
+        // FR-MHA-34/AC #95. upsertSafetyFlagCase() (MHA-133) guarantees at most one OPEN
+        // mha_safety_flag CounselorCase per student — a plain count on that (triggerType, status)
+        // pair is already the exact, dedup-free count of students with an unresolved safety flag,
+        // reusing the existing authoritative record rather than re-deriving it from DomainResult.
+        this.counselorCaseRepo.count({
+          where: {
+            triggerType: CounselorCaseTriggerType.MHA_SAFETY_FLAG,
+            status: CounselorCaseStatus.OPEN,
+          },
+        }),
       ]);
 
     const total = +(attendanceRaw?.total ?? 0);
@@ -102,7 +145,21 @@ export class PrincipalService {
       feeCollectionRate,
       pendingApprovals: pendingWaivers + pendingLeave + pendingExpenses,
       activeAlerts,
+      wellbeingConcernCount: wellbeingRows.length,
+      safetyAlertCount,
     };
+  }
+
+  /** FR-MHA-34/AC #94. De-identified-of-clinical-detail drill-down for the wellbeing KPI — name,
+   * grade, and overall severity only; no domain names, no risk-category names, no notes. */
+  async getWellbeingConcerns(): Promise<WellbeingConcernDto[]> {
+    const rows = await this.getWellbeingConcernRows();
+    return rows.map((r) => ({
+      studentId: r.studentId,
+      studentName: r.studentName,
+      grade: r.grade,
+      maxLevel: r.highestRiskLevel,
+    }));
   }
 
   async getApprovalQueue(): Promise<ApprovalQueueItem[]> {

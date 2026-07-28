@@ -15,6 +15,8 @@ import { SportMetricSeedModule } from './sport-metric/sport-metric-seed.module';
 import { LabTypeSeedModule } from './lab-type/lab-type-seed.module';
 import { EquipmentCategorySeedModule } from './equipment-category/equipment-category-seed.module';
 import { StudentSeedModule } from './student/student-seed.module';
+import { DisorderRegistrySeedModule } from './disorder-registry/disorder-registry-seed.module';
+import { AssessmentMatrixSeedModule } from './assessment-matrix/assessment-matrix-seed.module';
 import databaseConfig from '../../config/database.config';
 import appConfig from '../../../config/app.config';
 
@@ -31,6 +33,8 @@ import appConfig from '../../../config/app.config';
     LabTypeSeedModule,
     EquipmentCategorySeedModule,
     StudentSeedModule,
+    DisorderRegistrySeedModule,
+    AssessmentMatrixSeedModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [databaseConfig, appConfig],

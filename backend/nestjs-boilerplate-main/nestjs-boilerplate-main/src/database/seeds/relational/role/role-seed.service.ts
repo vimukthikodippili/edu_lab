@@ -16,6 +16,7 @@ const ROLES = [
   { id: RoleEnum.security_officer, name: 'Security Officer' },
   { id: RoleEnum.librarian,        name: 'Librarian' },
   { id: RoleEnum.accountant,       name: 'Accountant' },
+  { id: RoleEnum.school_psychologist, name: 'School Psychologist' },
 ];
 
 @Injectable()

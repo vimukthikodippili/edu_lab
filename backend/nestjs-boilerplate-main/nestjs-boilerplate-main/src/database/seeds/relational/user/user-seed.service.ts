@@ -18,6 +18,7 @@ const SEED_USERS = [
   { firstName: 'Roshan',   lastName: 'Kumara',   email: 'security@sims.edu.lk',  roleId: RoleEnum.security_officer, roleName: 'Security Officer' },
   { firstName: 'Amali',    lastName: 'Wickrama', email: 'librarian@sims.edu.lk', roleId: RoleEnum.librarian,        roleName: 'Librarian' },
   { firstName: 'Ruwan',    lastName: 'Dissanayake', email: 'accountant@sims.edu.lk', roleId: RoleEnum.accountant,   roleName: 'Accountant' },
+  { firstName: 'Nadeesha', lastName: 'Rajapaksha', email: 'psychologist@sims.edu.lk', roleId: RoleEnum.school_psychologist, roleName: 'School Psychologist' },
 ];
 
 @Injectable()

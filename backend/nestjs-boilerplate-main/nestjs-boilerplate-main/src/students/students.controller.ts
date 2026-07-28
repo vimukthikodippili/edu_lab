@@ -79,7 +79,14 @@ export class StudentsController {
   // ─── Listing & Search ──────────────────────────────────────────────
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head, RoleEnum.teacher)
+  @Roles(
+    RoleEnum.admin,
+    RoleEnum.principal,
+    RoleEnum.section_head,
+    RoleEnum.teacher,
+    RoleEnum.counselor,
+    RoleEnum.school_psychologist,
+  )
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List students with pagination and filters' })
   findMany(@Query() query: QueryStudentDto) {
@@ -224,7 +231,14 @@ export class StudentsController {
   }
 
   @Get(':id')
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head, RoleEnum.teacher)
+  @Roles(
+    RoleEnum.admin,
+    RoleEnum.principal,
+    RoleEnum.section_head,
+    RoleEnum.teacher,
+    RoleEnum.counselor,
+    RoleEnum.school_psychologist,
+  )
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get student by UUID' })
   @ApiOkResponse({ type: StudentEntity })

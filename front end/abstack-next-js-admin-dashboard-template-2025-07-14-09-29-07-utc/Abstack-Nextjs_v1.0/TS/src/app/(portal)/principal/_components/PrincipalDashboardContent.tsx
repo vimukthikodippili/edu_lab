@@ -8,6 +8,8 @@ import {
   ClipboardList,
   AlertTriangle,
   RefreshCw,
+  HeartPulse,
+  ShieldAlert,
 } from 'lucide-react'
 import { usePrincipalKpi } from '@/features/principal/hooks/usePrincipalKpi'
 import type { PrincipalKpi } from '@/types/sims/principal'
@@ -55,13 +57,32 @@ function buildStats(kpi: PrincipalKpi): StatCard[] {
       color: '#ef4444',
       href: '/principal/emergency-alert',
     },
+    // FR-MHA-34/AC #92-93 — the label IS the AC's exact required wording, not a short paraphrase,
+    // since the AC frames this specific phrasing as the whole non-diagnostic point.
+    {
+      label: 'Students with elevated wellbeing concern — see counselor for detail',
+      value: kpi.wellbeingConcernCount,
+      sub: 'non-diagnostic count only',
+      icon: HeartPulse,
+      color: '#8b5cf6',
+      href: '/principal/wellbeing-concerns',
+    },
+    // FR-MHA-34/AC #95 — links to the existing Safety Alerts feed (MHA-133), not a new page.
+    {
+      label: 'Safety Alerts',
+      value: kpi.safetyAlertCount,
+      sub: 'students with an unresolved safety flag',
+      icon: ShieldAlert,
+      color: '#dc2626',
+      href: '/principal/safety-alerts',
+    },
   ]
 }
 
 function SkeletonCards() {
   return (
     <div className="row g-3 mb-4">
-      {Array.from({ length: 4 }).map((_, i) => (
+      {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="col-12 col-sm-6 col-xl-3">
           <div className="card border-0 shadow-sm rounded-4 h-100">
             <div className="card-body d-flex align-items-center gap-3 py-3 placeholder-glow">

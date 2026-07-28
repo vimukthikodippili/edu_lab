@@ -11,6 +11,8 @@ import { SportMetricSeedService } from './sport-metric/sport-metric-seed.service
 import { LabTypeSeedService } from './lab-type/lab-type-seed.service';
 import { EquipmentCategorySeedService } from './equipment-category/equipment-category-seed.service';
 import { StudentSeedService } from './student/student-seed.service';
+import { DisorderRegistrySeedService } from './disorder-registry/disorder-registry-seed.service';
+import { AssessmentMatrixSeedService } from './assessment-matrix/assessment-matrix-seed.service';
 
 const runSeed = async () => {
   const app = await NestFactory.create(SeedModule);
@@ -30,6 +32,11 @@ const runSeed = async () => {
   await app.get(EquipmentCategorySeedService).run();
   // 10 students + 1 guardian each across all 39 class sections (13 grades × 3 sections).
   await app.get(StudentSeedService).run();
+  // No FK dependency on anything above — Module 12 (MHA) Disorder/Test Registry config data.
+  await app.get(DisorderRegistrySeedService).run();
+  // Depends on DisorderRegistrySeedService above — resolves each row's domain code to a real
+  // domainId via a live lookup, so disorder_registry must already be populated.
+  await app.get(AssessmentMatrixSeedService).run();
 
   await app.close();
 };

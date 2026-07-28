@@ -70,9 +70,21 @@ import { SessionEquipmentModule } from './session-equipment/session-equipment.mo
 import { ExperimentLogModule } from './experiment-log/experiment-log.module';
 import { LabReportsModule } from './lab-reports/lab-reports.module';
 import { LabOverviewModule } from './lab-overview/lab-overview.module';
+import { DisorderRegistryModule } from './disorder-registry/disorder-registry.module';
+import { ActionRuleModule } from './action-rule/action-rule.module';
+import { AssessmentMatrixModule } from './assessment-matrix/assessment-matrix.module';
+import { MhaConsentModule } from './mha-consent/mha-consent.module';
+import { MhaSessionModule } from './mha-session/mha-session.module';
+import { DomainResultModule } from './domain-result/domain-result.module';
+import { SafetyNotificationModule } from './safety-notification/safety-notification.module';
+import { MhaParentNotificationModule } from './mha-parent-notification/mha-parent-notification.module';
+import { AcademicContextModule } from './academic-context/academic-context.module';
+import { StudentTimelineModule } from './student-timeline/student-timeline.module';
+import { EventModule } from './events/event.module';
 import teacherPerformanceConfig from './teacher-performance/config/teacher-performance.config';
 import wellbeingCaseConfig from './counselor/config/wellbeing-case.config';
 import counselorNoteConfig from './counselor/config/counselor-note.config';
+import domainResultNoteConfig from './domain-result/config/domain-result-note.config';
 import liveSessionConfig from './lms/config/live-session.config';
 import livekitConfig from './lms/config/livekit.config';
 import livekitEgressConfig from './lms/config/livekit-egress.config';
@@ -116,6 +128,7 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
         teacherPerformanceConfig,
         wellbeingCaseConfig,
         counselorNoteConfig,
+        domainResultNoteConfig,
         liveSessionConfig,
         livekitConfig,
         livekitEgressConfig,
@@ -200,6 +213,17 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     ExperimentLogModule,
     LabReportsModule,
     LabOverviewModule,
+    DisorderRegistryModule,
+    ActionRuleModule,
+    AssessmentMatrixModule,
+    MhaConsentModule,
+    MhaSessionModule,
+    DomainResultModule,
+    SafetyNotificationModule,
+    MhaParentNotificationModule,
+    StudentTimelineModule,
+    EventModule,
+    AcademicContextModule,
   ],
 })
 export class AppModule {}

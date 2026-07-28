@@ -40,5 +40,6 @@ import { StaffModule } from '../staff/staff.module';
   ],
   providers: [CommunicationService, TargetedMessageService],
   controllers: [CommunicationController, TargetedMessageController],
+  exports: [CommunicationService, TargetedMessageService],
 })
 export class CommunicationModule {}

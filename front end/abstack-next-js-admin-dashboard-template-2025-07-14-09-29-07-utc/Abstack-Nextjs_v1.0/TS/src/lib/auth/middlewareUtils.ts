@@ -33,6 +33,11 @@ export const SHARED_PATH_PREFIXES = [
   '/admin/labs',
   '/admin/lab-types',
   '/admin/lab-overview',
+  '/admin/mha/disorder-registry',
+  '/admin/mha/assessment-matrix',
+  '/admin/students',
+  '/admin/events',
+  '/counselor/mha-sessions',
 ]
 
 export function getRoleFromPath(pathname: string): Role | null {

@@ -10,4 +10,5 @@ export enum RoleEnum {
   'security_officer' = 9,
   'librarian' = 10,
   'accountant' = 11,
+  'school_psychologist' = 12,
 }

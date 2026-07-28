@@ -11,6 +11,7 @@ import {
 } from './counselor-case.service';
 import {
   CounselorCaseEntity,
+  CounselorCasePriority,
   CounselorCaseStatus,
   CounselorCaseTriggerType,
 } from './entities/counselor-case.entity';
@@ -34,6 +35,7 @@ describe('CounselorCaseEntity — structural non-clinical schema guarantee', () 
         'triggerType',
         'triggerSummary',
         'status',
+        'priority',
         'createdAt',
         'closedAt',
         'closedByStaffId',
@@ -269,6 +271,54 @@ describe('CounselorCaseService', () => {
       await expect(service.closeCase('missing', 'staff-1')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('upsertSafetyFlagCase — MHA-133 AC #4/AI-prompt test (c)', () => {
+    it('sets priority: urgent on a newly-created case, while status stays open', async () => {
+      caseRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.upsertSafetyFlagCase('student-1', 'Safety flag raised in MHA session SC-1');
+
+      expect(caseRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CounselorCaseStatus.OPEN,
+          priority: CounselorCasePriority.URGENT,
+        }),
+      );
+      expect(result.status).toBe(CounselorCaseStatus.OPEN);
+      expect(result.priority).toBe(CounselorCasePriority.URGENT);
+    });
+
+    it('sets priority: urgent on an existing open case being updated, without touching status', async () => {
+      caseRepo.findOne.mockResolvedValue({
+        id: 'case-1',
+        studentId: 'student-1',
+        triggerType: CounselorCaseTriggerType.MHA_SAFETY_FLAG,
+        status: CounselorCaseStatus.OPEN,
+        priority: CounselorCasePriority.ROUTINE,
+        triggerSummary: 'old summary',
+      });
+
+      await service.upsertSafetyFlagCase('student-1', 'Safety flag raised in MHA session SC-2');
+
+      expect(caseRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: CounselorCaseStatus.OPEN, priority: CounselorCasePriority.URGENT }),
+      );
+    });
+
+    it('is distinct from a routine case: createCaseIfNeeded (the detection path) never sets priority, relying on the ROUTINE column default', async () => {
+      observationRepo.find.mockResolvedValue([
+        { studentId: 'student-3', createdAt: new Date() },
+        { studentId: 'student-3', createdAt: new Date() },
+        { studentId: 'student-3', createdAt: new Date() },
+      ]);
+
+      await service.detectAndCreateCases();
+
+      const savedCase = caseRepo.save.mock.calls[0][0];
+      expect(savedCase.priority).toBeUndefined();
+      expect(savedCase).not.toHaveProperty('priority', CounselorCasePriority.URGENT);
     });
   });
 });

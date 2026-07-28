@@ -22,7 +22,7 @@ export default function StudentsPage() {
   const totalPages = data ? Math.ceil(data.total / LIMIT) : 1
 
   return (
-    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD, ROLES.TEACHER]}>
+    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD, ROLES.TEACHER, ROLES.COUNSELOR, ROLES.SCHOOL_PSYCHOLOGIST]}>
       <div className="container-fluid">
         {/* Page header */}
         <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">

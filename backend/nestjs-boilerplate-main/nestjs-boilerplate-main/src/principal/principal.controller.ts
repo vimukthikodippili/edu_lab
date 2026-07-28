@@ -6,6 +6,7 @@ import { RoleEnum } from '../roles/roles.enum';
 import { RolesGuard } from '../roles/roles.guard';
 import { PrincipalService, ApprovalQueueItem } from './principal.service';
 import { PrincipalKpiResponse } from './dto/principal-kpi.response';
+import { WellbeingConcernDto } from './dto/wellbeing-concern.dto';
 
 @ApiTags('Principal')
 @ApiBearerAuth()
@@ -26,5 +27,14 @@ export class PrincipalController {
   @ApiOperation({ summary: 'Unified pending approval queue (fee waivers + leave + expenses)' })
   getApprovalQueue(): Promise<ApprovalQueueItem[]> {
     return this.principalService.getApprovalQueue();
+  }
+
+  // FR-MHA-34/AC #94 — narrower than the KPI endpoint above: Principal and Counselor only,
+  // deliberately excluding admin, per the AC's literal role list.
+  @Get('wellbeing-concerns')
+  @Roles(RoleEnum.principal, RoleEnum.counselor)
+  @ApiOperation({ summary: 'De-identified drill-down for the Student Wellbeing KPI — name, grade, highest level only' })
+  getWellbeingConcerns(): Promise<WellbeingConcernDto[]> {
+    return this.principalService.getWellbeingConcerns();
   }
 }

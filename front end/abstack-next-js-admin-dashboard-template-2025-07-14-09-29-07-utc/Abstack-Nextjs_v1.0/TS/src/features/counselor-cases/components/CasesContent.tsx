@@ -1,13 +1,20 @@
 'use client'
 import { useState } from 'react'
-import { ClipboardList, HeartHandshake, MessageCircleWarning, CheckCircle2 } from 'lucide-react'
+import { ClipboardList, HeartHandshake, MessageCircleWarning, ShieldAlert, CheckCircle2 } from 'lucide-react'
 import { useCounselorCases } from '../hooks/useCounselorCases'
 import { useCloseCase } from '../hooks/useCloseCase'
 import { useStudents } from '@/features/students/hooks/useStudents'
 import { useNotificationContext } from '@/context/useNotificationContext'
-import type { CounselorCase, CounselorCaseStatus, CounselorCaseTriggerType } from '../types'
+import type { CounselorCase, CounselorCasePriority, CounselorCaseStatus, CounselorCaseTriggerType } from '../types'
 
 function TriggerBadge({ type }: { type: CounselorCaseTriggerType }) {
+  if (type === 'mha_safety_flag') {
+    return (
+      <span className="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle d-inline-flex align-items-center gap-1">
+        <ShieldAlert size={12} /> Safety Flag
+      </span>
+    )
+  }
   if (type === 'low_mood_checkins') {
     return (
       <span className="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle d-inline-flex align-items-center gap-1">
@@ -27,6 +34,15 @@ function StatusBadge({ status }: { status: CounselorCaseStatus }) {
     <span className="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">Open</span>
   ) : (
     <span className="badge bg-success-subtle text-success-emphasis border border-success-subtle">Closed</span>
+  )
+}
+
+function PriorityBadge({ priority }: { priority: CounselorCasePriority }) {
+  if (priority !== 'urgent') return null
+  return (
+    <span className="badge bg-danger text-white ms-1 d-inline-flex align-items-center gap-1">
+      <ShieldAlert size={12} /> URGENT
+    </span>
   )
 }
 
@@ -150,7 +166,10 @@ export function CasesContent() {
                         <td><TriggerBadge type={row.triggerType} /></td>
                         <td className="small text-muted">{row.triggerSummary}</td>
                         <td className="small text-nowrap">{formatDate(row.createdAt)}</td>
-                        <td><StatusBadge status={row.status} /></td>
+                        <td>
+                          <StatusBadge status={row.status} />
+                          <PriorityBadge priority={row.priority} />
+                        </td>
                         <td className="pe-4">
                           {row.status === 'open' && (
                             <button

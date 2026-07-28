@@ -93,6 +93,8 @@ export class EnrollmentsController {
     RoleEnum.principal,
     RoleEnum.teacher,
     RoleEnum.section_head,
+    RoleEnum.counselor,
+    RoleEnum.school_psychologist,
   )
   findStudentEnrollments(
     @Param('studentId', new ParseUUIDPipe({ version: '4' })) studentId: string,
