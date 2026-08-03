@@ -20,7 +20,19 @@ export type AuditAction =
   | 'create_event'
   | 'publish_event'
   | 'cancel_event'
-  | 'add_participants';
+  | 'add_participants'
+  | 'allocate_seats'
+  | 'assign_invigilator'
+  | 'visitor_sign_in'
+  | 'visitor_sign_out'
+  | 'visitor_blocked'
+  | 'visitor_block'
+  | 'ptm_book'
+  | 'ptm_cancel'
+  | 'feedback_review'
+  | 'feedback_respond'
+  | 'create_consent'
+  | 'remind_consent';
 export type AuditTargetType =
   | 'fee_waiver'
   | 'leave'
@@ -32,7 +44,12 @@ export type AuditTargetType =
   | 'mha_session'
   | 'domain_result'
   | 'session_action'
-  | 'event';
+  | 'event'
+  | 'exam'
+  | 'visitor'
+  | 'ptm_booking'
+  | 'parent_feedback'
+  | 'consent_form';
 
 @Entity({ name: 'audit_log' })
 export class AuditLogEntity extends EntityRelationalHelper {

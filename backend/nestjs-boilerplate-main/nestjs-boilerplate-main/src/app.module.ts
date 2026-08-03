@@ -81,6 +81,11 @@ import { MhaParentNotificationModule } from './mha-parent-notification/mha-paren
 import { AcademicContextModule } from './academic-context/academic-context.module';
 import { StudentTimelineModule } from './student-timeline/student-timeline.module';
 import { EventModule } from './events/event.module';
+import { ExamHallsModule } from './exam-halls/exam-halls.module';
+import { VisitorsModule } from './visitors/visitors.module';
+import { PtmModule } from './ptm/ptm.module';
+import { ParentFeedbackModule } from './parent-feedback/parent-feedback.module';
+import { ConsentFormsModule } from './consent-forms/consent-forms.module';
 import teacherPerformanceConfig from './teacher-performance/config/teacher-performance.config';
 import wellbeingCaseConfig from './counselor/config/wellbeing-case.config';
 import counselorNoteConfig from './counselor/config/counselor-note.config';
@@ -223,6 +228,11 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     MhaParentNotificationModule,
     StudentTimelineModule,
     EventModule,
+    ExamHallsModule,
+    VisitorsModule,
+    PtmModule,
+    ParentFeedbackModule,
+    ConsentFormsModule,
     AcademicContextModule,
   ],
 })

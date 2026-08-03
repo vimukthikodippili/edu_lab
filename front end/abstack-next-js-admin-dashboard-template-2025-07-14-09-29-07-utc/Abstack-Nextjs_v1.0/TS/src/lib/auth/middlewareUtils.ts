@@ -37,6 +37,7 @@ export const SHARED_PATH_PREFIXES = [
   '/admin/mha/assessment-matrix',
   '/admin/students',
   '/admin/events',
+  '/admin/exam-halls',
   '/counselor/mha-sessions',
 ]
 

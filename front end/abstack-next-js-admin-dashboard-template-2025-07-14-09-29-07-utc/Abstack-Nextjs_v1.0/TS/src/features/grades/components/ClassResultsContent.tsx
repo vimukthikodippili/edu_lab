@@ -31,7 +31,7 @@ function PercentageCell({ row }: { row: ClassRankRow }) {
 export function ClassResultsContent() {
   const { user } = useAuthStore()
   const { showNotification } = useNotificationContext()
-  const canPublish = user?.role === ROLES.SYSTEM_ADMIN || user?.role === ROLES.PRINCIPAL
+  const canPublish = user?.role === ROLES.PRINCIPAL || user?.role === ROLES.SECTION_HEAD
 
   const [selectedTermId, setSelectedTermId] = useState<number | null>(null)
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<number | null>(null)

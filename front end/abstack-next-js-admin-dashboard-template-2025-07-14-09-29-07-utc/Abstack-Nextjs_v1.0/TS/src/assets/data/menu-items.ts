@@ -43,6 +43,8 @@ import {
   Brain,
   ClipboardPlus,
   Table2,
+  MessageSquareWarning,
+  FileSignature,
 } from 'lucide-react'
 
 export const MENU_ITEMS: MenuItemType[] = [
@@ -55,6 +57,23 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: Trophy,
     url: '/sports/public-board',
     allowedRoles: Object.values(ROLES),
+  },
+  {
+    key: 'visitors-pre-register',
+    label: 'Pre-Register Visitor',
+    icon: UserPlus,
+    url: '/visitors/pre-register',
+    allowedRoles: [
+      ROLES.SYSTEM_ADMIN,
+      ROLES.PRINCIPAL,
+      ROLES.SECTION_HEAD,
+      ROLES.TEACHER,
+      ROLES.COUNSELOR,
+      ROLES.SECURITY_OFFICER,
+      ROLES.LIBRARIAN,
+      ROLES.ACCOUNTANT,
+      ROLES.SCHOOL_PSYCHOLOGIST,
+    ],
   },
 
   // ─── System Admin ─────────────────────────────────────────────────────────
@@ -266,6 +285,41 @@ export const MENU_ITEMS: MenuItemType[] = [
         parentKey: 'admin-grades',
         allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
       },
+      {
+        key: 'admin-exam-halls',
+        label: 'Exam Halls',
+        url: '/admin/exam-halls',
+        parentKey: 'admin-grades',
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
+      {
+        key: 'admin-exam-day-dashboard',
+        label: 'Exam Day Dashboard',
+        url: '/admin/exam-halls/day-dashboard',
+        parentKey: 'admin-grades',
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
+      {
+        key: 'admin-ptm-events',
+        label: 'Parent-Teacher Meetings',
+        url: '/admin/ptm-events',
+        parentKey: 'admin-grades',
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
+      {
+        key: 'admin-feedback',
+        label: 'Parent Feedback',
+        url: '/admin/feedback',
+        parentKey: 'admin-grades',
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
+      {
+        key: 'admin-consent-forms',
+        label: 'Digital Consent Forms',
+        url: '/admin/consent-forms',
+        parentKey: 'admin-grades',
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
     ],
   },
 
@@ -459,6 +513,13 @@ export const MENU_ITEMS: MenuItemType[] = [
         parentKey: 'sh-grades',
         allowedRoles: [ROLES.SECTION_HEAD],
       },
+      {
+        key: 'sh-exam-halls',
+        label: 'Exam Halls',
+        url: '/section-head/exam-halls',
+        parentKey: 'sh-grades',
+        allowedRoles: [ROLES.SECTION_HEAD],
+      },
     ],
   },
 
@@ -510,6 +571,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'Timetable',
     icon: Calendar,
     url: '/teacher/timetable',
+    allowedRoles: [ROLES.TEACHER],
+  },
+  {
+    key: 'teacher-ptm',
+    label: 'Parent-Teacher Meetings',
+    icon: CalendarClock,
+    url: '/teacher/ptm',
     allowedRoles: [ROLES.TEACHER],
   },
   {
@@ -719,6 +787,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/student/events',
     allowedRoles: [ROLES.STUDENT],
   },
+  {
+    key: 'student-admit-cards',
+    label: 'Admit Cards',
+    icon: ClipboardCheck,
+    url: '/student/admit-cards',
+    allowedRoles: [ROLES.STUDENT],
+  },
 
   // ─── Guardian ─────────────────────────────────────────────────────────────
 
@@ -742,6 +817,27 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/guardian/children',
     allowedRoles: [ROLES.GUARDIAN],
     isDisabled: true,
+  },
+  {
+    key: 'guardian-ptm',
+    label: 'Parent-Teacher Meetings',
+    icon: CalendarClock,
+    url: '/guardian/ptm',
+    allowedRoles: [ROLES.GUARDIAN],
+  },
+  {
+    key: 'guardian-feedback',
+    label: 'Feedback & Complaints',
+    icon: MessageSquareWarning,
+    url: '/guardian/feedback',
+    allowedRoles: [ROLES.GUARDIAN],
+  },
+  {
+    key: 'guardian-consent-forms',
+    label: 'Consent Forms',
+    icon: FileSignature,
+    url: '/guardian/consent-forms',
+    allowedRoles: [ROLES.GUARDIAN],
   },
   {
     key: 'guardian-assignments',
@@ -783,6 +879,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'School Events',
     icon: CalendarDays,
     url: '/guardian/events',
+    allowedRoles: [ROLES.GUARDIAN],
+  },
+  {
+    key: 'guardian-admit-cards',
+    label: 'Admit Cards',
+    icon: ClipboardCheck,
+    url: '/guardian/admit-cards',
     allowedRoles: [ROLES.GUARDIAN],
   },
 
@@ -878,6 +981,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'Security Incidents',
     icon: AlertTriangle,
     url: '/security/incidents',
+    allowedRoles: [ROLES.SECURITY_OFFICER, ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+  },
+  {
+    key: 'security-visitors',
+    label: 'Visitor Management',
+    icon: UserCheck,
+    url: '/security/visitors',
     allowedRoles: [ROLES.SECURITY_OFFICER, ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
   },
   {

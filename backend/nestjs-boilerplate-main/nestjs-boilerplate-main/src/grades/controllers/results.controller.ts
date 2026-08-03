@@ -250,11 +250,11 @@ export class ResultsController {
   }
 
   @Post('publish')
-  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @Roles(RoleEnum.principal, RoleEnum.section_head)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Publish all complete term results for a class section and term (Principal/Exam Admin only)',
+      'Publish all complete term results for a class section and term (Principal/Section Head only)',
   })
   async publishResults(@Body() dto: PublishResultsDto) {
     return this.resultPublishingService.publishClassResults(
