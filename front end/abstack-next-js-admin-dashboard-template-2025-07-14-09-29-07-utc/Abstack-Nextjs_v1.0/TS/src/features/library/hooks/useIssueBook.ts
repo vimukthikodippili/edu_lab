@@ -5,7 +5,8 @@ import type { BookIssuance } from '@/types/sims/library'
 
 interface IssueBookPayload {
   bookId: string
-  studentId: string
+  studentId?: string
+  staffId?: string
 }
 
 export function useIssueBook() {

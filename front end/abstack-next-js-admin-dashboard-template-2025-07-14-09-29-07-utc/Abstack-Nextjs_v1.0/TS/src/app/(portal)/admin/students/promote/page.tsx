@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { GraduationCap, ArrowRight } from 'lucide-react'
+import { GraduationCap, ArrowRight, AlertTriangle } from 'lucide-react'
 import RoleGuard from '@/components/wrappers/RoleGuard'
 import { ROLES } from '@/lib/auth/roles'
 import { useNotificationContext } from '@/context/useNotificationContext'
@@ -21,36 +21,45 @@ interface EditableRow extends PromotionPreviewRow {
   commitOutcome: CommitOutcome
   selectedGradeId: number | null
   selectedClassSectionId: number | null
+  // True when the backend's preview couldn't auto-pick a target section (e.g. the target
+  // grade has more than one section) — kept even after the row is otherwise mapped to a real
+  // commit outcome, so the UI can flag "this one needs your input" instead of silently sitting
+  // in the commit-blocked state with no explanation.
+  neededManualSection: boolean
 }
 
 function toEditableRow(row: PromotionPreviewRow): EditableRow {
   if (row.outcome === 'graduated') {
-    return { ...row, commitOutcome: 'graduated', selectedGradeId: null, selectedClassSectionId: null }
+    return { ...row, commitOutcome: 'graduated', selectedGradeId: null, selectedClassSectionId: null, neededManualSection: false }
   }
   return {
     ...row,
     commitOutcome: 'promoted',
     selectedGradeId: row.targetGradeId,
     selectedClassSectionId: row.targetClassSectionId,
+    neededManualSection: row.outcome === 'needs_manual_section',
   }
 }
 
 function RowSectionPicker({
   row,
   targetYear,
+  needsAttention,
   onChange,
 }: {
   row: EditableRow
   targetYear: string
+  needsAttention?: boolean
   onChange: (gradeId: number | null, classSectionId: number | null) => void
 }) {
   const { data: grades = [] } = useGrades()
   const { data: sections = [] } = useClassSections(row.selectedGradeId, targetYear)
+  const fieldClass = `form-select form-select-sm${needsAttention ? ' border-warning' : ''}`
 
   return (
     <div className="d-flex gap-1">
       <select
-        className="form-select form-select-sm"
+        className={fieldClass}
         style={{ width: 110 }}
         value={row.selectedGradeId ?? ''}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null, null)}
@@ -61,7 +70,7 @@ function RowSectionPicker({
         ))}
       </select>
       <select
-        className="form-select form-select-sm"
+        className={fieldClass}
         style={{ width: 90 }}
         value={row.selectedClassSectionId ?? ''}
         onChange={(e) => onChange(row.selectedGradeId, e.target.value ? Number(e.target.value) : null)}
@@ -100,9 +109,10 @@ function PromotionContent() {
     setRows((prev) => prev?.map((r) => (r.studentId === studentId ? { ...r, ...patch } : r)) ?? null)
   }
 
-  const readyToCommit = rows?.every(
-    (r) => (r.commitOutcome !== 'promoted' && r.commitOutcome !== 'repeated') || r.selectedClassSectionId,
-  )
+  const pendingSectionRows = rows?.filter(
+    (r) => (r.commitOutcome === 'promoted' || r.commitOutcome === 'repeated') && !r.selectedClassSectionId,
+  ) ?? []
+  const readyToCommit = rows !== null && pendingSectionRows.length === 0
 
   const handleCommit = () => {
     if (!rows) return
@@ -160,7 +170,7 @@ function PromotionContent() {
 
       {rows && (
         <div className="card border-0 shadow-sm">
-          <div className="card-header bg-transparent d-flex align-items-center justify-content-between">
+          <div className="card-header bg-transparent d-flex align-items-center justify-content-between flex-wrap gap-2">
             <span className="fw-semibold">{rows.length} student(s)</span>
             <button
               type="button"
@@ -171,6 +181,15 @@ function PromotionContent() {
               Commit Promotion
             </button>
           </div>
+          {pendingSectionRows.length > 0 && (
+            <div className="alert alert-warning d-flex align-items-center gap-2 mb-0 rounded-0 border-0 border-top py-2 px-3 small">
+              <AlertTriangle size={14} className="flex-shrink-0" />
+              <span>
+                <strong>{pendingSectionRows.length} student{pendingSectionRows.length !== 1 ? 's' : ''}</strong> still need a target class section picked
+                (highlighted below) before you can commit — their target grade has more than one section, so it can&apos;t be chosen automatically.
+              </span>
+            </div>
+          )}
           <div className="table-responsive">
             <table className="table table-sm align-middle mb-0">
               <thead>
@@ -182,39 +201,49 @@ function PromotionContent() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.studentId}>
-                    <td>
-                      <div className="fw-semibold small">{row.firstName} {row.lastName}</div>
-                      <div className="text-muted" style={{ fontSize: 11 }}>{row.admissionNumber}</div>
-                    </td>
-                    <td className="small">{row.currentGradeName} · {row.currentClassSectionName}</td>
-                    <td>
-                      <select
-                        className="form-select form-select-sm"
-                        style={{ width: 130 }}
-                        value={row.commitOutcome}
-                        onChange={(e) => updateRow(row.studentId, { commitOutcome: e.target.value as CommitOutcome })}
-                      >
-                        <option value="promoted">Promoted</option>
-                        <option value="repeated">Repeated (same grade)</option>
-                        <option value="transferred">Transferred out</option>
-                        <option value="graduated">Graduated</option>
-                      </select>
-                    </td>
-                    <td>
-                      {(row.commitOutcome === 'promoted' || row.commitOutcome === 'repeated') ? (
-                        <RowSectionPicker
-                          row={row}
-                          targetYear={targetYear}
-                          onChange={(gradeId, classSectionId) => updateRow(row.studentId, { selectedGradeId: gradeId, selectedClassSectionId: classSectionId })}
-                        />
-                      ) : (
-                        <span className="text-muted small">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((row) => {
+                  const needsSection =
+                    (row.commitOutcome === 'promoted' || row.commitOutcome === 'repeated') && !row.selectedClassSectionId
+                  return (
+                    <tr key={row.studentId} style={needsSection ? { background: '#fff7ed' } : undefined}>
+                      <td>
+                        <div className="fw-semibold small">{row.firstName} {row.lastName}</div>
+                        <div className="text-muted" style={{ fontSize: 11 }}>{row.admissionNumber}</div>
+                      </td>
+                      <td className="small">{row.currentGradeName} · {row.currentClassSectionName}</td>
+                      <td>
+                        <select
+                          className="form-select form-select-sm"
+                          style={{ width: 130 }}
+                          value={row.commitOutcome}
+                          onChange={(e) => updateRow(row.studentId, { commitOutcome: e.target.value as CommitOutcome })}
+                        >
+                          <option value="promoted">Promoted</option>
+                          <option value="repeated">Repeated (same grade)</option>
+                          <option value="transferred">Transferred out</option>
+                          <option value="graduated">Graduated</option>
+                        </select>
+                        {row.neededManualSection && needsSection && (
+                          <div className="text-warning d-flex align-items-center gap-1 mt-1" style={{ fontSize: 10.5 }}>
+                            <AlertTriangle size={10} /> Multiple sections in target grade
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {(row.commitOutcome === 'promoted' || row.commitOutcome === 'repeated') ? (
+                          <RowSectionPicker
+                            row={row}
+                            targetYear={targetYear}
+                            needsAttention={needsSection}
+                            onChange={(gradeId, classSectionId) => updateRow(row.studentId, { selectedGradeId: gradeId, selectedClassSectionId: classSectionId })}
+                          />
+                        ) : (
+                          <span className="text-muted small">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -252,7 +281,7 @@ function PromotionContent() {
 
 export default function PromoteStudentsPage() {
   return (
-    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN]}>
+    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>
       <PromotionContent />
     </RoleGuard>
   )

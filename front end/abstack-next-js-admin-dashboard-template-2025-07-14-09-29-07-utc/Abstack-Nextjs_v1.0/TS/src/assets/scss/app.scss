@@ -96,6 +96,9 @@ File: App Css File
 @import "sims/sims-variables";
 @import "sims/sims-timetable";
 @import "sims/sims-biometric";
+@import "sims/sims-auth";
+@import "sims/sims-nav";
+@import "sims/sims-principal-pages";
 
 // WCAG 2.1 AA: override text-muted contrast ratio from ~3.2:1 to ~4.5:1
 .text-muted {

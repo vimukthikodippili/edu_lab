@@ -6,7 +6,7 @@ export const currentYear = new Date().getFullYear()
 
 export const developedByLink = ''
 
-export const developedBy = 'SIMS'
+export const developedBy = 'EduLab'
 
 export const contactUs = 'admin@sims.edu.lk'
 
@@ -14,7 +14,7 @@ export const buyLink = ''
 
 export const basePath = ''
 
-export const DEFAULT_PAGE_TITLE = 'SIMS – School Information Management System'
+export const DEFAULT_PAGE_TITLE = 'EduLab – School Information Management System'
 
 // NestJS backend URL — set in .env.local
 export const API_BASE_PATH = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'

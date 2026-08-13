@@ -12,6 +12,19 @@ import type { GradeTrendStudentRow } from '@/types/sims/grades'
 // ApexCharts touches `window` — must never render during SSR.
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
 
+// Picks the term whose date range covers today, falling back to the most recently-started term.
+// Not just "sort by academicYear and take the first" — stray/QA terms with an out-of-range
+// academicYear (e.g. a fat-fingered "2092") would otherwise silently win that sort and default
+// the whole page onto a term with no real data.
+function resolveCurrentTermId(terms: { id: number; startDate: string; endDate: string }[]): number | null {
+  if (terms.length === 0) return null
+  const todayISO = new Date().toISOString().slice(0, 10)
+  const current = terms.find((t) => t.startDate <= todayISO && t.endDate >= todayISO)
+  if (current) return current.id
+  const mostRecent = [...terms].sort((a, b) => (a.startDate < b.startDate ? 1 : -1))[0]
+  return mostRecent?.id ?? null
+}
+
 interface SubjectClassOption {
   subjectId: string
   classSectionId: number
@@ -60,7 +73,7 @@ function GradeTrendsPage() {
 
   useEffect(() => {
     if (terms.length > 0 && selectedTermId === null) {
-      setSelectedTermId(terms[0].id)
+      setSelectedTermId(resolveCurrentTermId(terms))
     }
   }, [terms, selectedTermId])
 

@@ -44,7 +44,7 @@ const LayoutProvider = ({ children }: ChildrenType) => {
     layoutOrientation: queryParams['layout_type'] ? (queryParams['layout_type'] as LayoutOrientationType) : 'vertical',
     topbarTheme: queryParams['topbar_theme'] ? (queryParams['topbar_theme'] as TopBarThemeType) : 'brand',
     menu: {
-      theme: queryParams['menu_theme'] ? (queryParams['menu_theme'] as MenuType['theme']) : 'light',
+      theme: queryParams['menu_theme'] ? (queryParams['menu_theme'] as MenuType['theme']) : 'brand',
       size: queryParams['menu_size'] ? (queryParams['menu_size'] as MenuType['size']) : 'default',
     },
     layoutMode: queryParams['layout_mode'] ? (queryParams['layout_mode'] as LayoutModeType) : 'fluid',

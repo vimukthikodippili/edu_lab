@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { BookOpen, Layers, Pencil, Plus, Power, Search, Trash2, X } from 'lucide-react'
+import RoleGuard from '@/components/wrappers/RoleGuard'
+import { ROLES } from '@/lib/auth/roles'
 import { useStreams } from '@/features/enrollments/hooks/useStreams'
 import { useStreamSubjects } from '@/features/enrollments/hooks/useStreamSubjects'
 import { useCreateStream } from '@/features/enrollments/hooks/useCreateStream'
@@ -108,7 +110,10 @@ function AddSubjectToStreamModal({
   const [categoryFilter, setCategoryFilter] = useState<number | ''>('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState('')
-  const { data: subjectsPage } = useSubjects({ limit: 200 })
+  // Backend caps `limit` at 100 (class-validator @Max(100) on QuerySubjectDto) — requesting 200
+  // fails validation with a 422 the caller never surfaced, so this modal silently showed "No
+  // available subjects" no matter how many actually existed.
+  const { data: subjectsPage } = useSubjects({ limit: 100 })
   const { data: categories = [] } = useSubjectCategories()
   const addSubject = useAddStreamSubject(streamId)
 
@@ -193,7 +198,7 @@ function AddSubjectToStreamModal({
   )
 }
 
-export default function ALStreamsPage() {
+function ALStreamsContent() {
   const [selectedStreamId, setSelectedStreamId] = useState<number | null>(null)
   const [showStreamForm, setShowStreamForm] = useState(false)
   const [editStream, setEditStream] = useState<ALStream | null>(null)
@@ -414,5 +419,13 @@ export default function ALStreamsPage() {
         />
       )}
     </>
+  )
+}
+
+export default function ALStreamsPage() {
+  return (
+    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>
+      <ALStreamsContent />
+    </RoleGuard>
   )
 }

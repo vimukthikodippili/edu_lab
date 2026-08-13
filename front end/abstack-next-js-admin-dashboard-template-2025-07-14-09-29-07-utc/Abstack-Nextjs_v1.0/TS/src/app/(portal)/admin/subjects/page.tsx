@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { Pencil, Plus, Power, BookOpen, AlertCircle } from 'lucide-react'
+import RoleGuard from '@/components/wrappers/RoleGuard'
+import { ROLES } from '@/lib/auth/roles'
 import { useSubjectCategories } from '@/features/subjects/hooks/useSubjectCategories'
 import { useSubjects } from '@/features/subjects/hooks/useSubjects'
 import { useToggleCategoryStatus } from '@/features/subjects/hooks/useToggleCategoryStatus'
@@ -17,7 +19,7 @@ type ModalState =
   | 'addSubject'
   | 'editSubject'
 
-export default function SubjectsPage() {
+function SubjectsContent() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
   const [search, setSearch] = useState('')
   const [includeInactive, setIncludeInactive] = useState(false)
@@ -418,5 +420,13 @@ export default function SubjectsPage() {
         />
       )}
     </div>
+  )
+}
+
+export default function SubjectsPage() {
+  return (
+    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>
+      <SubjectsContent />
+    </RoleGuard>
   )
 }

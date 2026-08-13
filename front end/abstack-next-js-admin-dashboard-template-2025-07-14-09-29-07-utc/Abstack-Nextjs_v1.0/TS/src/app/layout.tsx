@@ -31,10 +31,11 @@ const notoTamil = Noto_Sans_Tamil({
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | SIMS – School Information Management',
+    template: '%s | EduLab – School Information Management',
     default: DEFAULT_PAGE_TITLE,
   },
   description: 'Sri Lankan School Information Management System – manage students, staff, attendance, grades, fees, library, timetable and more.',
+  icons: { icon: '/favicon.svg' },
 }
 
 export default async function RootLayout({

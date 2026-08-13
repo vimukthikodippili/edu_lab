@@ -1,0 +1,66 @@
+//
+// _sims-principal-pages.scss — EduLab Principal pages redesign (2026)
+//
+// Scoped entirely to .edulab-page, mirroring how _sims-auth.scss scopes to .edulab-auth —
+// only the 6 Principal-facing pages that opt into this wrapper get the EduLab card chrome
+// and --edulab-accent button retint; every other page in the app keeps the stock template
+// $primary blue, unaffected.
+//
+
+.edulab-page {
+  .edulab-page-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+
+    &__icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, var(--edulab-nav-bg) 0%, var(--edulab-nav-bg-2) 100%);
+    }
+
+    &--critical &__icon {
+      // Emergency Alert / Safety Alerts keep their semantic red — genuine urgency,
+      // not brand color — rather than being forced into the navy/blue identity.
+      background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+    }
+
+    &__title {
+      margin: 0;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--edulab-ink);
+    }
+
+    &__subtitle {
+      margin: 0.15rem 0 0;
+      font-size: 0.875rem;
+      color: var(--edulab-muted);
+    }
+  }
+
+  .card {
+    border: 1px solid var(--edulab-border);
+    border-radius: 16px;
+    box-shadow: 0 20px 45px -30px rgba(15, 27, 48, 0.35);
+  }
+
+  .btn-primary {
+    background: var(--edulab-accent);
+    border-color: var(--edulab-accent);
+  }
+
+  .btn-primary:hover,
+  .btn-primary:focus,
+  .btn-primary:active {
+    background: var(--edulab-accent-hover) !important;
+    border-color: var(--edulab-accent-hover) !important;
+  }
+}

@@ -87,7 +87,7 @@ function NotificationsPanel({ staffId }: { staffId: string }) {
       {open && (
         <div
           className="position-absolute end-0 mt-1 card shadow-lg border-0 rounded-3"
-          style={{ width: 380, zIndex: 1050, maxHeight: 400, overflowY: 'auto' }}
+          style={{ width: 380, maxWidth: 'calc(100vw - 2rem)', zIndex: 1050, maxHeight: 400, overflowY: 'auto' }}
         >
           <div className="card-header py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
             <span className="fw-semibold small">Notifications</span>

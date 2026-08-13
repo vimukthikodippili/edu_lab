@@ -37,6 +37,8 @@ export interface StaffMember {
   status: StaffStatus
   roleAssignments: StaffRoleAssignment[]
   photo?: { id: string; path: string } | null
+  sectionHeadGradeFrom: number | null
+  sectionHeadGradeTo: number | null
   createdAt: string
   updatedAt: string
 }

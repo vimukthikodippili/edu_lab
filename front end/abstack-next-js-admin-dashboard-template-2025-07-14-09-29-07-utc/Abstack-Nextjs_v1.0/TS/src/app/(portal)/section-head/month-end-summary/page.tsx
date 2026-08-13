@@ -4,6 +4,7 @@ import { CalendarCheck, AlertTriangle, CheckCircle2, Users, BookOpen, ChevronDow
 import RoleGuard from '@/components/wrappers/RoleGuard'
 import { ROLES } from '@/lib/auth/roles'
 import { useMonthEndSummary } from '@/features/lesson-plan/hooks/useMonthEndSummary'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
 const LAST_MONTH = (() => {
@@ -74,21 +75,13 @@ function MonthEndSummaryPage() {
   ) ?? 0
 
   return (
-    <div className="container-fluid py-4">
+    <div className="container-fluid py-4 edulab-page">
 
-      {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4">
-        <div
-          className="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
-          style={{ width: 48, height: 48, background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}
-        >
-          <CalendarCheck size={22} className="text-white" />
-        </div>
-        <div>
-          <h4 className="mb-0 fw-bold">Month-End Summary</h4>
-          <p className="text-muted small mb-0">Lesson coverage snapshot per teacher, generated automatically at month end</p>
-        </div>
-      </div>
+      <PrincipalPageHeader
+        icon={CalendarCheck}
+        title="Month-End Summary"
+        subtitle="Lesson coverage snapshot per teacher, generated automatically at month end"
+      />
 
       {/* Filter card */}
       <div className="card border-0 shadow-sm mb-4">

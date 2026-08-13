@@ -1,4 +1,4 @@
-export type ApprovalItemType = 'fee_waiver' | 'leave' | 'expense'
+export type ApprovalItemType = 'fee_waiver' | 'leave' | 'expense' | 'mark_correction'
 
 export interface ApprovalQueueItem {
   id: string
@@ -9,4 +9,10 @@ export interface ApprovalQueueItem {
   reason: string
   submittedAt: string
   status: string
+}
+
+export interface ApprovalHistoryItem extends ApprovalQueueItem {
+  decidedByName: string
+  decidedAt: string
+  decisionNote: string | null
 }

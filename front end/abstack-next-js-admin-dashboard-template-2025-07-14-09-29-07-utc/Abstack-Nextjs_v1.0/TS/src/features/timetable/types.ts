@@ -43,12 +43,20 @@ export interface ConflictRecord {
   unassigned: number
 }
 
+export interface SkippedSectionRecord {
+  classSectionId: number
+  gradeName: string
+  name: string
+  reason: string
+}
+
 export interface GenerationResult {
   academicYear: string
   entriesCreated: number
   conflictsCount: number
   durationMs: number
   conflicts: ConflictRecord[]
+  skippedSections: SkippedSectionRecord[]
 }
 
 export const DAY_LABELS: Record<number, string> = {

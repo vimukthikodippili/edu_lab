@@ -1,33 +1,10 @@
 import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
-import { ROLES, type Role } from '@/lib/auth/roles'
+import type { Role } from '@/lib/auth/roles'
+import { normalizeRole } from '@/lib/auth/normalizeRole'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
-
-// Backend returns role as { id: number, name: string }; map to SIMS Role string
-function normalizeRole(backendRole: unknown): Role {
-  if (typeof backendRole === 'string' && backendRole !== '[object Object]') {
-    return backendRole as Role
-  }
-  if (typeof backendRole === 'object' && backendRole !== null) {
-    const r = backendRole as { id?: number }
-    const idMap: Record<number, Role> = {
-      1: ROLES.SYSTEM_ADMIN,
-      3: ROLES.PRINCIPAL,
-      4: ROLES.SECTION_HEAD,
-      5: ROLES.TEACHER,
-      6: ROLES.STUDENT,
-      7: ROLES.GUARDIAN,
-      8: ROLES.COUNSELOR,
-      9: ROLES.SECURITY_OFFICER,
-      10: ROLES.LIBRARIAN,
-      11: ROLES.ACCOUNTANT,
-    }
-    if (r.id !== undefined && idMap[r.id]) return idMap[r.id]
-  }
-  return ROLES.STUDENT
-}
 
 async function fetchBackend(endpoint: string, body: Record<string, string>) {
   const res = await fetch(`${API_BASE_URL}/api/v1${endpoint}`, {

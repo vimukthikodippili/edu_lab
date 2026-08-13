@@ -1,0 +1,179 @@
+//
+// _sims-auth.scss — EduLab login/logout redesign (2026)
+//
+// Scoped entirely to .edulab-auth so every other auth page (register, mfa, lock-screen,
+// confirm-mail, ...) keeps using the original .auth-bg / .auth-brand from _authentication.scss
+// untouched — this is a login/logout-only rebrand, not a global one.
+//
+
+:root {
+  --edulab-ink: #0f1b30;
+  --edulab-panel-bg: #101f3a;
+  --edulab-panel-bg-2: #17294e;
+  --edulab-accent: #3f7fe0;
+  --edulab-accent-hover: #3268bd;
+  --edulab-chip-bg: #ffffff;
+  --edulab-mark-ink: #142647;
+  --edulab-page-bg: #f3f6fb;
+  --edulab-card-bg: #ffffff;
+  --edulab-border: #e2e8f1;
+  --edulab-muted: #64748b;
+}
+
+html[data-bs-theme="dark"] {
+  --edulab-ink: #e7ecf6;
+  --edulab-panel-bg: #0a1526;
+  --edulab-panel-bg-2: #101f38;
+  --edulab-accent: #6fa3ec;
+  --edulab-accent-hover: #85b4f2;
+  --edulab-chip-bg: #ffffff;
+  --edulab-mark-ink: #142647;
+  --edulab-page-bg: #0b1220;
+  --edulab-card-bg: #131c2e;
+  --edulab-border: #253045;
+  --edulab-muted: #93a1b5;
+}
+
+.edulab-auth {
+  min-height: 100vh;
+  display: flex;
+  background: var(--edulab-page-bg);
+
+  &__panel {
+    display: none;
+    position: relative;
+    overflow: hidden;
+    width: 44%;
+    padding: 4rem 3.25rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1.5rem;
+    background: linear-gradient(160deg, var(--edulab-panel-bg) 0%, var(--edulab-panel-bg-2) 100%);
+    // Wordmark on the navy panel reads white; everywhere else EduLabLogo falls back to
+    // currentColor (e.g. __brand-mobile, which sits on the light page background and needs
+    // to stay dark/ink-colored — was previously invisible white-on-white before this fix).
+    --edulab-wordmark: #ffffff;
+
+    @media (min-width: 992px) {
+      display: flex;
+    }
+  }
+
+  &__panel-texture {
+    position: absolute;
+    inset: 0;
+    opacity: 0.5;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(circle at 30% 30%, black, transparent 70%);
+  }
+
+  &__panel-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  &__panel-title {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.6rem;
+    line-height: 1.3;
+    margin: 1.5rem 0 0.5rem;
+  }
+
+  &__panel-text {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.92rem;
+    max-width: 32ch;
+    margin: 0;
+  }
+
+  &__form-side {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1.25rem;
+  }
+
+  &__card {
+    width: 100%;
+    max-width: 410px;
+    background: var(--edulab-card-bg);
+    border: 1px solid var(--edulab-border);
+    border-radius: 20px;
+    box-shadow: 0 24px 60px -28px rgba(15, 27, 48, 0.3);
+    padding: 2.5rem 2.25rem;
+  }
+
+  &__brand-mobile {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+
+    @media (min-width: 992px) {
+      display: none;
+    }
+  }
+
+  &__title {
+    color: var(--edulab-ink);
+    font-weight: 700;
+    font-size: 1.35rem;
+    margin: 0 0 0.25rem;
+  }
+
+  &__subtitle {
+    color: var(--edulab-muted);
+    font-size: 0.88rem;
+    margin: 0 0 1.75rem;
+  }
+
+  &__footer {
+    margin-top: 1.5rem;
+    text-align: center;
+    color: var(--edulab-muted);
+    font-size: 0.78rem;
+  }
+
+  .form-label {
+    color: var(--edulab-ink);
+    font-size: 0.85rem;
+  }
+
+  .form-control {
+    border-radius: 10px;
+    border-color: var(--edulab-border);
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+  }
+
+  .form-control:focus {
+    border-color: var(--edulab-accent);
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--edulab-accent) 20%, transparent);
+  }
+
+  .input-group .btn-outline-secondary {
+    border-radius: 0 10px 10px 0;
+  }
+
+  .btn-primary {
+    background: var(--edulab-accent);
+    border-color: var(--edulab-accent);
+    border-radius: 10px;
+  }
+
+  .btn-primary:hover,
+  .btn-primary:focus,
+  .btn-primary:active {
+    background: var(--edulab-accent-hover) !important;
+    border-color: var(--edulab-accent-hover) !important;
+  }
+
+  .nav-pills .btn-primary {
+    border-radius: 8px;
+  }
+}

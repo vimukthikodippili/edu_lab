@@ -15,6 +15,7 @@ import { useDayAttendance } from '@/features/attendance/hooks/useDayAttendance'
 import { useBulkMarkAttendance } from '@/features/attendance/hooks/useBulkMarkAttendance'
 import { useNotificationContext } from '@/context/useNotificationContext'
 import type { AttendanceStatus, DayAttendanceRow, MyClassSection } from '@/features/attendance/types'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -315,34 +316,20 @@ function AttendancePage() {
   const selectedSection = sections.find((s: MyClassSection) => s.id === selectedSectionId)
 
   return (
-    <div className="container-fluid px-4 py-4">
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="d-flex align-items-start justify-content-between gap-3 mb-4 flex-wrap">
-        <div className="d-flex align-items-center gap-3">
-          <div
-            className="d-flex align-items-center justify-content-center rounded-3"
-            style={{
-              width: 48,
-              height: 48,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              flexShrink: 0,
-            }}
-          >
-            <ClipboardList size={22} className="text-white" />
-          </div>
-          <div>
-            <h4 className="mb-0 fw-bold">Daily Attendance</h4>
-            <p className="text-muted small mb-0">
-              {selectedSection
-                ? `${selectedSection.grade.name} · Section ${selectedSection.name}`
-                : 'Select a class section'}
-            </p>
-          </div>
-        </div>
+    <div className="container-fluid px-4 py-4 edulab-page">
+      <PrincipalPageHeader
+        icon={ClipboardList}
+        title="Daily Attendance"
+        subtitle={
+          selectedSection
+            ? `${selectedSection.grade.name} · Section ${selectedSection.name}`
+            : 'Select a class section'
+        }
+      />
 
-        {/* Controls */}
-        <div className="d-flex align-items-center gap-2 flex-wrap">
-          {sectionsLoading ? (
+      {/* Controls */}
+      <div className="mb-4 d-flex align-items-center gap-2 flex-wrap">
+        {sectionsLoading ? (
             <span className="placeholder col-4 rounded" style={{ height: 32, width: 160 }} />
           ) : (
             <select
@@ -372,14 +359,13 @@ function AttendancePage() {
             onChange={(e) => setDate(e.target.value)}
           />
 
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => setDate(TODAY)}
-          >
-            Today
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-outline-secondary btn-sm"
+          onClick={() => setDate(TODAY)}
+        >
+          Today
+        </button>
       </div>
 
       {/* ── Day banner ─────────────────────────────────────────────── */}
@@ -394,7 +380,7 @@ function AttendancePage() {
       <div className="card border-0 shadow-sm">
         <div
           className="card-header border-0 py-3 px-4 rounded-top-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
-          style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+          style={{ background: 'linear-gradient(135deg, var(--edulab-nav-bg) 0%, var(--edulab-nav-bg-2) 100%)' }}
         >
           <span className="fw-bold text-white d-flex align-items-center gap-2">
             <UserCheck size={16} />
@@ -408,7 +394,7 @@ function AttendancePage() {
         <div className="card-body p-0">
           {/* Bulk actions */}
           <div
-            className="d-flex align-items-center gap-2 px-3 py-2 border-bottom"
+            className="d-flex align-items-center gap-2 px-3 py-2 border-bottom flex-wrap"
             style={{ background: '#f8fafc' }}
           >
             <button
@@ -430,7 +416,7 @@ function AttendancePage() {
               Clear All
             </button>
 
-            <div className="ms-auto d-flex gap-1 align-items-center small text-muted">
+            <div className="ms-auto d-flex gap-1 align-items-center flex-wrap small text-muted">
               <span
                 className="badge rounded-pill"
                 style={{ background: '#dcfce7', color: '#15803d' }}
@@ -530,7 +516,7 @@ function AttendancePage() {
                 style={{
                   background: saveBlocked
                     ? '#94a3b8'
-                    : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    : 'linear-gradient(135deg, var(--edulab-accent) 0%, var(--edulab-accent-hover) 100%)',
                   border: 'none',
                   cursor: saveBlocked ? 'not-allowed' : 'pointer',
                 }}

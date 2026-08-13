@@ -1,18 +1,19 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import {
   LayoutDashboard,
   UserCheck,
   DollarSign,
   ClipboardList,
   AlertTriangle,
-  RefreshCw,
   HeartPulse,
   ShieldAlert,
 } from 'lucide-react'
 import { usePrincipalKpi } from '@/features/principal/hooks/usePrincipalKpi'
 import type { PrincipalKpi } from '@/types/sims/principal'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 
 interface StatCard {
   label: string
@@ -23,6 +24,21 @@ interface StatCard {
   href: string
 }
 
+// Green/amber/red bands for a percentage KPI — grade-appropriate thresholds shared by
+// Attendance and Fee Collection so both track the same "healthy / watch / low" language.
+function rateColor(rate: number): string {
+  if (rate >= 90) return '#10b981'
+  if (rate >= 75) return '#f59e0b'
+  return '#ef4444'
+}
+
+function greeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
 function buildStats(kpi: PrincipalKpi): StatCard[] {
   return [
     {
@@ -30,23 +46,23 @@ function buildStats(kpi: PrincipalKpi): StatCard[] {
       value: kpi.attendanceHasData ? `${kpi.attendanceRate}%` : 'N/A',
       sub: kpi.attendanceHasData ? 'of students present today' : 'Not yet marked today',
       icon: UserCheck,
-      color: '#10b981',
-      href: '/admin/attendance',
+      color: kpi.attendanceHasData ? rateColor(kpi.attendanceRate) : '#94a3b8',
+      href: '/admin/attendance/reports',
     },
     {
       label: 'Fee Collection',
       value: `${kpi.feeCollectionRate}%`,
       sub: 'of all invoices paid',
       icon: DollarSign,
-      color: '#667eea',
-      href: '/accounts',
+      color: rateColor(kpi.feeCollectionRate),
+      href: '/accounts/fees',
     },
     {
       label: 'Pending Approvals',
       value: kpi.pendingApprovals,
       sub: 'fee waiver requests',
       icon: ClipboardList,
-      color: '#f59e0b',
+      color: kpi.pendingApprovals > 0 ? '#f59e0b' : '#94a3b8',
       href: '/principal/approvals',
     },
     {
@@ -83,7 +99,7 @@ function SkeletonCards() {
   return (
     <div className="row g-3 mb-4">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="col-12 col-sm-6 col-xl-3">
+        <div key={i} className="col-12 col-sm-6 col-lg-4">
           <div className="card border-0 shadow-sm rounded-4 h-100">
             <div className="card-body d-flex align-items-center gap-3 py-3 placeholder-glow">
               <div
@@ -103,6 +119,7 @@ function SkeletonCards() {
 }
 
 export default function PrincipalDashboardContent() {
+  const { data: session } = useSession()
   const { data, isLoading, isError } = usePrincipalKpi()
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
@@ -111,24 +128,21 @@ export default function PrincipalDashboardContent() {
   }, [data])
 
   const stats = data ? buildStats(data) : []
+  const firstName = session?.user?.firstName
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
 
   return (
-    <div className="container-fluid px-4 py-4">
-      {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4">
-        <div
-          className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-          style={{ width: 48, height: 48, background: 'linear-gradient(135deg,#667eea,#764ba2)' }}
-        >
-          <LayoutDashboard size={22} color="white" />
-        </div>
-        <div>
-          <h4 className="mb-0 fw-bold">Principal Dashboard</h4>
-          <p className="mb-0 text-muted small">
-            Live school-wide KPIs — click any card to drill into the underlying records
-          </p>
-        </div>
-      </div>
+    <div className="container-fluid px-4 py-4 edulab-page">
+      <PrincipalPageHeader
+        icon={LayoutDashboard}
+        title={firstName ? `${greeting()}, ${firstName}` : 'Principal Dashboard'}
+        subtitle={today}
+      />
 
       {/* Loading */}
       {isLoading && <SkeletonCards />}
@@ -148,11 +162,15 @@ export default function PrincipalDashboardContent() {
       {!isLoading && !isError && data && (
         <div className="row g-3 mb-3">
           {stats.map((s) => (
-            <div key={s.label} className="col-12 col-sm-6 col-xl-3">
+            <div key={s.label} className="col-12 col-sm-6 col-lg-4">
               <Link href={s.href} className="text-decoration-none">
                 <div
                   className="card border-0 shadow-sm rounded-4 h-100"
-                  style={{ cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
+                  style={{
+                    cursor: 'pointer',
+                    transition: 'transform 0.15s, box-shadow 0.15s',
+                    borderTop: `3px solid ${s.color}`,
+                  }}
                   onMouseEnter={(e) => {
                     ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'
                     ;(e.currentTarget as HTMLElement).style.boxShadow =
@@ -166,12 +184,12 @@ export default function PrincipalDashboardContent() {
                   <div className="card-body d-flex align-items-center gap-3 py-3">
                     <div
                       className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-                      style={{ width: 44, height: 44, background: `${s.color}20` }}
+                      style={{ width: 48, height: 48, background: `${s.color}1a` }}
                     >
-                      <s.icon size={20} color={s.color} />
+                      <s.icon size={22} color={s.color} />
                     </div>
                     <div>
-                      <div className="fw-bold fs-5" style={{ color: s.color }}>
+                      <div className="fw-bold fs-4" style={{ color: s.color, lineHeight: 1.15 }}>
                         {s.value}
                       </div>
                       <div className="fw-semibold small">{s.label}</div>
@@ -188,13 +206,30 @@ export default function PrincipalDashboardContent() {
       )}
 
       {/* Refresh indicator */}
-      <div className="d-flex align-items-center gap-1 text-muted" style={{ fontSize: '0.72rem' }}>
-        <RefreshCw size={11} />
-        <span>Auto-refreshes every 30 s</span>
+      <div className="d-flex align-items-center gap-2 text-muted" style={{ fontSize: '0.72rem' }}>
+        <span className="dashboard-live-dot" style={{ background: '#10b981' }} />
+        <span>Live · auto-refreshes every 30 s</span>
         {lastUpdated && (
           <span className="ms-1">· Last updated {lastUpdated.toLocaleTimeString()}</span>
         )}
       </div>
+
+      <style jsx>{`
+        .dashboard-live-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          display: inline-block;
+          animation: dashboard-live-pulse 2s ease-in-out infinite;
+        }
+        @keyframes dashboard-live-pulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35); }
+          50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .dashboard-live-dot { animation: none; }
+        }
+      `}</style>
     </div>
   )
 }

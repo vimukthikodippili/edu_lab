@@ -3,9 +3,11 @@ import type { Role } from './roles'
 
 export const PUBLIC_PATHS = [
   '/auth/login',
+  '/auth/logout',
   '/auth/forgot-password',
   '/auth/reset-password',
   '/auth/recover-password',
+  '/auth/create-password',
   '/auth/sign-in',
   '/auth/register',
   '/403',
@@ -26,6 +28,7 @@ export function isStaticAsset(pathname: string): boolean {
 export const SHARED_PATH_PREFIXES = [
   '/security/gate-terminal',
   '/security/incidents',
+  '/security/visitors',
   '/principal/live-class-monitor',
   '/principal/sports-dashboard',
   '/admin/settings',
@@ -38,7 +41,21 @@ export const SHARED_PATH_PREFIXES = [
   '/admin/students',
   '/admin/events',
   '/admin/exam-halls',
+  '/admin/ptm-events',
+  '/admin/attendance/reports',
+  '/admin/academic',
+  '/admin/subjects',
+  '/accounts/fees',
   '/counselor/mha-sessions',
+  '/teacher/marks',
+  '/teacher/grade-trends',
+  '/teacher/syllabus',
+  '/teacher/class-diary',
+  '/teacher/leave',
+  '/teacher/assignments',
+  '/teacher/live-classes',
+  '/library/online',
+  '/library/catalog',
 ]
 
 export function getRoleFromPath(pathname: string): Role | null {

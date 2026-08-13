@@ -18,6 +18,7 @@ import {
 import { useNotificationContext } from '@/context/useNotificationContext'
 import apiClient from '@/lib/api/axios'
 import type { MyClassSection } from '@/features/attendance/types'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -200,26 +201,12 @@ function AttendanceReportsContent() {
   const hasReport = !!report && !reportLoading
 
   return (
-    <div className="container-fluid px-4 py-4">
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <div className="d-flex align-items-center gap-3 mb-4">
-        <div
-          className="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
-          style={{
-            width: 48,
-            height: 48,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          }}
-        >
-          <BarChart2 size={22} className="text-white" />
-        </div>
-        <div>
-          <h4 className="mb-0 fw-bold">Attendance Reports</h4>
-          <p className="text-muted small mb-0">
-            Generate and export attendance summaries by class or student
-          </p>
-        </div>
-      </div>
+    <div className="container-fluid px-4 py-4 edulab-page">
+      <PrincipalPageHeader
+        icon={BarChart2}
+        title="Attendance Reports"
+        subtitle="Generate and export attendance summaries by class or student"
+      />
 
       {/* ── Filter card ─────────────────────────────────────────────── */}
       <div className="card border-0 shadow-sm mb-4">
@@ -280,7 +267,7 @@ function AttendanceReportsContent() {
                 type="button"
                 className="btn btn-sm text-white fw-semibold w-100 d-flex align-items-center justify-content-center gap-2"
                 style={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'linear-gradient(135deg, var(--edulab-accent) 0%, var(--edulab-accent-hover) 100%)',
                   border: 'none',
                   height: 38,
                 }}

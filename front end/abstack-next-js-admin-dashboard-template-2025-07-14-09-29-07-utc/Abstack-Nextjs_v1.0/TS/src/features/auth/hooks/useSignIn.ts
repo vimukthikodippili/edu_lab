@@ -6,33 +6,10 @@ import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import axios from '@/lib/api/axios'
 import { useAuthStore } from '@/stores/authStore'
-import { ROLES, ROLE_HOME_PATHS, type Role } from '@/lib/auth/roles'
+import { ROLE_HOME_PATHS } from '@/lib/auth/roles'
+import { normalizeRole } from '@/lib/auth/normalizeRole'
 import { loginSchema, type LoginSchemaType } from '../schemas/loginSchema'
 import type { LoginResponse } from '../types'
-
-// Backend returns role as { id: number, name: string }; normalize to SIMS Role string
-function normalizeRole(backendRole: unknown): Role {
-  if (typeof backendRole === 'string' && backendRole !== '[object Object]') {
-    return backendRole as Role
-  }
-  if (typeof backendRole === 'object' && backendRole !== null) {
-    const r = backendRole as { id?: number; name?: string }
-    const idMap: Record<number, Role> = {
-      1: ROLES.SYSTEM_ADMIN,
-      3: ROLES.PRINCIPAL,
-      4: ROLES.SECTION_HEAD,
-      5: ROLES.TEACHER,
-      6: ROLES.STUDENT,
-      7: ROLES.GUARDIAN,
-      8: ROLES.COUNSELOR,
-      9: ROLES.SECURITY_OFFICER,
-      10: ROLES.LIBRARIAN,
-      11: ROLES.ACCOUNTANT,
-    }
-    if (r.id !== undefined && idMap[r.id]) return idMap[r.id]
-  }
-  return ROLES.STUDENT
-}
 
 export function useSignIn() {
   const [isLoading, setIsLoading] = useState(false)

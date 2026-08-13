@@ -1,4 +1,7 @@
 export const ENDPOINTS = {
+  ADMIN: {
+    AUDIT_LOG: '/audit-log',
+  },
   AUTH: {
     LOGIN: '/auth/email/login',
     REFRESH: '/auth/refresh',
@@ -21,6 +24,9 @@ export const ENDPOINTS = {
     DOCUMENTS: (id: string) => `/students/${id}/documents`,
     SEARCH: '/students/search',
     BY_ADMISSION_NUMBER: (admissionNumber: string) => `/students/admission/${encodeURIComponent(admissionNumber)}`,
+  },
+  STAFF: {
+    SEARCH: '/staff',
   },
   TEACHERS: {
     LIST: '/teachers',
@@ -52,6 +58,9 @@ export const ENDPOINTS = {
   },
   GRADES: {
     TERMS: '/grades/terms',
+    ACADEMIC_YEARS: '/grades/academic-years',
+    ACADEMIC_YEARS_START: '/grades/academic-years/start',
+    ACADEMIC_YEAR_END: (id: number) => `/grades/academic-years/${id}/end`,
     ASSESSMENT_PLANS: '/grades/assessment-plans',
     MY_SUBJECT_PLANS: '/grades/assessment-plans/my-subjects',
     ASSESSMENTS: '/grades/assessments',
@@ -74,7 +83,10 @@ export const ENDPOINTS = {
     REPORT_CARD_BY_ID: (id: string) => `/report-cards/${id}`,
     PUBLISH: (examId: string) => `/exams/${examId}/publish`,
     ANALYTICS: '/grades/analytics',
-    CORRECTION: (id: string) => `/marks/${id}/correction`,
+    REQUEST_CORRECTION: (markId: string) => `/grades/marks/${markId}/correction-requests`,
+    MY_CORRECTIONS: '/grades/marks/correction-requests/mine',
+    CORRECTION_APPROVE: (id: string) => `/grades/marks/correction-requests/${id}/approve`,
+    CORRECTION_REJECT: (id: string) => `/grades/marks/correction-requests/${id}/reject`,
   },
   FEES: {
     STRUCTURE: '/fees/structure',
@@ -98,6 +110,7 @@ export const ENDPOINTS = {
     BOOKS_BY_BARCODE: (barcode: string) => `/library/books/barcode/${barcode}`,
     ISSUANCE: '/library/issuance',
     LOANS: '/library/loans',
+    MY_LOANS: '/library/loans/mine',
     LOANS_RETURN: (id: string) => `/library/loans/${id}/return`,
     FINES: '/library/fines',
     FINES_PAY: (loanId: string) => `/library/fines/${loanId}/pay`,
@@ -140,6 +153,7 @@ export const ENDPOINTS = {
   PRINCIPAL: {
     KPI: '/principal/kpi',
     APPROVALS: '/principal/approvals',
+    APPROVAL_HISTORY: '/principal/approvals/history',
     APPROVAL_BY_ID: (id: string) => `/principal/approvals/${id}`,
     STRATEGIC: '/principal/strategic',
     REPORTS: '/principal/reports',

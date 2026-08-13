@@ -1,12 +1,15 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ClipboardList, ChevronRight, Plus, GraduationCap } from 'lucide-react'
+import RoleGuard from '@/components/wrappers/RoleGuard'
+import { ROLES } from '@/lib/auth/roles'
 import { useGrades } from '@/features/students/hooks/useGrades'
 import { useClassSections } from '@/features/teacher-subject-requirements/hooks/useClassSections'
 import { useClassSectionRequirements } from '@/features/teacher-subject-requirements/hooks/useClassSectionRequirements'
 import { useCreateClassSection } from '@/features/teacher-subject-requirements/hooks/useCreateClassSection'
 import { useAssignClassTeacher } from '@/features/teacher-subject-requirements/hooks/useAssignClassTeacher'
 import { useStaff } from '@/features/staff/hooks/useStaff'
+import { useAcademicYears } from '@/features/grades/hooks/useAcademicYears'
 import { AllocationBar } from '@/features/teacher-subject-requirements/components/AllocationBar'
 import { RequirementRow } from '@/features/teacher-subject-requirements/components/RequirementRow'
 import { AddRequirementForm } from '@/features/teacher-subject-requirements/components/AddRequirementForm'
@@ -20,12 +23,22 @@ const CURRENT_YEAR = String(new Date().getFullYear())
 
 function AddSectionModal({ onClose }: { onClose: () => void }) {
   const { data: grades = [] } = useGrades()
+  const { data: years = [] } = useAcademicYears()
+  const activeYears = years.filter((y) => y.status === 'active')
   const create = useCreateClassSection()
 
   const [gradeId, setGradeId] = useState('')
   const [name, setName] = useState('')
-  const [academicYear, setAcademicYear] = useState(CURRENT_YEAR)
+  const [academicYear, setAcademicYear] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+
+  // Sync once active years finish loading (empty on first render).
+  useEffect(() => {
+    if (!academicYear && activeYears.length > 0) {
+      setAcademicYear(activeYears[0].year)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeYears])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,17 +117,17 @@ function AddSectionModal({ onClose }: { onClose: () => void }) {
               {/* Academic year */}
               <div>
                 <label className="form-label small fw-semibold mb-1">Academic Year</label>
-                <input
-                  type="text"
-                  className="form-control form-control-sm"
-                  placeholder="2026"
-                  maxLength={4}
-                  minLength={4}
-                  pattern="\d{4}"
+                <select
+                  className="form-select form-select-sm"
                   value={academicYear}
                   required
                   onChange={(e) => setAcademicYear(e.target.value)}
-                />
+                >
+                  {activeYears.length === 0 && <option value="">— No active years —</option>}
+                  {activeYears.map((y) => (
+                    <option key={y.id} value={y.year}>{y.year}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Preview */}
@@ -378,7 +391,7 @@ function RequirementsPanel({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function PeriodRequirementsPage() {
+function PeriodRequirementsContent() {
   const [gradeFilter, setGradeFilter] = useState<number | undefined>(undefined)
   const [yearFilter, setYearFilter] = useState(CURRENT_YEAR)
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -525,5 +538,13 @@ export default function PeriodRequirementsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PeriodRequirementsPage() {
+  return (
+    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>
+      <PeriodRequirementsContent />
+    </RoleGuard>
   )
 }

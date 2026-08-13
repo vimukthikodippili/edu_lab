@@ -10,7 +10,7 @@ const PageTitle = ({ title, subTitle }: { title: string; subTitle?: string }) =>
       <div className="text-end">
         <ol className="breadcrumb m-0 py-0 fs-13">
           <li className="breadcrumb-item">
-            <Link href="">Abstack</Link>
+            <Link href="">EduLab</Link>
           </li>
           <div className="mx-1 flex-centered">
             <IconifyIcon className="mt-0" icon="tabler:chevron-right" height={12} width={12} />

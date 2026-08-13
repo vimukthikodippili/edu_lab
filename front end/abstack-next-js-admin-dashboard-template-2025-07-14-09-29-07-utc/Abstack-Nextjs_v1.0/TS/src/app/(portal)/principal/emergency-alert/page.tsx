@@ -6,6 +6,7 @@ import { ROLES } from '@/lib/auth/roles'
 import { useNotificationContext } from '@/context/useNotificationContext'
 import { useSendEmergencyAlert } from '@/features/communication/hooks/useSendEmergencyAlert'
 import type { EmergencyAlertSummary, AlertChannelResult } from '@/types/sims/communication'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 
 const MAX_CHARS = 1000
 
@@ -211,22 +212,13 @@ function EmergencyAlertContent() {
   }
 
   return (
-    <div className="container-fluid px-4 py-4">
-      {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4">
-        <div
-          className="rounded-3 d-flex align-items-center justify-content-center"
-          style={{ width: 48, height: 48, background: 'linear-gradient(135deg,#dc2626,#991b1b)' }}
-        >
-          <AlertTriangle size={22} color="white" />
-        </div>
-        <div>
-          <h4 className="mb-0 fw-bold">Emergency Alert</h4>
-          <p className="mb-0 text-muted small">
-            Broadcasts instantly to all active guardians and staff via SMS, push, and email simultaneously
-          </p>
-        </div>
-      </div>
+    <div className="container-fluid px-4 py-4 edulab-page">
+      <PrincipalPageHeader
+        icon={AlertTriangle}
+        title="Emergency Alert"
+        subtitle="Broadcasts instantly to all active guardians and staff via SMS, push, and email simultaneously"
+        tone="critical"
+      />
 
       {/* Warning banner */}
       <div

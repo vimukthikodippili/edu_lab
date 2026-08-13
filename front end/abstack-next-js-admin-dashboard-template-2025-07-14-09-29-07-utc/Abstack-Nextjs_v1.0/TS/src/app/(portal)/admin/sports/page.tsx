@@ -222,7 +222,7 @@ function SportsSetupPage() {
 
 export default function AdminSportsPage() {
   return (
-    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD]}>
+    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>
       <SportsSetupPage />
     </RoleGuard>
   )

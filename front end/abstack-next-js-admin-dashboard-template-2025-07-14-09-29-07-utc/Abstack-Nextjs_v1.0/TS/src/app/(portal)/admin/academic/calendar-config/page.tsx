@@ -1,5 +1,7 @@
 'use client'
 import { Settings } from 'lucide-react'
+import RoleGuard from '@/components/wrappers/RoleGuard'
+import { ROLES } from '@/lib/auth/roles'
 import { useCalendarConfigs } from '@/features/school-calendar-config/hooks/useCalendarConfigs'
 import { CalendarConfigCard } from '@/features/school-calendar-config/components/CalendarConfigCard'
 
@@ -34,7 +36,7 @@ function SkeletonCard() {
   )
 }
 
-export default function CalendarConfigPage() {
+function CalendarConfigContent() {
   const { data: configs, isLoading, isError } = useCalendarConfigs()
 
   // The API already returns one row per grade stage, in the stages' own display order
@@ -85,5 +87,13 @@ export default function CalendarConfigPage() {
             ))}
       </div>
     </div>
+  )
+}
+
+export default function CalendarConfigPage() {
+  return (
+    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>
+      <CalendarConfigContent />
+    </RoleGuard>
   )
 }

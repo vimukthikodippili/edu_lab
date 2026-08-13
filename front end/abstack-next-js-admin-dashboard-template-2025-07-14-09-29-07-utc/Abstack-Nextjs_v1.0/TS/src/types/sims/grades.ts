@@ -8,6 +8,23 @@ export interface AcademicTerm {
   createdAt: string
 }
 
+export type AcademicYearStatus = 'active' | 'ended'
+
+export interface AcademicYear {
+  id: number
+  year: string
+  status: AcademicYearStatus
+  endedAt: string | null
+  endedById: string | null
+  createdAt: string
+}
+
+export interface StartAcademicYearResult {
+  academicYear: AcademicYear
+  sectionsCreated: number
+  term: AcademicTerm
+}
+
 export interface TermAssessmentPlan {
   id: number
   subjectId: string
@@ -112,6 +129,28 @@ export interface BulkMarkEntryPayload {
   studentId: string
   score?: number
   topicScores?: BulkMarkTopicScoreEntryPayload[]
+}
+
+export type MarkCorrectionStatus = 'pending' | 'approved' | 'rejected'
+
+export interface MarkCorrectionRequest {
+  id: string
+  markId: string
+  requestedByTeacherId: string
+  originalScore: string
+  correctedScore: string
+  reason: string
+  status: MarkCorrectionStatus
+  decidedById: string | null
+  decidedAt: string | null
+  decisionNote: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateMarkCorrectionRequestPayload {
+  correctedScore: number
+  reason: string
 }
 
 export interface BulkMarkPayload {

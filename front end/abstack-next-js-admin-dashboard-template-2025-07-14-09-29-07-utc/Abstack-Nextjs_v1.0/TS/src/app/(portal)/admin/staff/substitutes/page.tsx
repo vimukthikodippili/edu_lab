@@ -7,6 +7,7 @@ import { useNotificationContext } from '@/context/useNotificationContext'
 import { useSubstituteSuggestions } from '@/features/staff/hooks/useSubstituteSuggestions'
 import { useAssignSubstitute } from '@/features/staff/hooks/useAssignSubstitute'
 import type { SubstituteAssignment, SubstituteCandidate } from '@/types/sims/substitute'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 
 const DAY_LABELS = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -175,36 +176,22 @@ function SubstitutesContent() {
   ]
 
   return (
-    <div className="container-fluid">
-      {/* Header Card */}
-      <div
-        className="card shadow-sm rounded-4 mb-4 border-0 text-white"
-        style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
-      >
-        <div className="card-body py-4 px-4 d-flex align-items-center gap-3">
-          <div
-            className="d-flex align-items-center justify-content-center rounded-3"
-            style={{ width: 52, height: 52, background: 'rgba(255,255,255,0.2)' }}
-          >
-            <Repeat2 size={26} color="#fff" />
-          </div>
-          <div>
-            <h4 className="mb-0 fw-bold">Substitute Cover</h4>
-            <p className="mb-0 opacity-75 small">
-              Review and assign substitute teachers for approved leave slots
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="container-fluid edulab-page">
+      <PrincipalPageHeader
+        icon={Repeat2}
+        title="Substitute Cover"
+        subtitle="Review and assign substitute teachers for approved leave slots"
+      />
 
       {/* Filter Tabs */}
       <div className="d-flex gap-2 mb-3">
         {tabs.map((t) => (
           <button
             key={t.key}
-            className={`btn btn-sm rounded-pill px-3 ${
-              activeTab === t.key ? 'btn-warning text-dark fw-semibold' : 'btn-outline-secondary'
+            className={`btn btn-sm rounded-pill px-3 fw-semibold ${
+              activeTab === t.key ? 'text-white' : 'btn-outline-secondary'
             }`}
+            style={activeTab === t.key ? { background: 'var(--edulab-accent)', border: 'none' } : undefined}
             onClick={() => setActiveTab(t.key)}
           >
             {t.label}

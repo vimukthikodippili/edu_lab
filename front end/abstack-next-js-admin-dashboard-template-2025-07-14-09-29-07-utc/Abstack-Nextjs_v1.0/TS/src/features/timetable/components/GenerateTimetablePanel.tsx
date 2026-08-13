@@ -1,18 +1,30 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Zap, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { useGenerateTimetable } from '../hooks/useGenerateTimetable'
 import { useTimetableRecord } from '../hooks/useTimetableRecord'
 import { ConflictPanel } from './ConflictPanel'
 import type { GenerationResult } from '../types'
 
-const CURRENT_YEAR = String(new Date().getFullYear())
+interface Props {
+  // Controlled by the page — previously this panel kept its own independent year state that
+  // only coincidentally matched the class selector's year by shared default. Generating for a
+  // different year than what's on screen produced no error, just silent confusion.
+  academicYear: string
+  onAcademicYearChange: (year: string) => void
+  // Re-synced (not fully controlled) whenever the selected class section changes, so "select a
+  // class, then generate" scopes to that class's grade by default — still freely overridable.
+  initialGradeId?: number | null
+}
 
-export function GenerateTimetablePanel() {
-  const [academicYear, setAcademicYear] = useState(CURRENT_YEAR)
+export function GenerateTimetablePanel({ academicYear, onAcademicYearChange, initialGradeId }: Props) {
   const [gradeFilter, setGradeFilter] = useState('')
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    setGradeFilter(initialGradeId ? String(initialGradeId) : '')
+  }, [initialGradeId])
 
   const generate = useGenerateTimetable()
   const trimmedYear = academicYear.trim()
@@ -69,7 +81,7 @@ export function GenerateTimetablePanel() {
               placeholder="2026"
               maxLength={4}
               value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
+              onChange={(e) => onAcademicYearChange(e.target.value)}
             />
           </div>
 
@@ -139,6 +151,21 @@ export function GenerateTimetablePanel() {
             {result.conflicts.length > 0 && (
               <div className="mt-3">
                 <ConflictPanel conflicts={result.conflicts} />
+              </div>
+            )}
+
+            {result.skippedSections.length > 0 && (
+              <div className="alert alert-secondary py-2 small mt-3 mb-0">
+                <div className="fw-semibold mb-1">
+                  {result.skippedSections.length} section{result.skippedSections.length !== 1 ? 's' : ''} skipped — existing schedule preserved:
+                </div>
+                <ul className="mb-0 ps-3">
+                  {result.skippedSections.map((s) => (
+                    <li key={s.classSectionId}>
+                      {s.gradeName} · Section {s.name} — {s.reason}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

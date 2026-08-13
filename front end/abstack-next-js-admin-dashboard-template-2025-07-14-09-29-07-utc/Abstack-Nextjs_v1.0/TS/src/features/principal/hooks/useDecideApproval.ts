@@ -25,6 +25,11 @@ function resolveUrl(
       ? ENDPOINTS.LEAVE.APPROVE(id)
       : ENDPOINTS.LEAVE.REJECT(id)
   }
+  if (type === 'mark_correction') {
+    return decision === 'approve'
+      ? ENDPOINTS.GRADES.CORRECTION_APPROVE(id)
+      : ENDPOINTS.GRADES.CORRECTION_REJECT(id)
+  }
   return decision === 'approve'
     ? ENDPOINTS.EXPENSES.APPROVE(id)
     : ENDPOINTS.EXPENSES.REJECT(id)

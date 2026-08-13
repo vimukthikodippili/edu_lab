@@ -30,3 +30,15 @@ export function useChangeStaffSystemRole(staffId: string) {
     },
   })
 }
+
+export function useUpdateSectionHeadRange(staffId: string) {
+  const queryClient = useQueryClient()
+  return useMutation<void, Error, { sectionHeadGradeFrom: number; sectionHeadGradeTo: number }>({
+    mutationFn: async (payload) => {
+      await apiClient.patch(`/staff/${staffId}/section-head-range`, payload)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff', staffId] })
+    },
+  })
+}

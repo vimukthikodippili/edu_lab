@@ -13,6 +13,9 @@ import { ENDPOINTS } from '@/lib/api/endpoints'
 import type { BookIssuance } from '@/types/sims/library'
 
 interface StudentResult { id: string; firstName: string; lastName: string; admissionNumber: string; grade?: { name?: string } }
+interface StaffResult { id: string; firstName: string; lastName: string; designation?: string }
+
+type BorrowerMode = 'student' | 'staff'
 
 function IssuanceContent() {
   const { showNotification } = useNotificationContext()
@@ -21,9 +24,13 @@ function IssuanceContent() {
   // Issue form state
   const [barcode, setBarcode] = useState('')
   const [committedBarcode, setCommittedBarcode] = useState('')
+  const [borrowerMode, setBorrowerMode] = useState<BorrowerMode>('student')
   const [admNo, setAdmNo] = useState('')
   const [student, setStudent] = useState<StudentResult | null>(null)
   const [studentLoading, setStudentLoading] = useState(false)
+  const [staffQuery, setStaffQuery] = useState('')
+  const [staffResult, setStaffResult] = useState<StaffResult | null>(null)
+  const [staffLoading, setStaffLoading] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
   const scannerRef = useRef<HTMLDivElement>(null)
   const html5ScannerRef = useRef<unknown>(null)
@@ -89,14 +96,50 @@ function IssuanceContent() {
     return () => clearTimeout(t)
   }, [admNo])
 
+  // Staff (teacher) lookup by name/email/department search
+  useEffect(() => {
+    if (!staffQuery || staffQuery.length < 3) { setStaffResult(null); return }
+    const t = setTimeout(async () => {
+      setStaffLoading(true)
+      try {
+        const res = await apiClient.get(ENDPOINTS.STAFF.SEARCH, { params: { search: staffQuery, limit: 5 } })
+        const results: StaffResult[] = res.data?.data ?? res.data ?? []
+        setStaffResult(results[0] ?? null)
+      } catch {
+        setStaffResult(null)
+      } finally {
+        setStaffLoading(false)
+      }
+    }, 500)
+    return () => clearTimeout(t)
+  }, [staffQuery])
+
   const handleIssue = () => {
-    if (!bookResult || !student) return
+    if (!bookResult) return
+    if (borrowerMode === 'student') {
+      if (!student) return
+      issueBook.mutate(
+        { bookId: bookResult.id, studentId: student.id },
+        {
+          onSuccess: () => {
+            showNotification({ variant: 'success', message: `"${bookResult.title}" issued to ${student.firstName} ${student.lastName}.` })
+            setBarcode(''); setCommittedBarcode(''); setAdmNo(''); setStudent(null)
+            refetchLoans()
+          },
+          onError: (e: Error & { response?: { data?: { message?: string } } }) =>
+            showNotification({ variant: 'danger', message: e?.response?.data?.message ?? 'Issue failed.' }),
+        },
+      )
+      return
+    }
+
+    if (!staffResult) return
     issueBook.mutate(
-      { bookId: bookResult.id, studentId: student.id },
+      { bookId: bookResult.id, staffId: staffResult.id },
       {
         onSuccess: () => {
-          showNotification({ variant: 'success', message: `"${bookResult.title}" issued to ${student.firstName} ${student.lastName}.` })
-          setBarcode(''); setCommittedBarcode(''); setAdmNo(''); setStudent(null)
+          showNotification({ variant: 'success', message: `"${bookResult.title}" issued to ${staffResult.firstName} ${staffResult.lastName}.` })
+          setBarcode(''); setCommittedBarcode(''); setStaffQuery(''); setStaffResult(null)
           refetchLoans()
         },
         onError: (e: Error & { response?: { data?: { message?: string } } }) =>
@@ -186,30 +229,73 @@ function IssuanceContent() {
 
             <div className="card border-0 shadow-sm rounded-4 mt-3">
               <div className="card-header border-0 py-2 px-4 rounded-top-4" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
-                <span className="fw-bold text-white small">Step 2 — Find Student</span>
+                <span className="fw-bold text-white small">Step 2 — Find Borrower</span>
               </div>
               <div className="card-body p-4">
-                <input
-                  className="form-control form-control-sm mb-2"
-                  placeholder="Enter admission number (e.g. SIMS/2026/00001)…"
-                  value={admNo}
-                  onChange={(e) => setAdmNo(e.target.value)}
-                />
-                {studentLoading && <div className="text-muted small">Searching…</div>}
-                {!studentLoading && admNo.length >= 3 && !student && <div className="text-danger small">No student found.</div>}
-                {student && (
-                  <div className="alert alert-success py-2 mb-0">
-                    <div className="fw-semibold small">{student.firstName} {student.lastName}</div>
-                    <div className="text-muted" style={{ fontSize: '0.72rem' }}>{student.admissionNumber}</div>
-                  </div>
+                <div className="btn-group btn-group-sm mb-3" role="group">
+                  <button
+                    type="button"
+                    className={`btn ${borrowerMode === 'student' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    onClick={() => setBorrowerMode('student')}
+                  >
+                    Student
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${borrowerMode === 'staff' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    onClick={() => setBorrowerMode('staff')}
+                  >
+                    Teacher
+                  </button>
+                </div>
+
+                {borrowerMode === 'student' ? (
+                  <>
+                    <input
+                      className="form-control form-control-sm mb-2"
+                      placeholder="Enter admission number (e.g. SIMS/2026/00001)…"
+                      value={admNo}
+                      onChange={(e) => setAdmNo(e.target.value)}
+                    />
+                    {studentLoading && <div className="text-muted small">Searching…</div>}
+                    {!studentLoading && admNo.length >= 3 && !student && <div className="text-danger small">No student found.</div>}
+                    {student && (
+                      <div className="alert alert-success py-2 mb-0">
+                        <div className="fw-semibold small">{student.firstName} {student.lastName}</div>
+                        <div className="text-muted" style={{ fontSize: '0.72rem' }}>{student.admissionNumber}</div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <input
+                      className="form-control form-control-sm mb-2"
+                      placeholder="Search teacher by name, email, or department…"
+                      value={staffQuery}
+                      onChange={(e) => setStaffQuery(e.target.value)}
+                    />
+                    {staffLoading && <div className="text-muted small">Searching…</div>}
+                    {!staffLoading && staffQuery.length >= 3 && !staffResult && <div className="text-danger small">No staff member found.</div>}
+                    {staffResult && (
+                      <div className="alert alert-success py-2 mb-0">
+                        <div className="fw-semibold small">{staffResult.firstName} {staffResult.lastName}</div>
+                        {staffResult.designation && <div className="text-muted" style={{ fontSize: '0.72rem' }}>{staffResult.designation}</div>}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
 
             <button
               className="btn fw-semibold text-white w-100 mt-3"
-              style={{ background: bookResult && student ? 'linear-gradient(135deg,#10b981,#059669)' : '#cbd5e1', border: 'none' }}
-              disabled={!bookResult || !student || issueBook.isPending}
+              style={{
+                background: bookResult && (borrowerMode === 'student' ? student : staffResult)
+                  ? 'linear-gradient(135deg,#10b981,#059669)'
+                  : '#cbd5e1',
+                border: 'none',
+              }}
+              disabled={!bookResult || (borrowerMode === 'student' ? !student : !staffResult) || issueBook.isPending}
               onClick={handleIssue}
             >
               <CheckCircle size={15} className="me-2" />
@@ -259,7 +345,7 @@ function IssuanceContent() {
                     <thead style={{ background: '#f8fafc' }}>
                       <tr>
                         <th className="px-4 py-3 text-muted small fw-semibold border-0">Book</th>
-                        <th className="py-3 text-muted small fw-semibold border-0">Student</th>
+                        <th className="py-3 text-muted small fw-semibold border-0">Borrower</th>
                         <th className="py-3 text-muted small fw-semibold border-0">Due Date</th>
                         <th className="py-3 text-muted small fw-semibold border-0">Overdue / Fine</th>
                         <th className="py-3 text-muted small fw-semibold border-0 px-4">Action</th>

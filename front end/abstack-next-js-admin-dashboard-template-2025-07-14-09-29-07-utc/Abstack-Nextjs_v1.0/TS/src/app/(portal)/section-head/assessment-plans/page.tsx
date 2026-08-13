@@ -1,7 +1,8 @@
 'use client'
-import React, { useState } from 'react'
-import { ClipboardCheck, Plus, Pencil, Trash2, AlertCircle, CalendarDays } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { ClipboardCheck, Plus, Pencil, Trash2, AlertCircle, CalendarDays, Lock, CheckCircle2 } from 'lucide-react'
 import RoleGuard from '@/components/wrappers/RoleGuard'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 import { ROLES } from '@/lib/auth/roles'
 import { useAcademicTerms } from '@/features/grades/hooks/useAcademicTerms'
 import { useAssessmentPlans } from '@/features/grades/hooks/useAssessmentPlans'
@@ -9,6 +10,9 @@ import { useCreateAssessmentPlan } from '@/features/grades/hooks/useCreateAssess
 import { useUpdateAssessmentPlan } from '@/features/grades/hooks/useUpdateAssessmentPlan'
 import { useDeleteAssessmentPlan } from '@/features/grades/hooks/useDeleteAssessmentPlan'
 import { useCreateAcademicTerm } from '@/features/grades/hooks/useCreateAcademicTerm'
+import { useAcademicYears } from '@/features/grades/hooks/useAcademicYears'
+import { useStartAcademicYear } from '@/features/grades/hooks/useStartAcademicYear'
+import { useEndAcademicYear } from '@/features/grades/hooks/useEndAcademicYear'
 import { useSubjects } from '@/features/subjects/hooks/useSubjects'
 import type { TermAssessmentPlan } from '@/types/sims/grades'
 
@@ -22,20 +26,29 @@ interface PlanModalState {
 // ─── Create Term Modal ────────────────────────────────────────────────────────
 
 function CreateTermModal({ onClose }: { onClose: () => void }) {
-  const currentYear = new Date().getFullYear().toString()
+  const { data: years = [] } = useAcademicYears()
+  const activeYears = years.filter((y) => y.status === 'active')
   const [name, setName] = useState('')
   const [termNumber, setTermNumber] = useState(1)
-  const [academicYear, setAcademicYear] = useState(currentYear)
+  const [academicYear, setAcademicYear] = useState(activeYears[0]?.year ?? '')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [error, setError] = useState('')
 
   const createMutation = useCreateAcademicTerm()
 
+  // Sync once active years finish loading (empty on first render).
+  useEffect(() => {
+    if (!academicYear && activeYears.length > 0) {
+      setAcademicYear(activeYears[0].year)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeYears])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!name || !startDate || !endDate) { setError('All fields are required.'); return }
+    if (!name || !academicYear || !startDate || !endDate) { setError('All fields are required.'); return }
     if (endDate <= startDate) { setError('End date must be after start date.'); return }
     try {
       await createMutation.mutateAsync({ name, termNumber, academicYear, startDate, endDate })
@@ -93,15 +106,17 @@ function CreateTermModal({ onClose }: { onClose: () => void }) {
                 </div>
                 <div className="col-6">
                   <label className="form-label fw-semibold small">Academic Year</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="2026"
-                    maxLength={4}
+                  <select
+                    className="form-select"
                     value={academicYear}
                     onChange={(e) => setAcademicYear(e.target.value)}
                     required
-                  />
+                  >
+                    {activeYears.length === 0 && <option value="">— No active years —</option>}
+                    {activeYears.map((y) => (
+                      <option key={y.id} value={y.year}>{y.year}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -133,10 +148,132 @@ function CreateTermModal({ onClose }: { onClose: () => void }) {
               <button
                 type="submit"
                 className="btn text-white fw-semibold px-4"
-                style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)' }}
+                style={{ background: 'var(--edulab-accent)' }}
                 disabled={createMutation.isPending}
               >
                 {createMutation.isPending ? 'Creating…' : 'Create Term'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Start New Year Modal ─────────────────────────────────────────────────────
+
+function StartYearModal({ onClose }: { onClose: () => void }) {
+  const nextYear = (new Date().getFullYear() + 1).toString()
+  const [year, setYear] = useState(nextYear)
+  const [termName, setTermName] = useState('Term 1')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [error, setError] = useState('')
+
+  const startMutation = useStartAcademicYear()
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    const minYear = new Date().getFullYear() - 1
+    const maxYear = new Date().getFullYear() + 5
+    if (!/^\d{4}$/.test(year) || Number(year) < minYear || Number(year) > maxYear) {
+      setError(`Year must be a 4-digit number between ${minYear} and ${maxYear}.`)
+      return
+    }
+    if (!termName || !startDate || !endDate) { setError('All fields are required.'); return }
+    if (endDate <= startDate) { setError('End date must be after start date.'); return }
+    try {
+      await startMutation.mutateAsync({ year, termName, startDate, endDate })
+      onClose()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      setError(msg ?? 'Failed to start the new year. Please try again.')
+    }
+  }
+
+  return (
+    <div
+      className="modal d-flex align-items-center justify-content-center"
+      style={{ display: 'flex !important', background: 'rgba(0,0,0,0.45)', position: 'fixed', inset: 0, zIndex: 1055 }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="modal-dialog modal-dialog-centered w-100" style={{ maxWidth: 460 }}>
+        <div className="modal-content border-0 shadow-lg rounded-4">
+          <div className="modal-header border-0 pb-0 pt-4 px-4">
+            <h5 className="modal-title fw-bold">Start New Academic Year</h5>
+            <button type="button" className="btn-close" onClick={onClose} />
+          </div>
+          <form onSubmit={handleSubmit}>
+            <div className="modal-body px-4 py-3">
+              {error && (
+                <div className="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3">
+                  <AlertCircle size={16} /> {error}
+                </div>
+              )}
+
+              <p className="text-muted small mb-3">
+                This clones every class section from the most recent year (same grade &amp; section names) into the new year, and creates its first term.
+              </p>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold small">Academic Year</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="2027"
+                  maxLength={4}
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold small">First Term Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. Term 1"
+                  value={termName}
+                  onChange={(e) => setTermName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="row g-3">
+                <div className="col-6">
+                  <label className="form-label fw-semibold small">Term Start Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="col-6">
+                  <label className="form-label fw-semibold small">Term End Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer border-0 px-4 pb-4">
+              <button type="button" className="btn btn-light" onClick={onClose}>Cancel</button>
+              <button
+                type="submit"
+                className="btn text-white fw-semibold px-4"
+                style={{ background: 'var(--edulab-accent)' }}
+                disabled={startMutation.isPending}
+              >
+                {startMutation.isPending ? 'Starting…' : 'Start Year'}
               </button>
             </div>
           </form>
@@ -309,7 +446,7 @@ function AssessmentPlanModal({
               <button
                 type="submit"
                 className="btn text-white fw-semibold px-4"
-                style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)' }}
+                style={{ background: 'var(--edulab-accent)' }}
                 disabled={isLoading}
               >
                 {isLoading ? 'Saving…' : editing ? 'Update Plan' : 'Set Plan'}
@@ -329,10 +466,14 @@ function AssessmentPlansContent() {
   const [modal, setModal] = useState<PlanModalState>({ open: false, editing: null })
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [showCreateTerm, setShowCreateTerm] = useState(false)
+  const [showStartYear, setShowStartYear] = useState(false)
+  const [endingYearId, setEndingYearId] = useState<number | null>(null)
 
   const { data: terms = [], isLoading: termsLoading } = useAcademicTerms()
+  const { data: years = [], isLoading: yearsLoading } = useAcademicYears()
   const { data: plans = [], isLoading: plansLoading } = useAssessmentPlans(selectedTermId)
   const deleteMutation = useDeleteAssessmentPlan()
+  const endYearMutation = useEndAcademicYear()
 
   async function handleDelete(id: number) {
     if (!confirm('Delete this assessment plan? This cannot be undone if assessments already exist.')) return
@@ -344,37 +485,91 @@ function AssessmentPlansContent() {
     }
   }
 
+  async function handleEndYear(id: number, year: string) {
+    if (!confirm(`End academic year ${year}? This just marks it ended — it won't be offered for new terms or class sections going forward, but nothing existing is affected.`)) return
+    setEndingYearId(id)
+    try {
+      await endYearMutation.mutateAsync(id)
+    } finally {
+      setEndingYearId(null)
+    }
+  }
+
   return (
-    <div className="container-fluid px-4 py-4">
-      {/* Header */}
-      <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-        <div className="d-flex align-items-center gap-3">
-          <div
-            className="rounded-3 d-flex align-items-center justify-content-center"
-            style={{ width: 48, height: 48, background: 'linear-gradient(135deg,#667eea,#764ba2)' }}
-          >
-            <ClipboardCheck size={22} color="white" />
+    <div className="container-fluid px-4 py-4 edulab-page">
+      <PrincipalPageHeader
+        icon={ClipboardCheck}
+        title="Assessment Plans & Terms"
+        subtitle="Create academic terms, then define required assessment counts per subject"
+      />
+
+      {/* Actions */}
+      <div className="d-flex justify-content-end gap-2 mb-4">
+        <button
+          className="btn btn-outline-secondary d-flex align-items-center gap-2"
+          onClick={() => setShowCreateTerm(true)}
+        >
+          <CalendarDays size={16} /> New Term
+        </button>
+        <button
+          className="btn text-white fw-semibold d-flex align-items-center gap-2"
+          style={{ background: 'var(--edulab-accent)' }}
+          onClick={() => setModal({ open: true, editing: null })}
+          disabled={terms.length === 0}
+        >
+          <Plus size={16} /> Set Plan
+        </button>
+      </div>
+
+      {/* Academic Years */}
+      <div className="card border-0 shadow-sm rounded-4 mb-4">
+        <div className="card-body py-3 px-4">
+          <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <span className="fw-semibold small">Academic Years</span>
+            <button
+              className="btn btn-sm btn-outline-primary d-flex align-items-center gap-2"
+              onClick={() => setShowStartYear(true)}
+            >
+              <CalendarDays size={14} /> Start New Year
+            </button>
           </div>
-          <div>
-            <h4 className="mb-0 fw-bold">Assessment Plans</h4>
-            <p className="mb-0 text-muted small">Define required assessment counts per subject per term</p>
-          </div>
-        </div>
-        <div className="d-flex gap-2">
-          <button
-            className="btn btn-outline-secondary d-flex align-items-center gap-2"
-            onClick={() => setShowCreateTerm(true)}
-          >
-            <CalendarDays size={16} /> New Term
-          </button>
-          <button
-            className="btn text-white fw-semibold d-flex align-items-center gap-2"
-            style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)' }}
-            onClick={() => setModal({ open: true, editing: null })}
-            disabled={terms.length === 0}
-          >
-            <Plus size={16} /> Set Plan
-          </button>
+
+          {yearsLoading ? (
+            <div className="placeholder-glow"><span className="placeholder col-12 rounded" style={{ height: 32 }} /></div>
+          ) : years.length === 0 ? (
+            <p className="text-muted small mb-0">No academic years yet — click "Start New Year" to create the first one.</p>
+          ) : (
+            <div className="d-flex flex-wrap gap-2">
+              {years.map((y) => (
+                <div
+                  key={y.id}
+                  className="d-flex align-items-center gap-2 border rounded-pill px-3 py-1"
+                >
+                  <span className="fw-semibold small">{y.year}</span>
+                  {y.status === 'active' ? (
+                    <span className="badge d-inline-flex align-items-center gap-1 bg-success bg-opacity-15 text-success">
+                      <CheckCircle2 size={12} /> Active
+                    </span>
+                  ) : (
+                    <span className="badge d-inline-flex align-items-center gap-1 bg-secondary bg-opacity-15 text-secondary">
+                      <Lock size={12} /> Ended
+                    </span>
+                  )}
+                  {y.status === 'active' && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-danger py-0 px-2"
+                      style={{ fontSize: '0.72rem' }}
+                      disabled={endingYearId === y.id}
+                      onClick={() => handleEndYear(y.id, y.year)}
+                    >
+                      {endingYearId === y.id ? 'Ending…' : 'End Year'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -467,7 +662,7 @@ function AssessmentPlansContent() {
                       <td>
                         <span
                           className="badge rounded-pill fw-bold px-3 py-2"
-                          style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', fontSize: '0.85rem' }}
+                          style={{ background: 'var(--edulab-accent)', color: 'white', fontSize: '0.85rem' }}
                         >
                           {plan.requiredAssessmentCount}
                         </span>
@@ -506,6 +701,10 @@ function AssessmentPlansContent() {
 
       {showCreateTerm && (
         <CreateTermModal onClose={() => setShowCreateTerm(false)} />
+      )}
+
+      {showStartYear && (
+        <StartYearModal onClose={() => setShowStartYear(false)} />
       )}
 
       {modal.open && (

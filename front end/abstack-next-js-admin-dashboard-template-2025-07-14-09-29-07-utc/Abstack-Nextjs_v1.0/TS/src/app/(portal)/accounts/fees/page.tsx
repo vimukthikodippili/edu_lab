@@ -15,6 +15,7 @@ import { useInvoices } from '@/features/fees/hooks/useInvoices'
 import { useCreateWaiverRequest } from '@/features/fees/hooks/useCreateWaiverRequest'
 import { useNotificationContext } from '@/context/useNotificationContext'
 import type { Invoice, InvoiceStatus } from '@/types/sims/fee'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 
 const STATUS_COLORS: Record<InvoiceStatus, { bg: string; color: string; label: string }> = {
   paid: { bg: '#dcfce7', color: '#15803d', label: 'Paid' },
@@ -189,26 +190,18 @@ function FeesPageContent() {
   }
 
   return (
-    <div className="container-fluid px-4 py-4">
-      {/* Header */}
-      <div className="d-flex align-items-center justify-content-between gap-3 mb-4 flex-wrap">
-        <div className="d-flex align-items-center gap-3">
-          <div
-            className="rounded-3 d-flex align-items-center justify-content-center"
-            style={{ width: 48, height: 48, background: 'linear-gradient(135deg,#667eea,#764ba2)' }}
-          >
-            <DollarSign size={22} color="white" />
-          </div>
-          <div>
-            <h4 className="mb-0 fw-bold">Fee Structure & Invoices</h4>
-            <p className="mb-0 text-muted small">Configure fees per grade and term, then generate invoices</p>
-          </div>
-        </div>
+    <div className="container-fluid px-4 py-4 edulab-page">
+      <PrincipalPageHeader
+        icon={DollarSign}
+        title="Fee Structure & Invoices"
+        subtitle="Configure fees per grade and term, then generate invoices"
+      />
 
+      <div className="mb-4 d-flex justify-content-end">
         <button
           type="button"
           className="btn d-flex align-items-center gap-2 text-white fw-semibold px-4"
-          style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', border: 'none' }}
+          style={{ background: 'linear-gradient(135deg, var(--edulab-accent) 0%, var(--edulab-accent-hover) 100%)', border: 'none' }}
           disabled={!selectedTermId || generateInvoices.isPending}
           onClick={handleGenerate}
         >
@@ -267,7 +260,7 @@ function FeesPageContent() {
       <div className="card border-0 shadow-sm rounded-4 mb-4">
         <div
           className="card-header border-0 py-3 px-4 rounded-top-3"
-          style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)' }}
+          style={{ background: 'linear-gradient(135deg, var(--edulab-accent) 0%, var(--edulab-accent-hover) 100%)' }}
         >
           <span className="fw-bold text-white d-flex align-items-center gap-2">
             <Wallet size={16} />
@@ -305,7 +298,7 @@ function FeesPageContent() {
               <button
                 type="submit"
                 className="btn btn-sm d-flex align-items-center gap-1 text-white fw-semibold px-3"
-                style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', border: 'none' }}
+                style={{ background: 'linear-gradient(135deg, var(--edulab-accent) 0%, var(--edulab-accent-hover) 100%)', border: 'none' }}
                 disabled={createStructure.isPending}
               >
                 <Plus size={14} /> Add
@@ -364,7 +357,7 @@ function FeesPageContent() {
       <div className="card border-0 shadow-sm rounded-4 mb-4">
         <div
           className="card-header border-0 py-3 px-4 rounded-top-3"
-          style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)' }}
+          style={{ background: 'linear-gradient(135deg, var(--edulab-accent) 0%, var(--edulab-accent-hover) 100%)' }}
         >
           <span className="fw-bold text-white d-flex align-items-center gap-2">
             <Bell size={16} />
@@ -387,7 +380,7 @@ function FeesPageContent() {
           <button
             type="button"
             className="btn btn-sm d-flex align-items-center gap-2 text-white fw-semibold px-3"
-            style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', border: 'none' }}
+            style={{ background: 'linear-gradient(135deg, var(--edulab-accent) 0%, var(--edulab-accent-hover) 100%)', border: 'none' }}
             disabled={sendDueSoonReminders.isPending}
             onClick={handleSendDueSoonReminders}
           >
@@ -411,7 +404,7 @@ function FeesPageContent() {
       <div className="card border-0 shadow-sm rounded-4">
         <div
           className="card-header border-0 py-3 px-4 rounded-top-3 d-flex align-items-center justify-content-between"
-          style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)' }}
+          style={{ background: 'linear-gradient(135deg, var(--edulab-accent) 0%, var(--edulab-accent-hover) 100%)' }}
         >
           <span className="fw-bold text-white d-flex align-items-center gap-2">
             <DollarSign size={16} />
@@ -535,7 +528,7 @@ function FeesPageContent() {
                               <button
                                 type="submit"
                                 className="btn btn-sm d-flex align-items-center gap-1 text-white fw-semibold px-3"
-                                style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', border: 'none', whiteSpace: 'nowrap' }}
+                                style={{ background: 'linear-gradient(135deg, var(--edulab-accent) 0%, var(--edulab-accent-hover) 100%)', border: 'none', whiteSpace: 'nowrap' }}
                                 disabled={createWaiverRequest.isPending}
                               >
                                 <Tag size={12} />
@@ -559,7 +552,7 @@ function FeesPageContent() {
 
 export default function AccountsFeesPage() {
   return (
-    <RoleGuard allowedRoles={[ROLES.ACCOUNTANT]}>
+    <RoleGuard allowedRoles={[ROLES.ACCOUNTANT, ROLES.PRINCIPAL, ROLES.SYSTEM_ADMIN]}>
       <FeesPageContent />
     </RoleGuard>
   )

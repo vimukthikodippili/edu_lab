@@ -2,6 +2,7 @@
 import { HeartPulse, CheckCircle2 } from 'lucide-react'
 import { useWellbeingConcerns } from '../hooks/useWellbeingConcerns'
 import { DOMAIN_RESULT_LEVEL_LABELS, LEVEL_BADGE_CLASS } from '@/types/sims/domain-result'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 
 // FR-MHA-34/AC #92-94 — a de-identified-of-clinical-detail drill-down: student name, grade, and
 // overall severity only. No domain names, no risk-category names, no notes — matching AC #93's
@@ -10,26 +11,17 @@ export function WellbeingConcernsContent() {
   const { data: concerns, isLoading } = useWellbeingConcerns()
 
   return (
-    <div className="container-fluid py-4">
-      <div className="d-flex align-items-center gap-3 mb-4">
-        <div
-          className="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
-          style={{ width: 48, height: 48, background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}
-        >
-          <HeartPulse size={22} className="text-white" />
-        </div>
-        <div>
-          <h4 className="mb-0 fw-bold">Students with Elevated Wellbeing Concern</h4>
-          <p className="text-muted small mb-0">
-            Non-diagnostic — see the school counselor for detail. No screening or clinical information shown here.
-          </p>
-        </div>
-      </div>
+    <div className="container-fluid py-4 edulab-page">
+      <PrincipalPageHeader
+        icon={HeartPulse}
+        title="Students with Elevated Wellbeing Concern"
+        subtitle="Non-diagnostic — see the school counselor for detail. No screening or clinical information shown here."
+      />
 
       <div className="card border-0 shadow-sm">
         <div
           className="card-header border-0 py-3 px-4 rounded-top-3"
-          style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}
+          style={{ background: 'linear-gradient(135deg, var(--edulab-nav-bg) 0%, var(--edulab-nav-bg-2) 100%)' }}
         >
           <span className="fw-bold text-white">Students</span>
         </div>

@@ -6,6 +6,7 @@ import {
   DELIVERY_STATUS_BADGE_CLASS,
   DELIVERY_STATUS_LABELS,
 } from '@/types/sims/safety-alert'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return '—'
@@ -22,21 +23,13 @@ export function SafetyAlertsContent() {
   const sentCount = alerts?.filter((a) => a.status === 'sent').length ?? 0
 
   return (
-    <div className="container-fluid py-4">
-      <div className="d-flex align-items-center gap-3 mb-4">
-        <div
-          className="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
-          style={{ width: 48, height: 48, background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' }}
-        >
-          <ShieldAlert size={22} className="text-white" />
-        </div>
-        <div>
-          <h4 className="mb-0 fw-bold">Safety Alerts</h4>
-          <p className="text-muted small mb-0">
-            Delivery status of MHA safety-flag notifications to counselors and principals.
-          </p>
-        </div>
-      </div>
+    <div className="container-fluid py-4 edulab-page">
+      <PrincipalPageHeader
+        icon={ShieldAlert}
+        title="Safety Alerts"
+        subtitle="Delivery status of MHA safety-flag notifications to counselors and principals."
+        tone="critical"
+      />
 
       {/* KPI cards */}
       <div className="row g-3 mb-4">

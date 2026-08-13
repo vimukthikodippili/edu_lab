@@ -42,7 +42,7 @@ export default function FreePeriodWidget() {
           <div className="d-flex align-items-center gap-2">
             <div
               className="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
-              style={{ width: 36, height: 36, background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}
+              style={{ width: 36, height: 36, background: 'linear-gradient(135deg, var(--edulab-nav-bg) 0%, var(--edulab-nav-bg-2) 100%)' }}
             >
               <Coffee size={18} className="text-white" />
             </div>

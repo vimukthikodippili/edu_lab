@@ -9,9 +9,13 @@ import { useMarksForAssessment } from '@/features/grades/hooks/useMarksForAssess
 import { useBulkUpsertMarks } from '@/features/grades/hooks/useBulkUpsertMarks'
 import { useMaterialsCheckStatus } from '@/features/grades/hooks/useMaterialsCheckStatus'
 import { MaterialsCheckPanel } from '@/features/grades/components/MaterialsCheckPanel'
+import { RequestCorrectionModal } from '@/features/grades/components/RequestCorrectionModal'
+import { useMyMarkCorrections } from '@/features/grades/hooks/useMyMarkCorrections'
 import { useNotificationContext } from '@/context/useNotificationContext'
+import { usePermission } from '@/hooks/usePermission'
 import { ASSESSMENT_TYPE_LABELS } from '@/types/sims/grades'
 import type { MarkRosterRow } from '@/types/sims/grades'
+import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -46,6 +50,48 @@ function StatusBadge({ status }: { status: 'draft' | 'submitted' | null }) {
   )
 }
 
+// ─── Correction action cell — shown only for locked (submitted) rows ──────────
+
+function CorrectionActionCell({
+  row,
+  canRequestCorrection,
+  hasPendingCorrection,
+  onRequestCorrection,
+}: {
+  row: MarkRosterRow
+  canRequestCorrection: boolean
+  hasPendingCorrection: boolean
+  onRequestCorrection: (row: MarkRosterRow) => void
+}) {
+  if (row.status !== 'submitted' || !row.markId || !canRequestCorrection) {
+    return <td />
+  }
+  if (hasPendingCorrection) {
+    return (
+      <td>
+        <span
+          className="badge rounded-pill px-2 py-1 fw-bold"
+          style={{ background: '#fef9c3', color: '#92400e', fontSize: '0.68rem' }}
+        >
+          Correction pending
+        </span>
+      </td>
+    )
+  }
+  return (
+    <td>
+      <button
+        type="button"
+        className="btn btn-sm btn-outline-secondary"
+        style={{ fontSize: '0.72rem' }}
+        onClick={() => onRequestCorrection(row)}
+      >
+        Request Correction
+      </button>
+    </td>
+  )
+}
+
 // ─── Roster row — legacy (no topic allocations on this assessment) ────────────
 
 function MarkRosterRowItem({
@@ -53,11 +99,17 @@ function MarkRosterRowItem({
   row,
   value,
   onChange,
+  canRequestCorrection,
+  hasPendingCorrection,
+  onRequestCorrection,
 }: {
   index: number
   row: MarkRosterRow
   value: string
   onChange: (studentId: string, v: string) => void
+  canRequestCorrection: boolean
+  hasPendingCorrection: boolean
+  onRequestCorrection: (row: MarkRosterRow) => void
 }) {
   const locked = row.status === 'submitted'
   const numeric = value.trim() === '' ? null : Number(value)
@@ -98,6 +150,12 @@ function MarkRosterRowItem({
       <td>
         <StatusBadge status={row.status} />
       </td>
+      <CorrectionActionCell
+        row={row}
+        canRequestCorrection={canRequestCorrection}
+        hasPendingCorrection={hasPendingCorrection}
+        onRequestCorrection={onRequestCorrection}
+      />
     </tr>
   )
 }
@@ -109,11 +167,17 @@ function TopicMarkRosterRowItem({
   row,
   values,
   onChange,
+  canRequestCorrection,
+  hasPendingCorrection,
+  onRequestCorrection,
 }: {
   index: number
   row: MarkRosterRow
   values: Record<string, string>
   onChange: (studentId: string, subjectTopicId: string, v: string) => void
+  canRequestCorrection: boolean
+  hasPendingCorrection: boolean
+  onRequestCorrection: (row: MarkRosterRow) => void
 }) {
   const locked = row.status === 'submitted'
 
@@ -171,6 +235,12 @@ function TopicMarkRosterRowItem({
       <td>
         <StatusBadge status={row.status} />
       </td>
+      <CorrectionActionCell
+        row={row}
+        canRequestCorrection={canRequestCorrection}
+        hasPendingCorrection={hasPendingCorrection}
+        onRequestCorrection={onRequestCorrection}
+      />
     </tr>
   )
 }
@@ -185,6 +255,13 @@ function MarksEntryContent() {
   const [localScores, setLocalScores] = useState<Record<string, string>>({})
   // studentId -> subjectTopicId -> raw input value — only used for a topic-tracked assessment.
   const [topicLocalScores, setTopicLocalScores] = useState<Record<string, Record<string, string>>>({})
+  const [correctionRow, setCorrectionRow] = useState<MarkRosterRow | null>(null)
+
+  const canRequestCorrection = usePermission('grades:correction-workflow')
+  const { data: myCorrections = [] } = useMyMarkCorrections()
+  const pendingCorrectionMarkIds = new Set(
+    myCorrections.filter((c) => c.status === 'pending').map((c) => c.markId),
+  )
 
   const { data: terms = [], isLoading: termsLoading } = useAcademicTerms()
   const { data: assessments = [], isLoading: assessmentsLoading } = useMyAssessments(selectedTermId)
@@ -351,34 +428,20 @@ function MarksEntryContent() {
   }
 
   return (
-    <div className="container-fluid px-4 py-4">
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="d-flex align-items-start justify-content-between gap-3 mb-4 flex-wrap">
-        <div className="d-flex align-items-center gap-3">
-          <div
-            className="d-flex align-items-center justify-content-center rounded-3"
-            style={{
-              width: 48,
-              height: 48,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              flexShrink: 0,
-            }}
-          >
-            <FileText size={22} className="text-white" />
-          </div>
-          <div>
-            <h4 className="mb-0 fw-bold">Marks Entry</h4>
-            <p className="text-muted small mb-0">
-              {assessment
-                ? `${assessment.subject.name} · ${ASSESSMENT_TYPE_LABELS[assessment.assessmentType]} · ${assessment.totalMarks} marks`
-                : 'Select a term and assessment'}
-            </p>
-          </div>
-        </div>
+    <div className="container-fluid px-4 py-4 edulab-page">
+      <PrincipalPageHeader
+        icon={FileText}
+        title="Marks Entry"
+        subtitle={
+          assessment
+            ? `${assessment.subject.name} · ${ASSESSMENT_TYPE_LABELS[assessment.assessmentType]} · ${assessment.totalMarks} marks`
+            : 'Select a term and assessment'
+        }
+      />
 
-        {/* Controls */}
-        <div className="d-flex align-items-center gap-2 flex-wrap">
-          {termsLoading ? (
+      {/* Controls */}
+      <div className="mb-4 d-flex align-items-center gap-2 flex-wrap">
+        {termsLoading ? (
             <span className="placeholder col-4 rounded" style={{ height: 32, width: 160 }} />
           ) : (
             <select
@@ -421,7 +484,6 @@ function MarksEntryContent() {
               ))}
             </select>
           )}
-        </div>
       </div>
 
       {/* ── Instructions ───────────────────────────────────────────── */}
@@ -448,7 +510,9 @@ function MarksEntryContent() {
         >
           <CheckCircle2 size={18} style={{ color: '#16a34a', flexShrink: 0 }} />
           <span className="small fw-semibold" style={{ color: '#15803d' }}>
-            Marks for this assessment have been submitted. Contact a Section Head to make corrections.
+            {canRequestCorrection
+              ? 'Marks for this assessment have been submitted. Use "Request Correction" on a row to ask a Principal to change a score.'
+              : 'Marks for this assessment have been submitted. Contact a Section Head to make corrections.'}
           </span>
         </div>
       )}
@@ -457,7 +521,7 @@ function MarksEntryContent() {
       <div className="card border-0 shadow-sm">
         <div
           className="card-header border-0 py-3 px-4 rounded-top-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
-          style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+          style={{ background: 'linear-gradient(135deg, var(--edulab-nav-bg) 0%, var(--edulab-nav-bg-2) 100%)' }}
         >
           <span className="fw-bold text-white d-flex align-items-center gap-2">
             <FileText size={16} />
@@ -513,6 +577,7 @@ function MarksEntryContent() {
                       <th className="fw-semibold text-muted small">Score</th>
                     )}
                     <th className="fw-semibold text-muted small">Status</th>
+                    <th className="fw-semibold text-muted small">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -524,6 +589,9 @@ function MarksEntryContent() {
                           row={row}
                           values={topicLocalScores[row.studentId] ?? {}}
                           onChange={handleTopicScoreChange}
+                          canRequestCorrection={canRequestCorrection}
+                          hasPendingCorrection={!!row.markId && pendingCorrectionMarkIds.has(row.markId)}
+                          onRequestCorrection={setCorrectionRow}
                         />
                       ))
                     : roster.map((row, idx) => (
@@ -533,6 +601,9 @@ function MarksEntryContent() {
                           row={row}
                           value={localScores[row.studentId] ?? ''}
                           onChange={handleScoreChange}
+                          canRequestCorrection={canRequestCorrection}
+                          hasPendingCorrection={!!row.markId && pendingCorrectionMarkIds.has(row.markId)}
+                          onRequestCorrection={setCorrectionRow}
                         />
                       ))}
                 </tbody>
@@ -563,7 +634,7 @@ function MarksEntryContent() {
                   type="button"
                   className="btn btn-sm d-flex align-items-center gap-2 text-white fw-semibold px-4"
                   style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    background: 'linear-gradient(135deg, var(--edulab-accent) 0%, var(--edulab-accent-hover) 100%)',
                     border: 'none',
                   }}
                   onClick={() => handleSave('submitted')}
@@ -588,6 +659,10 @@ function MarksEntryContent() {
           No academic terms configured yet. Ask your Section Head to create a term.
         </div>
       )}
+
+      {correctionRow && (
+        <RequestCorrectionModal row={correctionRow} onClose={() => setCorrectionRow(null)} />
+      )}
     </div>
   )
 }
@@ -596,7 +671,7 @@ function MarksEntryContent() {
 
 export default function TeacherMarks() {
   return (
-    <RoleGuard allowedRoles={[ROLES.TEACHER]}>
+    <RoleGuard allowedRoles={[ROLES.TEACHER, ROLES.SECTION_HEAD]}>
       <MarksEntryContent />
     </RoleGuard>
   )

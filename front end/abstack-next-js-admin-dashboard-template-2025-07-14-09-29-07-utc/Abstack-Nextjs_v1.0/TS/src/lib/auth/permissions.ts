@@ -49,7 +49,7 @@ export const PERMISSIONS = {
   'grades:view:class': [TE, PR],
   'grades:view:section': [SA, PR, SH],
   'grades:view:all': [SA, PR],
-  'grades:correction-workflow': [PR],
+  'grades:correction-workflow': [PR, TE, SH],
 
   // Section / Class management (SectionHead)
   'section:reports': [PR, SH],
@@ -84,7 +84,7 @@ export const PERMISSIONS = {
 
   // Principal Dashboard
   'dashboard:kpi': [PR, SA],
-  'dashboard:approvals': [PR],
+  'dashboard:approvals': [PR, SA],
   'dashboard:strategic': [PR, SA],
 
   // Biometric / Gate

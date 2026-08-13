@@ -127,7 +127,7 @@ export function MaterialsCheckPanel({ assessmentId }: Props) {
           <button
             type="button"
             className="btn btn-sm text-white fw-semibold mt-3"
-            style={{ background: '#0f766e', border: 'none' }}
+            style={{ background: 'var(--edulab-accent)', border: 'none' }}
             disabled={bulkCheck.isPending}
             onClick={handleConfirm}
           >

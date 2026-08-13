@@ -35,9 +35,21 @@ function AttendancePanel({ sessionId, onClose }: { sessionId: string; onClose: (
 
   return (
     <div
-      className="d-flex flex-column"
+      className="d-flex flex-column teacher-live-attendance-panel"
       style={{ width: 300, background: '#1f2937', borderLeft: '1px solid #374151' }}
     >
+      <style>{`
+        @media (max-width: 576px) {
+          .teacher-live-attendance-panel {
+            position: absolute;
+            inset: 0 0 0 auto;
+            width: 85vw !important;
+            max-width: 320px;
+            z-index: 20;
+            box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
+          }
+        }
+      `}</style>
       <div className="d-flex align-items-center justify-content-between px-3 py-2" style={{ borderBottom: '1px solid #374151' }}>
         <span className="text-white fw-semibold small d-flex align-items-center gap-2">
           <Users size={14} /> Who&apos;s Here ({rows.length})
@@ -186,9 +198,9 @@ function TeacherHostContent({ sessionId }: { sessionId: string }) {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div className="d-flex align-items-center justify-content-between px-3 py-2" style={{ background: '#111827' }}>
+      <div className="d-flex align-items-center justify-content-between px-3 py-2 flex-wrap gap-2" style={{ background: '#111827' }}>
         <span className="text-white fw-semibold small">Hosting Live Class</span>
-        <div className="d-flex align-items-center gap-2">
+        <div className="d-flex align-items-center gap-2 flex-wrap">
           <button
             type="button"
             className="btn btn-sm d-flex align-items-center gap-2 fw-semibold"
@@ -239,7 +251,7 @@ function TeacherHostContent({ sessionId }: { sessionId: string }) {
           <AlertCircle size={14} /> Air-writing couldn&apos;t start: {airWritingStatus.error}
         </div>
       )}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
         <div style={{ flex: 1, position: 'relative' }}>
           <LiveKitRoom
             token={tokenMutation.data.token}

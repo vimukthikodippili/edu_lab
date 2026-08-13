@@ -54,7 +54,7 @@ export default function ClassSummaryPanel() {
     <div className="card border-0 shadow-sm mb-3">
       <div
         className="card-header border-0 py-3 px-4 rounded-top-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
-        style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)', cursor: 'pointer' }}
+        style={{ background: 'linear-gradient(135deg, var(--edulab-nav-bg) 0%, var(--edulab-nav-bg-2) 100%)', cursor: 'pointer' }}
         onClick={() => setExpanded((v) => !v)}
       >
         <span className="fw-bold text-white d-flex align-items-center gap-2">

@@ -12,7 +12,6 @@ import { Collapse, OverlayTrigger, Tooltip } from 'react-bootstrap'
 
 const MenuItemWithChildren = ({ item, className, linkClassName, subMenuClassName, activeMenuItems, toggleMenu, level }: SubMenus) => {
   const [open, setOpen] = useState<boolean>(activeMenuItems!.includes(item.key))
-  const level1 = level === 1
   useEffect(() => {
     setOpen(activeMenuItems!.includes(item.key))
   }, [activeMenuItems, item])
@@ -42,28 +41,13 @@ const MenuItemWithChildren = ({ item, className, linkClassName, subMenuClassName
             <Icon size={18} />
           </span>
         )}
-        {level1 ? <span className="menu-text">{item.label}</span> :
-          <>
-            <a href="" className="side-nav-link">
-              <span className="menu-text">{item.label}</span>
-              <div className='menu-arrow content-none'>
-                <IconifyIcon icon="tabler:chevron-right" width={16} height={16} />
-              </div>
-            </a>
-          </>
-        }
+        <span className="menu-text">{item.label}</span>
         {!item.badge ? (
-          <>
-            {level1 &&
-              <span className='menu-arrow content-none'>
-                <IconifyIcon icon="tabler:chevron-right" width={16} height={16} />
-              </span>
-            }
-          </>
+          <span className='menu-arrow content-none'>
+            <IconifyIcon icon="tabler:chevron-right" width={16} height={16} />
+          </span>
         ) : (
-          <>
-            <span className={`badge rounded-pill text-end bg-${item.badge.variant}`}>{item.badge.text}</span>
-          </>
+          <span className={`badge rounded-pill text-end bg-${item.badge.variant}`}>{item.badge.text}</span>
         )}
 
       </div>

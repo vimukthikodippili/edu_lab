@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Parent-Teacher Meetings' }
 
 export default function AdminPtmEventsPage() {
   return (
-    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>
+    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL, ROLES.SECTION_HEAD]}>
       <PtmEventManagementContent />
     </RoleGuard>
   )

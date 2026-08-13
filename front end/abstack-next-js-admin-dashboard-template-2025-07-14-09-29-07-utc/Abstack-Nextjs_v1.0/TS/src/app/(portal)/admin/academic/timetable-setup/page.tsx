@@ -1,6 +1,8 @@
 'use client'
 import React, { useState } from 'react'
-import { CalendarDays, CalendarCheck, ChevronRight, GraduationCap, Lock, Unlock, Users } from 'lucide-react'
+import { AlertTriangle, CalendarDays, CalendarCheck, ChevronRight, GraduationCap, Lock, Unlock, Users } from 'lucide-react'
+import RoleGuard from '@/components/wrappers/RoleGuard'
+import { ROLES } from '@/lib/auth/roles'
 import { GenerateTimetablePanel } from '@/features/timetable/components/GenerateTimetablePanel'
 import { TimetableGrid } from '@/features/timetable/components/TimetableGrid'
 import { DraggableTimetableGrid } from '@/features/timetable/components/DraggableTimetableGrid'
@@ -10,6 +12,7 @@ import { useTimetableRecord } from '@/features/timetable/hooks/useTimetableRecor
 import { useFinalizeTimetable } from '@/features/timetable/hooks/useFinalizeTimetable'
 import { useUnlockTimetable } from '@/features/timetable/hooks/useUnlockTimetable'
 import { useClassSections } from '@/features/teacher-subject-requirements/hooks/useClassSections'
+import { useClassSectionRequirements } from '@/features/teacher-subject-requirements/hooks/useClassSectionRequirements'
 import { useStaff } from '@/features/staff/hooks/useStaff'
 import { useNotificationContext } from '@/context/useNotificationContext'
 import { GradeStageBadge } from '@/features/grade-stages/components/GradeStageBadge'
@@ -271,8 +274,10 @@ function TeacherSelector({
 function ClassTimetablePanel({ classSectionId, academicYear }: { classSectionId: number; academicYear: string }) {
   const { data = [], isLoading } = useClassSectionTimetable(classSectionId, academicYear)
   const { data: record } = useTimetableRecord(academicYear)
-  const section = data[0]?.classSection
+  const { data: reqData } = useClassSectionRequirements(classSectionId)
+  const section = data[0]?.classSection ?? reqData?.classSection
   const isLocked = record?.isLocked ?? false
+  const needsGeneration = !isLoading && data.length === 0 && (reqData?.requirements.length ?? 0) > 0
 
   return (
     <div>
@@ -287,6 +292,17 @@ function ClassTimetablePanel({ classSectionId, academicYear }: { classSectionId:
                 Finalized
               </span>
             )}
+          </div>
+        </div>
+      )}
+      {needsGeneration && (
+        <div className="px-4 pt-3">
+          <div className="alert alert-warning d-flex align-items-center gap-2 py-2 small mb-0">
+            <AlertTriangle size={15} className="flex-shrink-0" />
+            <span>
+              <strong>{reqData!.requirements.length} period requirement{reqData!.requirements.length !== 1 ? 's are' : ' is'}</strong> configured
+              for this class, but no timetable has been generated yet — use <strong>Generate Timetable</strong> above to create one.
+            </span>
           </div>
         </div>
       )}
@@ -322,11 +338,12 @@ function TeacherTimetablePanel({ teacherId, academicYear }: { teacherId: string;
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function TimetableGeneratorPage() {
+function TimetableGeneratorContent() {
   const [viewMode, setViewMode] = useState<ViewMode>('class')
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null)
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null)
   const [academicYear, setAcademicYear] = useState(CURRENT_YEAR)
+  const { data: selectedRequirements } = useClassSectionRequirements(selectedClassId)
 
   const hasSelection = viewMode === 'class' ? !!selectedClassId : !!selectedTeacherId
 
@@ -349,7 +366,11 @@ export default function TimetableGeneratorPage() {
       </div>
 
       {/* Generate panel */}
-      <GenerateTimetablePanel />
+      <GenerateTimetablePanel
+        academicYear={academicYear}
+        onAcademicYearChange={setAcademicYear}
+        initialGradeId={viewMode === 'class' ? selectedRequirements?.classSection.grade.id ?? null : null}
+      />
 
       {/* Finalization panel */}
       <FinalizationPanel academicYear={academicYear} />
@@ -460,5 +481,13 @@ export default function TimetableGeneratorPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function TimetableGeneratorPage() {
+  return (
+    <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>
+      <TimetableGeneratorContent />
+    </RoleGuard>
   )
 }

@@ -180,7 +180,7 @@ function OverrideModal({ examId, allocationId, onClose }: { examId: string; allo
 
 export function ExamAllocationContent() {
   const { data: exams, isLoading: examsLoading } = useExams()
-  const { data: subjects } = useSubjects({ limit: 200 })
+  const { data: subjects } = useSubjects({ limit: 100 })
   const { data: grades } = useGrades()
   const createExam = useCreateExam()
   const autoAllocate = useAutoAllocateSeats()
@@ -230,10 +230,15 @@ export function ExamAllocationContent() {
       { examId: selectedExamId, payload: { mixClasses, specialNeedsStudentIds: specialNeeds.map((s) => s.id) } },
       {
         onSuccess: (result) =>
-          showNotification({
-            variant: 'success',
-            message: `Allocated ${result.allocatedCount} student(s) across ${result.hallsUsed} hall(s) — ${result.specialNeedsPlaced} special-needs seat(s) placed.`,
-          }),
+          result.allocatedCount === 0
+            ? showNotification({
+                variant: 'warning',
+                message: 'No students were allocated — check that students are enrolled in this exam\'s subject and are active in this exam\'s grade.',
+              })
+            : showNotification({
+                variant: 'success',
+                message: `Allocated ${result.allocatedCount} student(s) across ${result.hallsUsed} hall(s) — ${result.specialNeedsPlaced} special-needs seat(s) placed.`,
+              }),
         onError: (err: any) => showNotification({ variant: 'danger', message: err?.response?.data?.message ?? 'Could not auto-allocate seats.' }),
       },
     )

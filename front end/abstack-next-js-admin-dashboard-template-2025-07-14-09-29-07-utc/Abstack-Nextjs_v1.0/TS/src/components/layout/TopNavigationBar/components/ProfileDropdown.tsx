@@ -1,10 +1,25 @@
+'use client'
 import avatar3 from '@/assets/images/users/avatar-3.jpg'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
+import { signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { Dropdown, DropdownHeader, DropdownItem, DropdownMenu, DropdownToggle } from 'react-bootstrap'
+import { useAuthStore } from '@/stores/authStore'
 
 const ProfileDropdown = () => {
+  const router = useRouter()
+  const { clearUser } = useAuthStore()
+
+  const handleSignOut = async () => {
+    clearUser()
+    // Same signOut() call useInactivityTimer.ts makes on an idle timeout — the "Sign Out" menu
+    // item previously only navigated to /auth/logout without ever ending the real session.
+    await signOut({ redirect: false })
+    router.push('/auth/logout')
+  }
+
   return (
     <div className="topbar-item nav-user">
       <Dropdown>
@@ -49,7 +64,7 @@ const ProfileDropdown = () => {
             <IconifyIcon icon="ri:lock-line" className="me-1 fs-16 align-middle" />
             <span className="align-middle">Lock Screen</span>
           </DropdownItem>
-          <DropdownItem as={Link} href="/auth/logout" className="active fw-semibold text-danger">
+          <DropdownItem onClick={handleSignOut} className="active fw-semibold text-danger">
             <IconifyIcon icon="ri:logout-box-line" className="me-1 fs-16 align-middle" />
             <span className="align-middle">Sign Out</span>
           </DropdownItem>

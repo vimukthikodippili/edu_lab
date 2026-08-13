@@ -20,6 +20,7 @@ export interface BookIssuance {
   bookId: string
   bookTitle: string
   bookBarcode: string
+  borrowerType: 'student' | 'staff'
   borrowerId: string
   borrowerName: string
   admissionNumber: string
@@ -27,6 +28,23 @@ export interface BookIssuance {
   dueAt: string
   returnedAt?: string
   fineAmount?: number | null
+  finePaid: boolean
+  status: 'active' | 'returned' | 'overdue'
+  daysOverdue: number
+}
+
+export interface MyLibraryLoan {
+  id: string
+  bookId: string
+  bookTitle: string
+  bookBarcode: string
+  studentId: string
+  studentName: string
+  admissionNumber: string
+  issuedAt: string
+  dueAt: string
+  returnedAt: string | null
+  fineAmount: number | null
   finePaid: boolean
   status: 'active' | 'returned' | 'overdue'
   daysOverdue: number

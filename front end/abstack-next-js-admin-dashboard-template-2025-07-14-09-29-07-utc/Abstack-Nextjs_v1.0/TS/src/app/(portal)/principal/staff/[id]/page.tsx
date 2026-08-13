@@ -7,7 +7,7 @@ import { ROLES } from '@/lib/auth/roles'
 import { useNotificationContext } from '@/context/useNotificationContext'
 import { useStaffMember } from '@/features/staff/hooks/useStaffMember'
 import { useUpdateStaffRoles } from '@/features/staff/hooks/useUpdateStaffRoles'
-import { useStaffSystemRole, useChangeStaffSystemRole } from '@/features/staff/hooks/useStaffSystemRole'
+import { useStaffSystemRole, useChangeStaffSystemRole, useUpdateSectionHeadRange } from '@/features/staff/hooks/useStaffSystemRole'
 import { StaffRoleBadges } from '@/features/staff/components/StaffRoleBadges'
 import { STAFF_FUNCTIONAL_ROLES, PORTAL_ROLES } from '@/features/staff/types'
 import type { StaffFunctionalRole, PortalRoleId } from '@/features/staff/types'
@@ -23,8 +23,12 @@ function StaffRolesContent({ id }: { id: string }) {
   const { data: systemRole } = useStaffSystemRole(id)
   const updateRoles = useUpdateStaffRoles(id)
   const changeSystemRole = useChangeStaffSystemRole(id)
+  const updateGradeRange = useUpdateSectionHeadRange(id)
 
   const [selectedRoles, setSelectedRoles] = useState<StaffFunctionalRole[] | null>(null)
+  const [gradeFrom, setGradeFrom] = useState<string>('')
+  const [gradeTo, setGradeTo] = useState<string>('')
+  const [gradeRangeTouched, setGradeRangeTouched] = useState(false)
 
   const roles = selectedRoles ?? staff?.roleAssignments.map((r) => r.role) ?? []
 
@@ -65,6 +69,30 @@ function StaffRolesContent({ id }: { id: string }) {
   }
 
   const hasPendingChanges = selectedRoles !== null
+
+  const displayGradeFrom = gradeRangeTouched ? gradeFrom : String(staff.sectionHeadGradeFrom ?? '')
+  const displayGradeTo = gradeRangeTouched ? gradeTo : String(staff.sectionHeadGradeTo ?? '')
+  const gradeRangeConfigured = staff.sectionHeadGradeFrom != null && staff.sectionHeadGradeTo != null
+  const gradeRangeValid =
+    displayGradeFrom !== '' &&
+    displayGradeTo !== '' &&
+    Number(displayGradeFrom) >= 1 &&
+    Number(displayGradeTo) <= 13 &&
+    Number(displayGradeFrom) <= Number(displayGradeTo)
+
+  const handleSaveGradeRange = () => {
+    if (!gradeRangeValid) return
+    updateGradeRange.mutate(
+      { sectionHeadGradeFrom: Number(displayGradeFrom), sectionHeadGradeTo: Number(displayGradeTo) },
+      {
+        onSuccess: () => {
+          showNotification({ variant: 'success', message: 'Grade range updated.' })
+          setGradeRangeTouched(false)
+        },
+        onError: (err) => showNotification({ variant: 'danger', message: extractErrorMessage(err, 'Could not update grade range.') }),
+      },
+    )
+  }
 
   return (
     <div className="container-fluid py-4">
@@ -156,6 +184,57 @@ function StaffRolesContent({ id }: { id: string }) {
                       </span>
                     </label>
                   ))}
+                </div>
+              )}
+
+              {systemRole?.hasAccount && systemRole.roleId === 4 && (
+                <div className="mt-3 pt-3 border-top">
+                  <p className="fw-semibold small mb-1">Grade Range</p>
+                  <p className="text-muted small mb-2">
+                    The grades this Section Head can act on — required for exams, sports, and other grade-scoped actions.
+                  </p>
+                  {!gradeRangeConfigured && !gradeRangeTouched && (
+                    <div className="alert alert-warning py-2 px-3 small mb-2">
+                      Not configured — this Section Head can&apos;t act on any grade until a range is set below.
+                    </div>
+                  )}
+                  <div className="d-flex align-items-end gap-2">
+                    <div>
+                      <label className="form-label small mb-1" htmlFor="grade-from">From</label>
+                      <input
+                        id="grade-from"
+                        type="number"
+                        className="form-control form-control-sm"
+                        style={{ width: 80 }}
+                        min={1}
+                        max={13}
+                        value={displayGradeFrom}
+                        onChange={(e) => { setGradeRangeTouched(true); setGradeFrom(e.target.value) }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label small mb-1" htmlFor="grade-to">To</label>
+                      <input
+                        id="grade-to"
+                        type="number"
+                        className="form-control form-control-sm"
+                        style={{ width: 80 }}
+                        min={1}
+                        max={13}
+                        value={displayGradeTo}
+                        onChange={(e) => { setGradeRangeTouched(true); setGradeTo(e.target.value) }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary d-flex align-items-center gap-2"
+                      onClick={handleSaveGradeRange}
+                      disabled={!gradeRangeValid || updateGradeRange.isPending}
+                    >
+                      {updateGradeRange.isPending ? <span className="spinner-border spinner-border-sm" /> : <Check size={14} />}
+                      Save Range
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

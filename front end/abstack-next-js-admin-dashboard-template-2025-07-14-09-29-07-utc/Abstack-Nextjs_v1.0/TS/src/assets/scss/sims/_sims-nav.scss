@@ -1,0 +1,95 @@
+//
+// _sims-nav.scss — EduLab sidebar/top bar redesign (2026)
+//
+// Overrides ONLY the "brand" variant of data-menu-color / data-topbar-color that
+// _theme-mode.scss already defines (never touches $primary globally — buttons/links
+// elsewhere in the app are unaffected). useLayoutContext.tsx now defaults both to "brand",
+// so this is what a fresh session sees; the ThemeCustomizer's light/dark/gradient options
+// keep working exactly as before, untouched by this file.
+//
+
+// Nav-specific chrome tokens — deliberately separate from _sims-auth.scss's --edulab-panel-bg
+// (which stays deep navy for the login page's brand panel, unaffected by this). Light theme gets
+// a noticeably softer, lighter blue: a full-width persistent bar in near-black navy read as harsh
+// against the bright content area it sits beside. Dark theme is already dark all around it, so
+// the deep navy there was never the problem and is left as-is.
+:root {
+  --edulab-nav-bg: #2b4870;
+  --edulab-nav-bg-2: #33578a;
+}
+
+html[data-bs-theme="dark"] {
+  --edulab-nav-bg: #0a1526;
+  --edulab-nav-bg-2: #101f38;
+}
+
+:root {
+  &[data-menu-color="brand"] {
+    --#{$prefix}menu-bg: linear-gradient(160deg, var(--edulab-nav-bg) 0%, var(--edulab-nav-bg-2) 100%);
+    --#{$prefix}menu-item-color: rgba(255, 255, 255, 0.75);
+    --#{$prefix}menu-item-hover-color: #ffffff;
+    --#{$prefix}menu-item-hover-bg: rgba(255, 255, 255, 0.08);
+    --#{$prefix}menu-item-active-color: #ffffff;
+    --#{$prefix}menu-item-active-bg: color-mix(in srgb, var(--edulab-accent) 35%, transparent);
+    --#{$prefix}sidebar-user-bg: rgba(255, 255, 255, 0.08);
+  }
+
+  &[data-topbar-color="brand"] {
+    --#{$prefix}topbar-bg: var(--edulab-nav-bg);
+    --#{$prefix}topbar-item-color: rgba(255, 255, 255, 0.8);
+    --#{$prefix}topbar-item-hover-color: #ffffff;
+    --#{$prefix}topbar-search-bg: rgba(255, 255, 255, 0.1);
+    --#{$prefix}topbar-user-bg: rgba(255, 255, 255, 0.1);
+    --#{$prefix}topbar-user-border: rgba(255, 255, 255, 0.15);
+  }
+}
+
+// White wordmark on the navy chrome (see LogoBox.tsx / EduLabLogo — falls back to
+// currentColor everywhere this isn't set, which is correct on light menu/topbar variants).
+html[data-menu-color="brand"],
+html[data-menu-color="dark"],
+html[data-menu-color="gradient"] {
+  .sidenav-menu .logo {
+    --edulab-wordmark: #ffffff;
+  }
+}
+
+html[data-topbar-color="brand"],
+html[data-topbar-color="dark"],
+html[data-topbar-color="gradient"] {
+  .app-topbar .logo {
+    --edulab-wordmark: #ffffff;
+  }
+}
+
+// Modern rounded "pill" active-item indicator + refined hover transition.
+.sidenav-menu {
+  .side-nav {
+    .side-nav-link {
+      border-radius: 10px;
+      margin: 0 0.5rem;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .side-nav-item.active > .side-nav-link,
+    .side-nav-link.active {
+      border-radius: 10px;
+      margin: 0 0.5rem;
+    }
+  }
+}
+
+// Subtle separation between the navy topbar and the light content area below it.
+.app-topbar {
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06), 0 6px 20px -12px rgba(10, 20, 40, 0.35);
+}
+
+// _sidenav.scss's condensed-sidebar hover flyout hardcodes $primary/$white instead of going
+// through --bs-menu-item-hover-* — extra [data-menu-color="brand"] attribute here both scopes
+// this to the brand chrome and out-specifies that hardcode so it wins regardless of import order.
+html[data-sidenav-size="condensed"][data-menu-color="brand"]:not([data-layout="topnav"]) {
+  .sidenav-menu .side-nav > .side-nav-item:hover > .side-nav-link {
+    color: #ffffff;
+    background-color: var(--edulab-accent);
+  }
+}
