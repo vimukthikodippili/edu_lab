@@ -75,9 +75,17 @@ export class AuthController {
     return this.service.forgotPassword(forgotPasswordDto.email);
   }
 
+  @SerializeOptions({
+    groups: ['me'],
+  })
   @Post('reset/password')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  resetPassword(@Body() resetPasswordDto: AuthResetPasswordDto): Promise<void> {
+  @ApiOkResponse({
+    type: LoginResponseDto,
+  })
+  @HttpCode(HttpStatus.OK)
+  resetPassword(
+    @Body() resetPasswordDto: AuthResetPasswordDto,
+  ): Promise<LoginResponseDto> {
     return this.service.resetPassword(
       resetPasswordDto.hash,
       resetPasswordDto.password,

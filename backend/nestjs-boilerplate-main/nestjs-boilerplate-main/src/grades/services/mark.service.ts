@@ -10,6 +10,7 @@ import { DataSource, In, Repository } from 'typeorm';
 import { MarkEntity, MarkStatus } from '../entities/mark.entity';
 import { MarkTopicScoreEntity } from '../entities/mark-topic-score.entity';
 import { AssessmentEntity } from '../entities/assessment.entity';
+import { TermResultEntity } from '../entities/term-result.entity';
 import { AssessmentTopicAllocationEntity } from '../entities/assessment-topic-allocation.entity';
 import {
   StudentEntity,
@@ -54,6 +55,8 @@ export class MarkService {
     private readonly studentRepo: Repository<StudentEntity>,
     @InjectRepository(TeacherSubjectClassRequirementEntity)
     private readonly requirementRepo: Repository<TeacherSubjectClassRequirementEntity>,
+    @InjectRepository(TermResultEntity)
+    private readonly termResultRepo: Repository<TermResultEntity>,
     private readonly eventEmitter: EventEmitter2,
     private readonly materialsCheckService: MaterialsCheckService,
     private readonly dataSource: DataSource,
@@ -291,6 +294,37 @@ export class MarkService {
       if (lockedTargets.length > 0) {
         throw new ForbiddenException(
           `Marks already submitted for ${lockedTargets.length} student(s) and are locked. Ask a Section Head to reopen them.`,
+        );
+      }
+    }
+
+    // Publication Gate — closes the bypass a privileged role otherwise has: once a student's
+    // term result has been published, no direct edit may change an already-submitted mark's
+    // score, regardless of role. A correction must go through MarkCorrectionService instead,
+    // which captures a reason and an audit trail. Unpublished marks are completely unaffected.
+    const changedSubmittedStudentIds = dto.entries
+      .filter((e) => {
+        const existingMark = existingMap.get(e.studentId);
+        if (existingMark?.status !== MarkStatus.SUBMITTED) return false;
+        const newScore = computedScoreByStudentId.get(e.studentId);
+        const oldScore =
+          existingMark.score != null ? Number(existingMark.score) : null;
+        return newScore !== oldScore;
+      })
+      .map((e) => e.studentId);
+
+    if (changedSubmittedStudentIds.length > 0) {
+      const publishedResults = await this.termResultRepo.find({
+        where: {
+          studentId: In(changedSubmittedStudentIds),
+          termId: assessment.termId,
+          isPublished: true,
+        },
+      });
+      if (publishedResults.length > 0) {
+        throw new ForbiddenException(
+          `${publishedResults.length} student(s)' results for this term have already been published. ` +
+            `Submit a mark correction request instead of editing directly.`,
         );
       }
     }

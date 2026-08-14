@@ -49,7 +49,8 @@ export type AuditTargetType =
   | 'visitor'
   | 'ptm_booking'
   | 'parent_feedback'
-  | 'consent_form';
+  | 'consent_form'
+  | 'mark_correction';
 
 @Entity({ name: 'audit_log' })
 export class AuditLogEntity extends EntityRelationalHelper {

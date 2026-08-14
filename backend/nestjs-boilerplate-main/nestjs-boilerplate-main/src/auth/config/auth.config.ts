@@ -44,5 +44,11 @@ export default registerAs<AuthConfig>('auth', () => {
     confirmEmailSecret: process.env.AUTH_CONFIRM_EMAIL_SECRET,
     confirmEmailExpires: process.env
       .AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN as ms.StringValue,
+    maxLoginAttempts: process.env.AUTH_MAX_LOGIN_ATTEMPTS
+      ? parseInt(process.env.AUTH_MAX_LOGIN_ATTEMPTS, 10)
+      : 5,
+    lockoutDurationMinutes: process.env.AUTH_LOCKOUT_DURATION_MINUTES
+      ? parseInt(process.env.AUTH_LOCKOUT_DURATION_MINUTES, 10)
+      : 15,
   };
 });

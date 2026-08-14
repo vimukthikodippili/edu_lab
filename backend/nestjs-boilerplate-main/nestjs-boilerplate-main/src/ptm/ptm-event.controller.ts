@@ -24,9 +24,9 @@ import { PTMEventService } from './ptm-event.service';
 import { CreatePtmEventDto } from './dto/create-ptm-event.dto';
 import { SubmitAvailabilityDto } from './dto/submit-availability.dto';
 
-/** P5-PP-01 — FR-P5-PP-01/02/06. Admin/Principal create + publish; Teacher confirms availability
- * and views their own schedule; Guardian only ever sees published events (enforced server-side in
- * `PTMEventService.findAll`, matching the Events module's own draft/published split). */
+/** P5-PP-01 — FR-P5-PP-01/02/06. Admin/Principal/Section Head create + publish; Teacher confirms
+ * availability and views their own schedule; Guardian only ever sees published events (enforced
+ * server-side in `PTMEventService.findAll`, matching the Events module's own draft/published split). */
 @ApiTags('PTM — Events')
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -49,7 +49,7 @@ export class PTMEventController {
   }
 
   @Post()
-  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a draft PTM event' })
   async create(@Body() dto: CreatePtmEventDto, @Request() req: { user: { id: unknown } }) {
@@ -88,7 +88,7 @@ export class PTMEventController {
   }
 
   @Post(':id/publish')
-  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Publish a PTM event, generating every teacher's slots from their confirmed availability" })
   async publish(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {

@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   HttpStatus,
   Injectable,
   NotFoundException,
@@ -28,12 +29,14 @@ import { Session } from '../session/domain/session';
 import { SessionService } from '../session/session.service';
 import { StatusEnum } from '../statuses/statuses.enum';
 import { User } from '../users/domain/user';
+import { UserRepository } from '../users/infrastructure/persistence/user.repository';
 
 @Injectable()
 export class AuthService {
   constructor(
     private jwtService: JwtService,
     private usersService: UsersService,
+    private userRepository: UserRepository,
     private sessionService: SessionService,
     private mailService: MailService,
     private configService: ConfigService<AllConfigType>,
@@ -69,17 +72,55 @@ export class AuthService {
       });
     }
 
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      const retryAfterMinutes = Math.ceil(
+        (user.lockedUntil.getTime() - Date.now()) / 60000,
+      );
+      throw new ForbiddenException({
+        status: HttpStatus.FORBIDDEN,
+        errors: {
+          password: 'accountLocked',
+        },
+        message: `Too many failed attempts. Try again in ${retryAfterMinutes} minute(s).`,
+      });
+    }
+
     const isValidPassword = await bcrypt.compare(
       loginDto.password,
       user.password,
     );
 
     if (!isValidPassword) {
+      const maxAttempts = this.configService.getOrThrow(
+        'auth.maxLoginAttempts',
+        { infer: true },
+      );
+      const failedLoginAttempts = (user.failedLoginAttempts ?? 0) + 1;
+      const lockoutDurationMinutes = this.configService.getOrThrow(
+        'auth.lockoutDurationMinutes',
+        { infer: true },
+      );
+
+      await this.userRepository.update(user.id, {
+        failedLoginAttempts,
+        lockedUntil:
+          failedLoginAttempts >= maxAttempts
+            ? new Date(Date.now() + lockoutDurationMinutes * 60000)
+            : null,
+      });
+
       throw new UnprocessableEntityException({
         status: HttpStatus.UNPROCESSABLE_ENTITY,
         errors: {
           password: 'incorrectPassword',
         },
+      });
+    }
+
+    if ((user.failedLoginAttempts ?? 0) > 0 || user.lockedUntil) {
+      await this.userRepository.update(user.id, {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       });
     }
 
@@ -340,6 +381,10 @@ export class AuthService {
       },
     );
 
+    await this.userRepository.update(user.id, {
+      passwordResetHash: hash,
+    });
+
     await this.mailService.forgotPassword({
       to: email,
       data: {
@@ -349,7 +394,10 @@ export class AuthService {
     });
   }
 
-  async resetPassword(hash: string, password: string): Promise<void> {
+  async resetPassword(
+    hash: string,
+    password: string,
+  ): Promise<LoginResponseDto> {
     let userId: User['id'];
 
     try {
@@ -382,6 +430,17 @@ export class AuthService {
       });
     }
 
+    // Single-use enforcement: the hash must still match the most recently issued
+    // (unconsumed) reset link — a replay, or a link superseded by a newer request, fails here.
+    if (!user.passwordResetHash || user.passwordResetHash !== hash) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          hash: `invalidHash`,
+        },
+      });
+    }
+
     user.password = password;
 
     await this.sessionService.deleteByUserId({
@@ -389,6 +448,32 @@ export class AuthService {
     });
 
     await this.usersService.update(user.id, user);
+    await this.userRepository.update(user.id, { passwordResetHash: null });
+
+    // Auto-login: mirrors validateLogin's tail so a reset genuinely logs the user in.
+    const sessionHash = crypto
+      .createHash('sha256')
+      .update(randomStringGenerator())
+      .digest('hex');
+
+    const session = await this.sessionService.create({
+      user,
+      hash: sessionHash,
+    });
+
+    const { token, refreshToken, tokenExpires } = await this.getTokensData({
+      id: user.id,
+      role: user.role,
+      sessionId: session.id,
+      hash: sessionHash,
+    });
+
+    return {
+      refreshToken,
+      token,
+      tokenExpires,
+      user,
+    };
   }
 
   async me(userJwtPayload: JwtPayloadType): Promise<NullableType<User>> {

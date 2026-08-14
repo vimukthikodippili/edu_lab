@@ -15,6 +15,7 @@ import { StaffEntity, StaffStatus } from '../staff/entities/staff.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { SchoolCalendarConfigService } from '../school-calendar-config/school-calendar-config.service';
 import { TimetableFinalizedEvent } from './events/timetable-finalized.event';
+import { ClassCheckInEntity } from '../class-check-in/entities/class-check-in.entity';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -97,6 +98,8 @@ const buildDeleteQb = () => {
     delete: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([]),
     execute: jest.fn().mockResolvedValue({ affected: 0 }),
     select: jest.fn().mockReturnThis(),
     leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -113,6 +116,7 @@ describe('TimetableService', () => {
   let recordRepo: jest.Mocked<Repository<TimetableRecordEntity>>;
   let requirementRepo: jest.Mocked<Repository<TeacherSubjectClassRequirementEntity>>;
   let classSectionRepo: jest.Mocked<Repository<ClassSectionEntity>>;
+  let checkInRepo: jest.Mocked<Repository<ClassCheckInEntity>>;
   let calendarSvc: jest.Mocked<SchoolCalendarConfigService>;
   let gradeStageService: jest.Mocked<GradeStageService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
@@ -122,6 +126,7 @@ describe('TimetableService', () => {
     recordRepo = repoMock<TimetableRecordEntity>() as any;
     requirementRepo = repoMock<TeacherSubjectClassRequirementEntity>() as any;
     classSectionRepo = repoMock<ClassSectionEntity>() as any;
+    checkInRepo = repoMock<ClassCheckInEntity>() as any;
     calendarSvc = { findAll: jest.fn(), findByGradeLevel: jest.fn() } as any;
     gradeStageService = { findAll: jest.fn().mockResolvedValue([SENIOR_SECONDARY_STAGE]) } as any;
     eventEmitter = { emit: jest.fn() } as any;
@@ -133,6 +138,7 @@ describe('TimetableService', () => {
         { provide: getRepositoryToken(TimetableRecordEntity), useValue: recordRepo },
         { provide: getRepositoryToken(TeacherSubjectClassRequirementEntity), useValue: requirementRepo },
         { provide: getRepositoryToken(ClassSectionEntity), useValue: classSectionRepo },
+        { provide: getRepositoryToken(ClassCheckInEntity), useValue: checkInRepo },
         { provide: SchoolCalendarConfigService, useValue: calendarSvc },
         { provide: GradeStageService, useValue: gradeStageService },
         { provide: EventEmitter2, useValue: eventEmitter },
@@ -157,6 +163,8 @@ describe('TimetableService', () => {
         delete: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([]),
         execute: jest.fn().mockResolvedValue({ affected: 0 }),
         select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -198,6 +206,8 @@ describe('TimetableService', () => {
         delete: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([]),
         execute: jest.fn().mockResolvedValue({ affected: 0 }),
         select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -244,6 +254,8 @@ describe('TimetableService', () => {
         delete: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([]),
         execute: jest.fn().mockResolvedValue({ affected: 0 }),
         select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -270,6 +282,8 @@ describe('TimetableService', () => {
         delete: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([]),
         execute: jest.fn().mockResolvedValue({ affected: 5 }),
         select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -310,6 +324,8 @@ describe('TimetableService', () => {
         delete: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([]),
         execute: jest.fn().mockResolvedValue({ affected: 0 }),
         select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -336,6 +352,8 @@ describe('TimetableService', () => {
         delete: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([]),
         execute: jest.fn().mockResolvedValue({ affected: 0 }),
         select: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -356,6 +374,109 @@ describe('TimetableService', () => {
 
       expect(savedEntries.length).toBeGreaterThan(0);
       expect(savedEntries.every((e) => e.status === TimetableEntryStatus.DRAFT)).toBe(true);
+    });
+
+    it('excludes a class section with recorded check-ins from delete+regeneration and reports it as skipped', async () => {
+      const section1 = makeSection(1);
+      const section2 = makeSection(2);
+      classSectionRepo.find.mockResolvedValue([section1, section2]);
+
+      const sharedQb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([{ classSectionId: 2 }]),
+        delete: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 0 }),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      entryRepo.createQueryBuilder.mockReturnValue(sharedQb as any);
+
+      const reqQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          makeRequirement({ id: 1, classSectionId: 1, periodsPerWeek: 3 }),
+        ]),
+      };
+      requirementRepo.createQueryBuilder.mockReturnValue(reqQb as any);
+
+      calendarSvc.findAll.mockResolvedValue([makeCalendarConfig(5, 8)]);
+      entryRepo.save.mockResolvedValue([] as any);
+
+      const result = await service.generate({ academicYear: '2026' });
+
+      expect(result.skippedSections).toHaveLength(1);
+      expect(result.skippedSections[0]).toEqual(
+        expect.objectContaining({ classSectionId: 2, name: 'A', gradeName: 'Grade 10' }),
+      );
+      // Requirements were only queried for the unprotected section (1), not the skipped one (2)
+      expect(reqQb.where).toHaveBeenCalledWith('r.classSectionId IN (:...sectionIds)', { sectionIds: [1] });
+    });
+
+    it('does not double-book a teacher into a slot already held by a preserved (skipped) section', async () => {
+      const section1 = makeSection(1); // being regenerated
+      classSectionRepo.find.mockResolvedValue([section1]);
+
+      const sharedTeacher = 'shared-teacher';
+      // The preserved section (e.g. a protected section outside this scope) already holds this
+      // teacher at day 1 / period 1 — the new schedule must not also place them there.
+      const preservedSlot = { teacherId: sharedTeacher, day: 1, period: 1 };
+
+      const sharedQb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]), // no check-in-protected sections
+        delete: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 0 }),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([preservedSlot]),
+      };
+      entryRepo.createQueryBuilder.mockReturnValue(sharedQb as any);
+
+      const reqQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          makeRequirement({ id: 1, classSectionId: 1, teacherId: sharedTeacher, periodsPerWeek: 1, teacher: makeStaff(sharedTeacher) }),
+        ]),
+      };
+      requirementRepo.createQueryBuilder.mockReturnValue(reqQb as any);
+
+      calendarSvc.findAll.mockResolvedValue([makeCalendarConfig(5, 8)]);
+      let savedEntries: Partial<TimetableEntryEntity>[] = [];
+      entryRepo.save.mockImplementation(async (entries: any) => {
+        savedEntries = entries;
+        return entries;
+      });
+
+      await service.generate({ academicYear: '2026' });
+
+      expect(savedEntries).toHaveLength(1);
+      expect(savedEntries[0]).not.toEqual(expect.objectContaining({ day: 1, period: 1 }));
+    });
+
+    it('throws when every matched section has recorded check-ins', async () => {
+      const section1 = makeSection(1);
+      classSectionRepo.find.mockResolvedValue([section1]);
+
+      const sharedQb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([{ classSectionId: 1 }]),
+      };
+      entryRepo.createQueryBuilder.mockReturnValue(sharedQb as any);
+
+      await expect(service.generate({ academicYear: '2026' })).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(requirementRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
 
     it('throws when the timetable for that academic year is already finalized', async () => {

@@ -234,7 +234,6 @@ export class StudentsController {
   @Roles(
     RoleEnum.admin,
     RoleEnum.principal,
-    RoleEnum.section_head,
     RoleEnum.teacher,
     RoleEnum.counselor,
     RoleEnum.school_psychologist,

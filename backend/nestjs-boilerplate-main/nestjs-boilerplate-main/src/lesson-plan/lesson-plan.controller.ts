@@ -109,7 +109,7 @@ export class LessonPlanController {
   }
 
   @Put('entry')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.section_head)
   @HttpCode(HttpStatus.OK)
   async upsertEntry(
     @Body() dto: UpsertLessonPlanEntryDto,
@@ -120,7 +120,7 @@ export class LessonPlanController {
   }
 
   @Patch('entry/complete')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.section_head)
   @HttpCode(HttpStatus.OK)
   async markComplete(
     @Body() dto: MarkCompleteLessonPlanEntryDto,
@@ -131,7 +131,7 @@ export class LessonPlanController {
   }
 
   @Post('submit')
-  @Roles(RoleEnum.teacher)
+  @Roles(RoleEnum.teacher, RoleEnum.section_head)
   @HttpCode(HttpStatus.CREATED)
   async submit(
     @Body() dto: SubmitLessonPlanDto,

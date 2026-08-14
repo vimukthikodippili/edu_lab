@@ -8,6 +8,7 @@ import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { StaffEntity } from '../staff/entities/staff.entity';
 import { UserEntity } from '../users/infrastructure/persistence/relational/entities/user.entity';
 import { LeaveRequestEntity } from '../leave/entities/leave-request.entity';
+import { ClassCheckInEntity } from '../class-check-in/entities/class-check-in.entity';
 import { SchoolCalendarConfigModule } from '../school-calendar-config/school-calendar-config.module';
 import { NotificationModule } from '../notification/notification.module';
 import { UsersModule } from '../users/users.module';
@@ -30,6 +31,7 @@ import { SubstituteSuggestionListener } from './listeners/substitute-suggestion.
       StaffEntity,
       UserEntity,
       LeaveRequestEntity,
+      ClassCheckInEntity,
     ]),
     SchoolCalendarConfigModule,
     NotificationModule,

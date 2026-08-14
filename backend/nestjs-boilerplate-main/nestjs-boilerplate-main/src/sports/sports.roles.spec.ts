@@ -18,17 +18,20 @@ function buildContext(handler: (...args: never[]) => unknown, roleId: number): E
 describe('SportsController — role-based access control (real RolesGuard + real Reflector)', () => {
   const guard = new RolesGuard(new Reflector());
 
-  describe('management routes (create/update/findAll) — admin, principal, section_head only', () => {
+  describe('management routes (create/update/findAll) — Sport Setup is admin/principal only, NOT Section Head', () => {
     const handlers: [string, (...args: never[]) => unknown][] = [
       ['create', SportsController.prototype.create],
       ['update', SportsController.prototype.update],
       ['findAll', SportsController.prototype.findAll],
     ];
 
-    it.each(handlers)('%s allows Admin, Principal, and Section Head', (_name, handler) => {
+    it.each(handlers)('%s allows Admin and Principal', (_name, handler) => {
       expect(guard.canActivate(buildContext(handler, RoleEnum.admin))).toBe(true);
       expect(guard.canActivate(buildContext(handler, RoleEnum.principal))).toBe(true);
-      expect(guard.canActivate(buildContext(handler, RoleEnum.section_head))).toBe(true);
+    });
+
+    it.each(handlers)('%s denies Section Head — Sport Setup management was intentionally removed from this role', (_name, handler) => {
+      expect(guard.canActivate(buildContext(handler, RoleEnum.section_head))).toBe(false);
     });
 
     it.each(handlers)('%s denies Teacher, Student, and Guardian', (_name, handler) => {

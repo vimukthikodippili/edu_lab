@@ -71,21 +71,21 @@ export class TeacherSubjectRequirementsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head)
+  @Roles(RoleEnum.admin, RoleEnum.principal)
   create(@Body() dto: CreateRequirementDto) {
     return this.svc.create(dto);
   }
 
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head)
+  @Roles(RoleEnum.admin, RoleEnum.principal)
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateRequirementDto) {
     return this.svc.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head)
+  @Roles(RoleEnum.admin, RoleEnum.principal)
   async delete(@Param('id', ParseIntPipe) id: number): Promise<void> {
     return this.svc.delete(id);
   }

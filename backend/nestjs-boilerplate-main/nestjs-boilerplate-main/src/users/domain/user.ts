@@ -69,6 +69,15 @@ export class User {
   })
   status?: Status;
 
+  @Exclude({ toPlainOnly: true })
+  failedLoginAttempts?: number;
+
+  @Exclude({ toPlainOnly: true })
+  lockedUntil?: Date | null;
+
+  @Exclude({ toPlainOnly: true })
+  passwordResetHash?: string | null;
+
   @ApiProperty()
   createdAt: Date;
 

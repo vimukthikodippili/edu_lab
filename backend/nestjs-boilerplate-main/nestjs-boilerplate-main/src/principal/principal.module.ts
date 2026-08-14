@@ -7,6 +7,8 @@ import { EmergencyAlertEntity } from '../communication/entities/emergency-alert.
 import { LeaveRequestEntity } from '../leave/entities/leave-request.entity';
 import { ExpenseApprovalEntity } from '../expenses/entities/expense-approval.entity';
 import { CounselorCaseEntity } from '../counselor/entities/counselor-case.entity';
+import { MarkCorrectionRequestEntity } from '../grades/entities/mark-correction-request.entity';
+import { MarkEntity } from '../grades/entities/mark.entity';
 import { MhaCaseloadModule } from '../mha-caseload/mha-caseload.module';
 import { PrincipalService } from './principal.service';
 import { PrincipalController } from './principal.controller';
@@ -21,6 +23,8 @@ import { PrincipalController } from './principal.controller';
       LeaveRequestEntity,
       ExpenseApprovalEntity,
       CounselorCaseEntity,
+      MarkCorrectionRequestEntity,
+      MarkEntity,
     ]),
     MhaCaseloadModule,
   ],

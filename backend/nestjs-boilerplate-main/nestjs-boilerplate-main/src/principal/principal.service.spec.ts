@@ -26,6 +26,8 @@ import {
 } from '../counselor/entities/counselor-case.entity';
 import { MhaCaseloadService } from '../mha-caseload/mha-caseload.service';
 import { CaseloadItemDto } from '../mha-caseload/dto/caseload-item.dto';
+import { MarkCorrectionRequestEntity } from '../grades/entities/mark-correction-request.entity';
+import { MarkEntity } from '../grades/entities/mark.entity';
 
 // ─── Mock factories ───────────────────────────────────────────────────────────
 
@@ -58,6 +60,8 @@ let alertRepo: MockRepo<EmergencyAlertEntity>;
 let leaveRepo: MockRepo<LeaveRequestEntity>;
 let expenseRepo: MockRepo<ExpenseApprovalEntity>;
 let counselorCaseRepo: MockRepo<CounselorCaseEntity>;
+let markCorrectionRepo: MockRepo<MarkCorrectionRequestEntity>;
+let markRepo: MockRepo<MarkEntity>;
 let mhaCaseloadService: { getCaseload: jest.Mock };
 
 const buildModule = async (): Promise<PrincipalService> => {
@@ -71,6 +75,8 @@ const buildModule = async (): Promise<PrincipalService> => {
       { provide: getRepositoryToken(LeaveRequestEntity), useValue: leaveRepo },
       { provide: getRepositoryToken(ExpenseApprovalEntity), useValue: expenseRepo },
       { provide: getRepositoryToken(CounselorCaseEntity), useValue: counselorCaseRepo },
+      { provide: getRepositoryToken(MarkCorrectionRequestEntity), useValue: markCorrectionRepo },
+      { provide: getRepositoryToken(MarkEntity), useValue: markRepo },
       { provide: MhaCaseloadService, useValue: mhaCaseloadService },
     ],
   }).compile();
@@ -105,6 +111,8 @@ describe('PrincipalService.getKpi', () => {
     leaveRepo = repoMock<LeaveRequestEntity>();
     expenseRepo = repoMock<ExpenseApprovalEntity>();
     counselorCaseRepo = repoMock<CounselorCaseEntity>();
+    markCorrectionRepo = repoMock<MarkCorrectionRequestEntity>();
+    markRepo = repoMock<MarkEntity>();
     mhaCaseloadService = { getCaseload: jest.fn() };
 
     // Safe defaults — all channels return zero
@@ -119,6 +127,7 @@ describe('PrincipalService.getKpi', () => {
     leaveRepo.count!.mockResolvedValue(0);
     expenseRepo.count!.mockResolvedValue(0);
     counselorCaseRepo.count!.mockResolvedValue(0);
+    markCorrectionRepo.count!.mockResolvedValue(0);
     mhaCaseloadService.getCaseload.mockResolvedValue([]);
 
     service = await buildModule();
@@ -263,6 +272,8 @@ describe('PrincipalService.getWellbeingConcerns', () => {
     leaveRepo = repoMock<LeaveRequestEntity>();
     expenseRepo = repoMock<ExpenseApprovalEntity>();
     counselorCaseRepo = repoMock<CounselorCaseEntity>();
+    markCorrectionRepo = repoMock<MarkCorrectionRequestEntity>();
+    markRepo = repoMock<MarkEntity>();
     mhaCaseloadService = { getCaseload: jest.fn() };
 
     service = await buildModule();
@@ -299,6 +310,8 @@ describe('PrincipalService.getApprovalQueue', () => {
     leaveRepo = repoMock<LeaveRequestEntity>();
     expenseRepo = repoMock<ExpenseApprovalEntity>();
     counselorCaseRepo = repoMock<CounselorCaseEntity>();
+    markCorrectionRepo = repoMock<MarkCorrectionRequestEntity>();
+    markRepo = repoMock<MarkEntity>();
     mhaCaseloadService = { getCaseload: jest.fn() };
 
     // KPI defaults (not tested here, just prevent errors)
@@ -309,6 +322,9 @@ describe('PrincipalService.getApprovalQueue', () => {
     leaveRepo.count!.mockResolvedValue(0);
     expenseRepo.count!.mockResolvedValue(0);
     counselorCaseRepo.count!.mockResolvedValue(0);
+    markCorrectionRepo.count!.mockResolvedValue(0);
+    markCorrectionRepo.find!.mockResolvedValue([]);
+    markRepo.find!.mockResolvedValue([]);
     mhaCaseloadService.getCaseload.mockResolvedValue([]);
 
     // Queue data — one item from each source type

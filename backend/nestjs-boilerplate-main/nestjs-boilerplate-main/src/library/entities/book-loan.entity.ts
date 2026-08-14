@@ -26,8 +26,14 @@ export class BookLoanEntity extends EntityRelationalHelper {
   @Column({ type: 'uuid' })
   bookId: string;
 
-  @Column({ type: 'uuid' })
-  studentId: string;
+  @Column({ type: 'uuid', nullable: true })
+  studentId: string | null;
+
+  // Exactly one of studentId / borrowerStaffId is ever set — enforced by a DB CHECK
+  // constraint (CHK_book_loan_borrower), not just app logic, since this row is the single
+  // source of truth for who has the book.
+  @Column({ type: 'uuid', nullable: true })
+  borrowerStaffId: string | null;
 
   @Column({ type: 'uuid' })
   issuedByStaffId: string;
@@ -62,9 +68,13 @@ export class BookLoanEntity extends EntityRelationalHelper {
   @JoinColumn({ name: 'bookId' })
   book: BookEntity;
 
-  @ManyToOne(() => StudentEntity, { nullable: false, eager: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => StudentEntity, { nullable: true, eager: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'studentId' })
-  student: StudentEntity;
+  student: StudentEntity | null;
+
+  @ManyToOne(() => StaffEntity, { nullable: true, eager: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'borrowerStaffId' })
+  borrowerStaff: StaffEntity | null;
 
   @ManyToOne(() => StaffEntity, { nullable: false, eager: false, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'issuedByStaffId' })

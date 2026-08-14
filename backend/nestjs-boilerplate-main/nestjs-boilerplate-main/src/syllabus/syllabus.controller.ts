@@ -40,7 +40,7 @@ export class SyllabusController {
   }
 
   @Post()
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.section_head)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a syllabus unit' })
   create(@Body() dto: CreateSyllabusUnitDto) {
@@ -51,7 +51,7 @@ export class SyllabusController {
   // NestJS from treating these path segments as UUID params.
 
   @Patch('reorder')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.section_head)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reorder units by providing an ordered array of UUIDs' })
   reorder(@Body() dto: ReorderSyllabusUnitsDto) {
@@ -59,7 +59,7 @@ export class SyllabusController {
   }
 
   @Post('copy-from-year')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.section_head)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Copy all syllabus units from a prior year into a new year' })
   copyFromYear(@Body() dto: CopyFromYearDto) {
@@ -67,7 +67,7 @@ export class SyllabusController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.section_head)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update a syllabus unit title, description, or order' })
   update(
@@ -78,7 +78,7 @@ export class SyllabusController {
   }
 
   @Delete(':id')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.section_head)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a syllabus unit' })
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {

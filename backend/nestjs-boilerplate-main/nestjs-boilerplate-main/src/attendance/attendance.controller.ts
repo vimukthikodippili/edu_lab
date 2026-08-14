@@ -64,6 +64,7 @@ export class AttendanceController {
   @Roles(
     RoleEnum.admin,
     RoleEnum.principal,
+    RoleEnum.section_head,
     RoleEnum.teacher,
     RoleEnum.counselor,
     RoleEnum.school_psychologist,

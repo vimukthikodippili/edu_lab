@@ -1,5 +1,6 @@
 import { IsDateString, IsInt, IsString, Length, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsSaneAcademicYear } from '../validators/is-sane-academic-year.validator';
 
 export class CreateAcademicTermDto {
   @IsString()
@@ -13,7 +14,7 @@ export class CreateAcademicTermDto {
   termNumber: number;
 
   @IsString()
-  @Length(4, 4)
+  @IsSaneAcademicYear()
   academicYear: string;
 
   @IsDateString()

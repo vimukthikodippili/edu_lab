@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TimetableEntryEntity, TimetableEntryStatus } from './entities/timetable-entry.entity';
 import { TimetableRecordEntity } from './entities/timetable-record.entity';
+import { ClassCheckInEntity } from '../class-check-in/entities/class-check-in.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { GradeStageEntity } from '../students/entities/grade-stage.entity';
@@ -30,12 +31,20 @@ export interface ConflictRecord {
   unassigned: number;
 }
 
+export interface SkippedSectionRecord {
+  classSectionId: number;
+  gradeName: string;
+  name: string;
+  reason: string;
+}
+
 export interface GenerationResult {
   academicYear: string;
   entriesCreated: number;
   conflictsCount: number;
   durationMs: number;
   conflicts: ConflictRecord[];
+  skippedSections: SkippedSectionRecord[];
 }
 
 export interface RoomConflictWarning {
@@ -83,6 +92,9 @@ export class TimetableService {
     @InjectRepository(ClassSectionEntity)
     private readonly classSectionRepo: Repository<ClassSectionEntity>,
 
+    @InjectRepository(ClassCheckInEntity)
+    private readonly checkInRepo: Repository<ClassCheckInEntity>,
+
     private readonly calendarSvc: SchoolCalendarConfigService,
     private readonly gradeStageService: GradeStageService,
     private readonly eventEmitter: EventEmitter2,
@@ -121,7 +133,44 @@ export class TimetableService {
       });
     }
 
-    const sectionIds = sections.map((s) => s.id);
+    const allSectionIds = sections.map((s) => s.id);
+
+    // 1b. class_check_in rows are DB-enforced append-only (see migration
+    // AddClassCheckInImmutabilityTrigger) — a section whose current timetable_entry rows have
+    // recorded check-ins can never have those entries deleted, so regenerating for it would
+    // always crash with a raw Postgres error. Exclude those sections from this run entirely
+    // (their existing schedule is left untouched) rather than let the delete fail.
+    const protectedSectionIds = new Set(
+      (
+        await this.entryRepo
+          .createQueryBuilder('te')
+          .innerJoin(ClassCheckInEntity, 'cci', 'cci."timetableEntryId" = te.id')
+          .where('te.academicYear = :year', { year: dto.academicYear })
+          .andWhere('te.classSectionId IN (:...allSectionIds)', { allSectionIds })
+          .select('DISTINCT te.classSectionId', 'classSectionId')
+          .getRawMany<{ classSectionId: number }>()
+      ).map((r) => r.classSectionId),
+    );
+
+    const skippedSections: SkippedSectionRecord[] = sections
+      .filter((s) => protectedSectionIds.has(s.id))
+      .map((s) => ({
+        classSectionId: s.id,
+        gradeName: s.grade.name,
+        name: s.name,
+        reason: 'Has recorded attendance check-ins — existing schedule preserved.',
+      }));
+
+    const sectionIds = allSectionIds.filter((id) => !protectedSectionIds.has(id));
+
+    if (sectionIds.length === 0) {
+      throw new UnprocessableEntityException({
+        status: 422,
+        errors: {
+          academicYear: `Every matched class section has recorded attendance check-ins and cannot be regenerated. Unaffected sections only.`,
+        },
+      });
+    }
 
     // 2. Load all requirements for those sections (with eager teacher + subject)
     const requirements = await this.requirementRepo
@@ -173,8 +222,20 @@ export class TimetableService {
       return { req, section, stage: resolveStageFromList(gradeStages, section.grade.level) };
     });
 
+    // 6b. A teacher is a cross-section resource — any entry for this academic year that this
+    // batch isn't deleting (skipped/protected sections, or any section outside the current
+    // gradeId filter entirely) can still hold a teacher who's also being scheduled here. Without
+    // this, the greedy algorithm below has no way to see those slots and can double-book a
+    // shared teacher into an already-occupied one (confirmed live: UQ_te_teacher_slot violation).
+    const preservedTeacherSlots = await this.entryRepo
+      .createQueryBuilder('te')
+      .select(['te.teacherId', 'te.day', 'te.period'])
+      .where('te.academicYear = :year', { year: dto.academicYear })
+      .andWhere('te.classSectionId NOT IN (:...sectionIds)', { sectionIds })
+      .getMany();
+
     // 7. Run greedy algorithm
-    const { entries, conflicts } = this.runGreedy(rows, configMap, dto.academicYear);
+    const { entries, conflicts } = this.runGreedy(rows, configMap, dto.academicYear, preservedTeacherSlots);
 
     // 8. Bulk insert generated entries
     if (entries.length > 0) {
@@ -187,6 +248,7 @@ export class TimetableService {
       conflictsCount: conflicts.length,
       durationMs: Date.now() - start,
       conflicts,
+      skippedSections,
     };
   }
 
@@ -360,6 +422,7 @@ export class TimetableService {
     rows: RequirementRow[],
     configMap: Map<string, { workingDaysPerWeek: number; periodsPerDay: number }>,
     academicYear: string,
+    preservedTeacherSlots: Pick<TimetableEntryEntity, 'teacherId' | 'day' | 'period'>[] = [],
   ): { entries: Partial<TimetableEntryEntity>[]; conflicts: ConflictRecord[] } {
     // Default grid if no config for a stage
     const DEFAULT_CFG = { workingDaysPerWeek: 5, periodsPerDay: 8 };
@@ -367,6 +430,13 @@ export class TimetableService {
     // Occupancy tracking: key = "teacherId|day-period" or "classSectionId|day-period"
     const teacherBusy = new Map<string, Set<string>>();
     const classBusy = new Map<number, Set<string>>();
+
+    // Seed with slots already held by a teacher outside this run's scope (preserved/protected
+    // sections, or sections in a different grade) so the new schedule can't double-book them.
+    for (const slot of preservedTeacherSlots) {
+      if (!teacherBusy.has(slot.teacherId)) teacherBusy.set(slot.teacherId, new Set());
+      teacherBusy.get(slot.teacherId)!.add(`${slot.day}-${slot.period}`);
+    }
 
     const entries: Partial<TimetableEntryEntity>[] = [];
     const conflicts: ConflictRecord[] = [];

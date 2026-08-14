@@ -7,7 +7,6 @@ import { ExamSeatEntity } from './entities/exam-seat.entity';
 import { ExamSeatAllocationEntity } from './entities/exam-seat-allocation.entity';
 import { AdmitCardEntity } from './entities/admit-card.entity';
 import { StudentEntity, StudentStatus } from '../students/entities/student.entity';
-import { StudentSubjectEnrollmentEntity } from '../enrollments/entities/student-subject-enrollment.entity';
 import { GuardianEntity } from '../students/entities/guardian.entity';
 import { ExamService } from './exam.service';
 import { AutoAllocateDto } from './dto/auto-allocate.dto';
@@ -63,9 +62,6 @@ export class ExamSeatAllocationService {
     @InjectRepository(StudentEntity)
     private readonly studentRepo: Repository<StudentEntity>,
 
-    @InjectRepository(StudentSubjectEnrollmentEntity)
-    private readonly enrollmentRepo: Repository<StudentSubjectEnrollmentEntity>,
-
     private readonly examService: ExamService,
     private readonly dataSource: DataSource,
     private readonly auditService: AuditService,
@@ -91,14 +87,8 @@ export class ExamSeatAllocationService {
       throw new ConflictException('This exam has already been allocated. Use manual override to change individual seats.');
     }
 
-    const enrollments = await this.enrollmentRepo.find({ where: { subjectId: exam.subjectId } });
-    const enrolledStudentIds = enrollments.map((e) => e.studentId);
-    if (enrolledStudentIds.length === 0) {
-      return { allocatedCount: 0, hallsUsed: 0, specialNeedsPlaced: 0 };
-    }
-
     const candidates = await this.studentRepo.find({
-      where: { id: In(enrolledStudentIds), gradeId: exam.gradeId, status: StudentStatus.ACTIVE },
+      where: { gradeId: exam.gradeId, status: StudentStatus.ACTIVE },
       order: { classSectionId: 'ASC', lastName: 'ASC', firstName: 'ASC' },
     });
     if (candidates.length === 0) {

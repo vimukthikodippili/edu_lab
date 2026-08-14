@@ -9,7 +9,6 @@ import { ExamSeatEntity } from './entities/exam-seat.entity';
 import { ExamSeatAllocationEntity } from './entities/exam-seat-allocation.entity';
 import { AdmitCardEntity } from './entities/admit-card.entity';
 import { StudentEntity, StudentStatus } from '../students/entities/student.entity';
-import { StudentSubjectEnrollmentEntity } from '../enrollments/entities/student-subject-enrollment.entity';
 import { ExamService } from './exam.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationService } from '../notification/notification.service';
@@ -75,7 +74,6 @@ describe('ExamSeatAllocationService', () => {
   let allocationRepo: MockRepo<ExamSeatAllocationEntity>;
   let admitCardRepo: MockRepo<AdmitCardEntity>;
   let studentRepo: MockRepo<StudentEntity>;
-  let enrollmentRepo: MockRepo<StudentSubjectEnrollmentEntity>;
   let examService: { assertSectionHeadCanActOnGrade: jest.Mock };
   let dataSource: { transaction: jest.Mock };
   let auditService: { log: jest.Mock };
@@ -102,7 +100,6 @@ describe('ExamSeatAllocationService', () => {
     allocationRepo = repoMock<ExamSeatAllocationEntity>();
     admitCardRepo = repoMock<AdmitCardEntity>();
     studentRepo = repoMock<StudentEntity>();
-    enrollmentRepo = repoMock<StudentSubjectEnrollmentEntity>();
     examService = { assertSectionHeadCanActOnGrade: jest.fn().mockResolvedValue(undefined) };
     dataSource = { transaction: jest.fn((cb) => cb(buildManagerMock())) };
     auditService = { log: jest.fn().mockResolvedValue(undefined) };
@@ -121,7 +118,6 @@ describe('ExamSeatAllocationService', () => {
         { provide: getRepositoryToken(ExamSeatAllocationEntity), useValue: allocationRepo },
         { provide: getRepositoryToken(AdmitCardEntity), useValue: admitCardRepo },
         { provide: getRepositoryToken(StudentEntity), useValue: studentRepo },
-        { provide: getRepositoryToken(StudentSubjectEnrollmentEntity), useValue: enrollmentRepo },
         { provide: ExamService, useValue: examService },
         { provide: DataSource, useValue: dataSource },
         { provide: AuditService, useValue: auditService },
@@ -148,7 +144,6 @@ describe('ExamSeatAllocationService', () => {
       );
 
       const students = [buildStudent({ id: 's1' }), buildStudent({ id: 's2' }), buildStudent({ id: 's3' }), buildStudent({ id: 's4' })];
-      (enrollmentRepo.find as jest.Mock).mockResolvedValue(students.map((s) => ({ studentId: s.id, subjectId: SUBJECT_ID })));
       (studentRepo.find as jest.Mock).mockResolvedValue(students);
 
       let savedAllocations: any[] = [];
@@ -202,7 +197,6 @@ describe('ExamSeatAllocationService', () => {
         buildStudent({ id: 'reg-3' }),
         buildStudent({ id: 'reg-4' }),
       ];
-      (enrollmentRepo.find as jest.Mock).mockResolvedValue(students.map((s) => ({ studentId: s.id, subjectId: SUBJECT_ID })));
       (studentRepo.find as jest.Mock).mockResolvedValue(students);
 
       let savedAllocations: any[] = [];
@@ -256,7 +250,6 @@ describe('ExamSeatAllocationService', () => {
         buildStudent({ id: 'c3-a', classSectionId: 3 }),
         buildStudent({ id: 'c3-b', classSectionId: 3 }),
       ];
-      (enrollmentRepo.find as jest.Mock).mockResolvedValue(students.map((s) => ({ studentId: s.id, subjectId: SUBJECT_ID })));
       (studentRepo.find as jest.Mock).mockResolvedValue(students);
 
       let savedAllocations: any[] = [];
@@ -301,7 +294,6 @@ describe('ExamSeatAllocationService', () => {
         buildStudent({ id: 'c2-a', classSectionId: 2 }),
         buildStudent({ id: 'c2-b', classSectionId: 2 }),
       ];
-      (enrollmentRepo.find as jest.Mock).mockResolvedValue(students.map((s) => ({ studentId: s.id, subjectId: SUBJECT_ID })));
       (studentRepo.find as jest.Mock).mockResolvedValue(students);
 
       let savedAllocations: any[] = [];
@@ -336,7 +328,6 @@ describe('ExamSeatAllocationService', () => {
       (hallRepo.find as jest.Mock).mockResolvedValue([buildHall({ capacity: 1, rowCount: 1, columnCount: 1 })]);
       (examRepo.find as jest.Mock).mockResolvedValue([]);
       const students = [buildStudent({ id: 's1' }), buildStudent({ id: 's2' })];
-      (enrollmentRepo.find as jest.Mock).mockResolvedValue(students.map((s) => ({ studentId: s.id, subjectId: SUBJECT_ID })));
       (studentRepo.find as jest.Mock).mockResolvedValue(students);
 
       await expect(service.autoAllocate(EXAM_ID, { mixClasses: false }, STAFF_ID, true, false)).rejects.toThrow(UnprocessableEntityException);
@@ -355,7 +346,6 @@ describe('ExamSeatAllocationService', () => {
 
     it('checks section-head grade range when the caller is not fully privileged', async () => {
       (hallRepo.find as jest.Mock).mockResolvedValue([]);
-      (enrollmentRepo.find as jest.Mock).mockResolvedValue([]);
       await service.autoAllocate(EXAM_ID, { mixClasses: false }, STAFF_ID, false, true);
       expect(examService.assertSectionHeadCanActOnGrade).toHaveBeenCalledWith(STAFF_ID, true, 11);
     });

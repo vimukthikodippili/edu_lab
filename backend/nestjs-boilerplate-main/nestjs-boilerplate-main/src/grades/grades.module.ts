@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AcademicTermEntity } from './entities/academic-term.entity';
+import { AcademicYearEntity } from './entities/academic-year.entity';
 import { TermAssessmentPlanEntity } from './entities/term-assessment-plan.entity';
 import { AssessmentEntity } from './entities/assessment.entity';
 import { MarkEntity } from './entities/mark.entity';
 import { MarkTopicScoreEntity } from './entities/mark-topic-score.entity';
+import { MarkCorrectionRequestEntity } from './entities/mark-correction-request.entity';
 import { GradingBandEntity } from './entities/grading-band.entity';
 import { SubjectResultEntity } from './entities/subject-result.entity';
 import { TermResultEntity } from './entities/term-result.entity';
@@ -24,9 +26,11 @@ import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-require
 import { StudentSubjectEnrollmentEntity } from '../enrollments/entities/student-subject-enrollment.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { AcademicTermsService } from './services/academic-terms.service';
+import { AcademicYearsService } from './services/academic-years.service';
 import { TermAssessmentPlanService } from './services/term-assessment-plan.service';
 import { AssessmentService } from './services/assessment.service';
 import { MarkService } from './services/mark.service';
+import { MarkCorrectionService } from './services/mark-correction.service';
 import { MaterialsCheckService } from './services/materials-check.service';
 import { GradingBandService } from './services/grading-band.service';
 import { ResultComputationService } from './services/result-computation.service';
@@ -38,9 +42,11 @@ import { TopicWeaknessService } from './services/topic-weakness.service';
 import { ResultComputationListener } from './listeners/result-computation.listener';
 import { ReportCardGenerationListener } from './listeners/report-card-generation.listener';
 import { AcademicTermsController } from './controllers/academic-terms.controller';
+import { AcademicYearsController } from './controllers/academic-years.controller';
 import { TermAssessmentPlanController } from './controllers/term-assessment-plan.controller';
 import { AssessmentController } from './controllers/assessment.controller';
 import { MarkController } from './controllers/mark.controller';
+import { MarkCorrectionController } from './controllers/mark-correction.controller';
 import { MaterialsCheckController } from './controllers/materials-check.controller';
 import { GradingBandController } from './controllers/grading-band.controller';
 import { ResultsController } from './controllers/results.controller';
@@ -50,15 +56,18 @@ import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
 import { NotificationModule } from '../notification/notification.module';
 import { SubjectTopicsModule } from '../subject-topics/subject-topics.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       AcademicTermEntity,
+      AcademicYearEntity,
       TermAssessmentPlanEntity,
       AssessmentEntity,
       MarkEntity,
       MarkTopicScoreEntity,
+      MarkCorrectionRequestEntity,
       SubjectEntity,
       StaffEntity,
       ClassSectionEntity,
@@ -82,12 +91,15 @@ import { SubjectTopicsModule } from '../subject-topics/subject-topics.module';
     StaffModule,
     NotificationModule,
     SubjectTopicsModule,
+    AuditModule,
   ],
   providers: [
     AcademicTermsService,
+    AcademicYearsService,
     TermAssessmentPlanService,
     AssessmentService,
     MarkService,
+    MarkCorrectionService,
     MaterialsCheckService,
     GradingBandService,
     ResultComputationService,
@@ -101,9 +113,11 @@ import { SubjectTopicsModule } from '../subject-topics/subject-topics.module';
   ],
   controllers: [
     AcademicTermsController,
+    AcademicYearsController,
     TermAssessmentPlanController,
     AssessmentController,
     MarkController,
+    MarkCorrectionController,
     MaterialsCheckController,
     GradingBandController,
     ResultsController,

@@ -16,15 +16,16 @@ function buildContext(handler: (...args: never[]) => unknown, roleId: number): E
 describe('PTMEventController — role-based access control (real RolesGuard + real Reflector)', () => {
   const guard = new RolesGuard(new Reflector());
 
-  describe('create / publish — Admin/Principal only', () => {
+  describe('create / publish — Admin/Principal/Section Head only', () => {
     const handlers: [string, (...args: never[]) => unknown][] = [
       ['create', PTMEventController.prototype.create],
       ['publish', PTMEventController.prototype.publish],
     ];
 
-    it.each(handlers)('%s allows Admin and Principal', (_name, handler) => {
+    it.each(handlers)('%s allows Admin, Principal, and Section Head', (_name, handler) => {
       expect(guard.canActivate(buildContext(handler, RoleEnum.admin))).toBe(true);
       expect(guard.canActivate(buildContext(handler, RoleEnum.principal))).toBe(true);
+      expect(guard.canActivate(buildContext(handler, RoleEnum.section_head))).toBe(true);
     });
 
     it.each(handlers)('%s denies Teacher and Guardian', (_name, handler) => {

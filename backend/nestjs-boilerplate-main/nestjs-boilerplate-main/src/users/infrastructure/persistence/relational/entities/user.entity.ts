@@ -63,6 +63,19 @@ export class UserEntity extends EntityRelationalHelper {
   })
   status?: StatusEntity;
 
+  // Login-lockout bookkeeping (QA LA-007 follow-up) — never exposed via UpdateUserDto,
+  // only ever written by AuthService through UserRepository directly.
+  @Column({ type: 'int', default: 0 })
+  failedLoginAttempts: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  lockedUntil?: Date | null;
+
+  // The currently-outstanding, unconsumed password-reset JWT (QA LA-005 follow-up) — makes the
+  // reset link single-use and auto-invalidates an older link when a newer one is requested.
+  @Column({ type: 'text', nullable: true })
+  passwordResetHash?: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

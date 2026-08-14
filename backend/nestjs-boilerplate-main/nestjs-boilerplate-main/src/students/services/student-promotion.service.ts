@@ -160,8 +160,14 @@ export class StudentPromotionService {
         );
       }
 
+      // Reassign both the FK scalar AND the eager-loaded relation object — StudentEntity's
+      // `grade`/`classSection` relations have no explicit @JoinColumn, so TypeORM's save()
+      // re-derives the FK from the (otherwise stale, still-pointing-at-the-old-grade) relation
+      // object rather than respecting a scalar-only reassignment, silently discarding it.
       student.gradeId = targetSection.gradeId;
+      student.grade = targetSection.grade;
       student.classSectionId = targetSection.id;
+      student.classSection = targetSection;
       student.academicYear = entry.targetAcademicYear;
     } else {
       // graduated | transferred

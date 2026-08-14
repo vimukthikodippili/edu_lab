@@ -130,8 +130,25 @@ export class LibraryController {
   findLoans(
     @Query('status') status?: LoanStatus,
     @Query('studentId') studentId?: string,
+    @Query('staffId') staffId?: string,
   ) {
-    return this.libraryService.findLoans(status, studentId);
+    return this.libraryService.findLoans(status, studentId, staffId);
+  }
+
+  @Get('loans/mine')
+  @Roles(RoleEnum.student, RoleEnum.teacher)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "The calling student's or teacher's own currently-issued and past library loans",
+  })
+  async findMyLoans(
+    @Request() req: { user: { id: unknown; role?: { id?: number } } },
+  ) {
+    if (req.user.role?.id === RoleEnum.teacher) {
+      const staffId = await this.resolveStaffId(req.user.id);
+      return this.libraryService.findMyStaffLoans(staffId);
+    }
+    return this.libraryService.findMyLoans(req.user.id as number);
   }
 
   // ─── Fines ────────────────────────────────────────────────────────────────

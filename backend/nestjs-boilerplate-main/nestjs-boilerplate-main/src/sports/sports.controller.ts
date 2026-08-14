@@ -119,7 +119,7 @@ export class SportsController {
   }
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head)
+  @Roles(RoleEnum.admin, RoleEnum.principal)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'List all sports — filtered to a Section Head\'s configured grade range',
@@ -143,7 +143,7 @@ export class SportsController {
   }
 
   @Post()
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head)
+  @Roles(RoleEnum.admin, RoleEnum.principal)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a sport and assign its coach' })
   async create(@Body() dto: CreateSportDto) {
@@ -151,7 +151,7 @@ export class SportsController {
   }
 
   @Patch(':id')
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head)
+  @Roles(RoleEnum.admin, RoleEnum.principal)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update a sport, including reassigning its coach' })
   async update(

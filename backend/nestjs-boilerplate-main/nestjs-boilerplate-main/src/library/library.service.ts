@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -11,6 +12,7 @@ import { BookLoanEntity, LoanStatus } from './entities/book-loan.entity';
 import { DigitalBookEntity } from './entities/digital-book.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { StudentEntity } from '../students/entities/student.entity';
+import { StaffEntity } from '../staff/entities/staff.entity';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { IssueBookDto } from './dto/issue-book.dto';
@@ -22,7 +24,10 @@ export interface LoanListRow {
   bookId: string;
   bookTitle: string;
   bookBarcode: string;
-  studentId: string;
+  borrowerType: 'student' | 'staff';
+  borrowerId: string;
+  borrowerName: string;
+  studentId: string | null;
   studentName: string;
   admissionNumber: string;
   issuedAt: Date;
@@ -61,6 +66,8 @@ export class LibraryService {
     private readonly fileRepo: Repository<FileEntity>,
     @InjectRepository(StudentEntity)
     private readonly studentRepo: Repository<StudentEntity>,
+    @InjectRepository(StaffEntity)
+    private readonly staffRepo: Repository<StaffEntity>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -132,19 +139,36 @@ export class LibraryService {
   // ─── Book Issuance & Return ───────────────────────────────────────────────
 
   async issueBook(dto: IssueBookDto, issuedByStaffId: string): Promise<BookLoanEntity> {
+    if (!!dto.studentId === !!dto.staffId) {
+      throw new BadRequestException(
+        'Provide exactly one of studentId or staffId to issue this book to.',
+      );
+    }
+
     const book = await this.bookRepo.findOne({ where: { id: dto.bookId } });
     if (!book) throw new NotFoundException(`Book ${dto.bookId} not found.`);
     if (book.availableCopies <= 0)
       throw new ConflictException('No copies of this book are currently available.');
 
-    const student = await this.studentRepo.findOne({ where: { id: dto.studentId } });
-    if (!student) throw new NotFoundException(`Student ${dto.studentId} not found.`);
+    if (dto.studentId) {
+      const student = await this.studentRepo.findOne({ where: { id: dto.studentId } });
+      if (!student) throw new NotFoundException(`Student ${dto.studentId} not found.`);
 
-    const existingActiveLoan = await this.loanRepo.findOne({
-      where: { bookId: dto.bookId, studentId: dto.studentId, status: LoanStatus.ACTIVE },
-    });
-    if (existingActiveLoan)
-      throw new ConflictException('This student already has an active loan for this book.');
+      const existingActiveLoan = await this.loanRepo.findOne({
+        where: { bookId: dto.bookId, studentId: dto.studentId, status: LoanStatus.ACTIVE },
+      });
+      if (existingActiveLoan)
+        throw new ConflictException('This student already has an active loan for this book.');
+    } else {
+      const staff = await this.staffRepo.findOne({ where: { id: dto.staffId } });
+      if (!staff) throw new NotFoundException(`Staff member ${dto.staffId} not found.`);
+
+      const existingActiveLoan = await this.loanRepo.findOne({
+        where: { bookId: dto.bookId, borrowerStaffId: dto.staffId, status: LoanStatus.ACTIVE },
+      });
+      if (existingActiveLoan)
+        throw new ConflictException('This staff member already has an active loan for this book.');
+    }
 
     const now = new Date();
     return this.dataSource.transaction(async (manager) => {
@@ -152,7 +176,8 @@ export class LibraryService {
       await manager.save(BookEntity, book);
       const loan = manager.create(BookLoanEntity, {
         bookId: dto.bookId,
-        studentId: dto.studentId,
+        studentId: dto.studentId ?? null,
+        borrowerStaffId: dto.staffId ?? null,
         issuedByStaffId,
         issuedAt: now,
         dueAt: new Date(now.getTime() + LOAN_PERIOD_DAYS * 24 * 60 * 60 * 1000),
@@ -169,7 +194,7 @@ export class LibraryService {
   async returnBook(loanId: string, returnedByStaffId: string): Promise<LoanListRow> {
     const loan = await this.loanRepo.findOne({
       where: { id: loanId },
-      relations: ['book', 'student'],
+      relations: ['book', 'student', 'borrowerStaff'],
     });
     if (!loan) throw new NotFoundException(`Loan ${loanId} not found.`);
     if (loan.status === LoanStatus.RETURNED)
@@ -195,14 +220,34 @@ export class LibraryService {
     return this.enrichLoan(loan, returnedAt, daysOverdue, fineAmount);
   }
 
-  async findLoans(status?: LoanStatus, studentId?: string): Promise<LoanListRow[]> {
+  async findMyLoans(userId: number): Promise<LoanListRow[]> {
+    const student = await this.studentRepo.findOne({ where: { userId } });
+    if (!student) {
+      throw new NotFoundException(
+        'Your account is not yet linked to a student record — contact your school administrator.',
+      );
+    }
+    return this.findLoans(undefined, student.id);
+  }
+
+  async findMyStaffLoans(staffId: string): Promise<LoanListRow[]> {
+    return this.findLoans(undefined, undefined, staffId);
+  }
+
+  async findLoans(
+    status?: LoanStatus,
+    studentId?: string,
+    staffId?: string,
+  ): Promise<LoanListRow[]> {
     const qb = this.loanRepo
       .createQueryBuilder('l')
       .leftJoinAndSelect('l.book', 'book')
       .leftJoinAndSelect('l.student', 'student')
+      .leftJoinAndSelect('l.borrowerStaff', 'borrowerStaff')
       .orderBy('l.issuedAt', 'DESC');
     if (status) qb.andWhere('l.status = :status', { status });
     if (studentId) qb.andWhere('l.studentId = :studentId', { studentId });
+    if (staffId) qb.andWhere('l.borrowerStaffId = :staffId', { staffId });
 
     const loans = await qb.getMany();
     const now = new Date();
@@ -222,22 +267,31 @@ export class LibraryService {
       .createQueryBuilder('l')
       .leftJoinAndSelect('l.book', 'book')
       .leftJoinAndSelect('l.student', 'student')
+      .leftJoinAndSelect('l.borrowerStaff', 'borrowerStaff')
       .where('l.fineAmount IS NOT NULL AND l.fineAmount > 0')
       .orderBy('l.returnedAt', 'DESC');
     if (paid !== undefined) qb.andWhere('l.finePaid = :paid', { paid });
 
     const loans = await qb.getMany();
-    return loans.map((l) => ({
-      loanId: l.id,
-      bookTitle: l.book?.title ?? '',
-      studentName: `${l.student?.firstName ?? ''} ${l.student?.lastName ?? ''}`.trim(),
-      admissionNumber: l.student?.admissionNumber ?? '',
-      issuedAt: l.issuedAt,
-      returnedAt: l.returnedAt,
-      fineAmount: parseFloat(l.fineAmount ?? '0'),
-      finePaid: l.finePaid,
-      status: l.status,
-    }));
+    return loans.map((l) => {
+      const isStaffLoan = l.borrowerStaffId !== null;
+      const borrowerName = isStaffLoan
+        ? `${l.borrowerStaff?.firstName ?? ''} ${l.borrowerStaff?.lastName ?? ''}`.trim()
+        : `${l.student?.firstName ?? ''} ${l.student?.lastName ?? ''}`.trim();
+      return {
+        loanId: l.id,
+        bookTitle: l.book?.title ?? '',
+        studentName: borrowerName,
+        admissionNumber: isStaffLoan
+          ? (l.borrowerStaff?.employeeNumber ?? '')
+          : (l.student?.admissionNumber ?? ''),
+        issuedAt: l.issuedAt,
+        returnedAt: l.returnedAt,
+        fineAmount: parseFloat(l.fineAmount ?? '0'),
+        finePaid: l.finePaid,
+        status: l.status,
+      };
+    });
   }
 
   async markFinePaid(loanId: string): Promise<{ loanId: string; finePaid: boolean }> {
@@ -318,14 +372,24 @@ export class LibraryService {
     daysOverdue: number,
     fineAmount: number,
   ): LoanListRow {
+    const isStaffLoan = loan.borrowerStaffId !== null;
+    const borrowerName = isStaffLoan
+      ? `${loan.borrowerStaff?.firstName ?? ''} ${loan.borrowerStaff?.lastName ?? ''}`.trim()
+      : `${loan.student?.firstName ?? ''} ${loan.student?.lastName ?? ''}`.trim();
+
     return {
       id: loan.id,
       bookId: loan.bookId,
       bookTitle: loan.book?.title ?? '',
       bookBarcode: loan.book?.barcode ?? '',
+      borrowerType: isStaffLoan ? 'staff' : 'student',
+      borrowerId: isStaffLoan ? (loan.borrowerStaffId as string) : (loan.studentId as string),
+      borrowerName,
       studentId: loan.studentId,
-      studentName: `${loan.student?.firstName ?? ''} ${loan.student?.lastName ?? ''}`.trim(),
-      admissionNumber: loan.student?.admissionNumber ?? '',
+      studentName: isStaffLoan ? '' : borrowerName,
+      admissionNumber: isStaffLoan
+        ? (loan.borrowerStaff?.employeeNumber ?? '')
+        : (loan.student?.admissionNumber ?? ''),
       issuedAt: loan.issuedAt,
       dueAt: loan.dueAt,
       returnedAt,

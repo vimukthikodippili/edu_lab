@@ -6,7 +6,8 @@
       "Bash(node -pe \"JSON.stringify\\(JSON.parse\\(require\\('fs'\\).readFileSync\\(0\\)\\).map\\(l=>\\({id:l.id,name:l.name,labInChargeId:l.labInChargeId}\\)\\),null,2\\)\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5000/api/v1/labs)",
       "PowerShell(Get-PSDrive -PSProvider FileSystem | Select-Object Name, @{N='UsedGB';E={[math]::Round\\($_.Used/1GB,2\\)}}, @{N='FreeGB';E={[math]::Round\\($_.Free/1GB,2\\)}})",
-      "Bash(taskkill //F //PID 16392)"
+      "Bash(taskkill //F //PID 16392)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/api/v1/auth/email/login -X POST -H \"Content-Type: application/json\" -d '{\"email\":\"admin@sims.edu.lk\",\"password\":\"secret\"}' --max-time 3)"
     ]
   }
 }

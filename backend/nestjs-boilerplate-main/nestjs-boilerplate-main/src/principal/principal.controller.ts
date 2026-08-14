@@ -4,7 +4,11 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../roles/roles.decorator';
 import { RoleEnum } from '../roles/roles.enum';
 import { RolesGuard } from '../roles/roles.guard';
-import { PrincipalService, ApprovalQueueItem } from './principal.service';
+import {
+  PrincipalService,
+  ApprovalQueueItem,
+  ApprovalHistoryItem,
+} from './principal.service';
 import { PrincipalKpiResponse } from './dto/principal-kpi.response';
 import { WellbeingConcernDto } from './dto/wellbeing-concern.dto';
 
@@ -27,6 +31,13 @@ export class PrincipalController {
   @ApiOperation({ summary: 'Unified pending approval queue (fee waivers + leave + expenses)' })
   getApprovalQueue(): Promise<ApprovalQueueItem[]> {
     return this.principalService.getApprovalQueue();
+  }
+
+  @Get('approvals/history')
+  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @ApiOperation({ summary: 'Decided (approved/rejected) approval items — audit history' })
+  getApprovalHistory(): Promise<ApprovalHistoryItem[]> {
+    return this.principalService.getApprovalHistory();
   }
 
   // FR-MHA-34/AC #94 — narrower than the KPI endpoint above: Principal and Counselor only,

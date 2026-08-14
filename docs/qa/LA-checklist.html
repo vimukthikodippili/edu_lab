@@ -1,0 +1,781 @@
+<title>Login &amp; Auth — Manual QA Checklist</title>
+<style>
+  @font-face {
+    font-family: 'CascadiaFallback';
+    src: local('Cascadia Code'), local('Cascadia Mono'), local('Consolas');
+  }
+
+  :root {
+    --ink: #1c2430;
+    --paper: #eef1f6;
+    --surface: #ffffff;
+    --surface-2: #f6f8fb;
+    --accent: #3a5a8c;
+    --accent-soft: #e4ebf4;
+    --line: #d5dce5;
+    --muted: #5c6a7c;
+
+    --pass: #1f8a5f;
+    --pass-bg: #e5f4ec;
+    --pass-line: #b9dfc9;
+    --partial: #a8720a;
+    --partial-bg: #fbf1de;
+    --partial-line: #eeceA0;
+    --gap: #b3423a;
+    --gap-bg: #fbe8e6;
+    --gap-line: #eec3bf;
+
+    --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+    --sans: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --mono: 'Cascadia Code', 'CascadiaFallback', 'Consolas', 'SF Mono', 'Roboto Mono', monospace;
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #e7ecf3;
+    --paper: #0f141b;
+    --surface: #171e28;
+    --surface-2: #1c2430;
+    --accent: #8fb0e0;
+    --accent-soft: #223449;
+    --line: #2b3541;
+    --muted: #93a1b0;
+
+    --pass: #46d19c;
+    --pass-bg: #163527;
+    --pass-line: #245b3f;
+    --partial: #e6b158;
+    --partial-bg: #3a2e14;
+    --partial-line: #63501f;
+    --gap: #ef8a80;
+    --gap-bg: #3a1f1c;
+    --gap-line: #65332c;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e7ecf3;
+      --paper: #0f141b;
+      --surface: #171e28;
+      --surface-2: #1c2430;
+      --accent: #8fb0e0;
+      --accent-soft: #223449;
+      --line: #2b3541;
+      --muted: #93a1b0;
+
+      --pass: #46d19c;
+      --pass-bg: #163527;
+      --pass-line: #245b3f;
+      --partial: #e6b158;
+      --partial-bg: #3a2e14;
+      --partial-line: #63501f;
+      --gap: #ef8a80;
+      --gap-bg: #3a1f1c;
+      --gap-line: #65332c;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+    font-size: 15px;
+  }
+
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+
+  header.top {
+    margin-bottom: 32px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 32px;
+    margin: 0 0 8px;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+
+  .sub {
+    color: var(--muted);
+    font-size: 14.5px;
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  .env {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .env-cell {
+    background: var(--surface);
+    padding: 12px 14px;
+  }
+  .env-cell .k {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 3px;
+  }
+  .env-cell .v {
+    font-family: var(--mono);
+    font-size: 13px;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 28px 0 8px;
+  }
+  .stat {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat .n {
+    font-family: var(--serif);
+    font-size: 26px;
+    font-variant-numeric: tabular-nums;
+    margin: 0;
+  }
+  .stat .l {
+    margin: 2px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .stat.pass .n { color: var(--pass); }
+  .stat.partial .n { color: var(--partial); }
+  .stat.gap .n { color: var(--gap); }
+
+  .callout {
+    margin: 24px 0;
+    padding: 14px 16px;
+    border: 1px solid var(--accent-soft);
+    background: var(--accent-soft);
+    border-radius: 8px;
+    font-size: 13.5px;
+  }
+  .callout strong { color: var(--accent); }
+
+  section.cases { margin-top: 36px; }
+  section.cases > h2 {
+    font-family: var(--serif);
+    font-size: 20px;
+    margin: 0 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .case {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .case.pass { border-left-color: var(--pass); }
+  .case.partial { border-left-color: var(--partial); }
+  .case.gap { border-left-color: var(--gap); }
+
+  .case-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .case-id {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .case-title {
+    font-weight: 600;
+    font-size: 16px;
+    margin: 2px 0 0;
+  }
+  .tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .tag {
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 100px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip {
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+  .chip.pass { color: var(--pass); background: var(--pass-bg); border: 1px solid var(--pass-line); }
+  .chip.partial { color: var(--partial); background: var(--partial-bg); border: 1px solid var(--partial-line); }
+  .chip.gap { color: var(--gap); background: var(--gap-bg); border: 1px solid var(--gap-line); }
+
+  .field { margin-top: 12px; }
+  .field .k {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 5px;
+  }
+  .field .v { margin: 0; font-size: 14px; }
+
+  ol.steps, ul.steps {
+    margin: 4px 0 0;
+    padding-left: 0;
+    list-style: none;
+  }
+  ol.steps li, ul.steps li {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 5px 0;
+    font-size: 14px;
+  }
+  ol.steps li input, ul.steps li input {
+    margin-top: 3px;
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+  }
+  li.done label { color: var(--muted); text-decoration: line-through; }
+
+  .codewrap {
+    position: relative;
+    margin-top: 8px;
+  }
+  pre {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    margin: 0;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    white-space: pre;
+    color: var(--ink);
+  }
+  .copybtn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-family: var(--sans);
+    font-size: 11px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .copybtn:hover { color: var(--ink); border-color: var(--accent); }
+  .copybtn:focus-visible, .copybtn:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .reality {
+    margin-top: 12px;
+    padding: 11px 14px;
+    border-radius: 8px;
+    font-size: 13.5px;
+  }
+  .reality.pass { background: var(--pass-bg); border: 1px solid var(--pass-line); color: var(--ink); }
+  .reality.partial { background: var(--partial-bg); border: 1px solid var(--partial-line); color: var(--ink); }
+  .reality.gap { background: var(--gap-bg); border: 1px solid var(--gap-line); color: var(--ink); }
+  .reality strong { display: block; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 3px; }
+  .reality.pass strong { color: var(--pass); }
+  .reality.partial strong { color: var(--partial); }
+  .reality.gap strong { color: var(--gap); }
+
+  section.backlog {
+    margin-top: 40px;
+    border: 1px solid var(--gap-line);
+    background: var(--gap-bg);
+    border-radius: 10px;
+    padding: 20px 22px;
+  }
+  section.backlog h2 {
+    font-family: var(--serif);
+    font-size: 19px;
+    margin: 0 0 4px;
+    color: var(--gap);
+  }
+  section.backlog .sub { margin-bottom: 14px; }
+  section.backlog ol {
+    margin: 0;
+    padding-left: 20px;
+  }
+  section.backlog li { margin-bottom: 10px; font-size: 14px; }
+  section.backlog li strong { font-weight: 600; }
+
+  table.accounts {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 13.5px;
+  }
+  table.accounts th, table.accounts td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  table.accounts th {
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  table.accounts td.mono { font-family: var(--mono); font-size: 12.5px; }
+
+  footer.note {
+    margin-top: 44px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+
+  @media (max-width: 640px) {
+    .summary { grid-template-columns: 1fr; }
+    .env { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="top">
+    <p class="eyebrow">SIMS · Login &amp; Auth Module · QA Pass</p>
+    <h1>Manual QA Checklist — LA-001 through LA-009</h1>
+    <p class="sub">Every case below was checked against the real backend/frontend source before you run it, so the "Reality" note tells you in advance whether to expect a genuine pass, a partial, or a fail against something that isn't built yet — rather than you discovering that mid-test.</p>
+
+    <div class="env">
+      <div class="env-cell"><p class="k">Backend</p><p class="v">http://localhost:5000/api/v1</p></div>
+      <div class="env-cell"><p class="k">Frontend</p><p class="v">http://localhost:5001</p></div>
+      <div class="env-cell"><p class="k">All test passwords</p><p class="v">secret</p></div>
+    </div>
+  </header>
+
+  <div class="summary">
+    <div class="stat pass"><p class="n">3</p><p class="l">Pass — works as specified</p></div>
+    <div class="stat partial"><p class="n">4</p><p class="l">Partial — real, but with a gap</p></div>
+    <div class="stat gap"><p class="n">2</p><p class="l">Not implemented yet</p></div>
+  </div>
+
+  <div class="callout">
+    <strong>Fixed before you test:</strong> School Psychologist logins were silently misrouting to the Student dashboard (a missing entry in the frontend's role-ID map). This is now fixed — LA-006 below asks you to specifically confirm it.
+  </div>
+
+  <section class="cases">
+    <h2>Test Cases</h2>
+
+    <article class="case pass">
+      <div class="case-head">
+        <div>
+          <p class="case-id">LA-001</p>
+          <p class="case-title">Standard Login</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Functional</span>
+          <span class="tag">Critical</span>
+          <span class="chip pass">Pass</span>
+        </div>
+      </div>
+
+      <div class="field"><p class="k">Precondition</p><p class="v">User has valid account credentials</p></div>
+      <div class="field">
+        <p class="k">Steps</p>
+        <ol class="steps">
+          <li><input type="checkbox" id="la1-1"><label for="la1-1">Open the SIMS PWA</label></li>
+          <li><input type="checkbox" id="la1-2"><label for="la1-2">Enter registered email + password</label></li>
+          <li><input type="checkbox" id="la1-3"><label for="la1-3">Tap Login</label></li>
+        </ol>
+      </div>
+      <div class="field"><p class="k">Expected result</p><p class="v">User is authenticated and redirected to their role-specific dashboard.</p></div>
+
+      <div class="field">
+        <p class="k">Curl equivalent (backend-only check)</p>
+        <div class="codewrap">
+          <pre><code>curl -s -X POST http://localhost:5000/api/v1/auth/email/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@sims.edu.lk","password":"secret"}'</code></pre>
+          <button class="copybtn" type="button">Copy</button>
+        </div>
+      </div>
+
+      <div class="reality pass">
+        <strong>Reality</strong>
+        Works end-to-end for email login. The login screen also offers a "phone number" toggle — that path has no backend route at all, so don't test with a phone number expecting it to work; that's a known unbuilt path, not something to log as a new bug.
+      </div>
+    </article>
+
+    <article class="case gap">
+      <div class="case-head">
+        <div>
+          <p class="case-id">LA-002</p>
+          <p class="case-title">MFA Enforcement</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Security</span>
+          <span class="tag">Critical</span>
+          <span class="chip gap">Not implemented</span>
+        </div>
+      </div>
+
+      <div class="field"><p class="k">Precondition</p><p class="v">User account is Principal, Admin, or Security Officer</p></div>
+      <div class="field">
+        <p class="k">Steps</p>
+        <ol class="steps">
+          <li><input type="checkbox" id="la2-1"><label for="la2-1">Enter valid email/password</label></li>
+          <li><input type="checkbox" id="la2-2"><label for="la2-2">Submit login</label></li>
+        </ol>
+      </div>
+      <div class="field"><p class="k">Expected result</p><p class="v">System prompts for a one-time OTP code before granting access; login fails without a valid OTP.</p></div>
+
+      <div class="reality gap">
+        <strong>Reality</strong>
+        There is no MFA/OTP code anywhere in the backend — none, for any role. Logging in as Admin/Principal/Security Officer returns a fully valid token immediately, no OTP prompt ever appears. The frontend has a complete MFA screen built, but it calls a backend route that doesn't exist. Expect a hard fail against the current build — this is a scope gap, not a bug in a specific flow.
+      </div>
+    </article>
+
+    <article class="case gap">
+      <div class="case-head">
+        <div>
+          <p class="case-id">LA-003</p>
+          <p class="case-title">MFA Bypass Attempt</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Security</span>
+          <span class="tag">Critical</span>
+          <span class="chip gap">Cannot test</span>
+        </div>
+      </div>
+
+      <div class="field"><p class="k">Precondition</p><p class="v">MFA-required account</p></div>
+      <div class="field">
+        <p class="k">Steps</p>
+        <ol class="steps">
+          <li><input type="checkbox" id="la3-1"><label for="la3-1">Log in with a valid password</label></li>
+          <li><input type="checkbox" id="la3-2"><label for="la3-2">Attempt to directly navigate to the dashboard URL without entering an OTP</label></li>
+        </ol>
+      </div>
+      <div class="field"><p class="k">Expected result</p><p class="v">System blocks access and redirects back to the MFA screen; no session token issued.</p></div>
+
+      <div class="reality gap">
+        <strong>Reality</strong>
+        This case's own precondition (LA-002, an OTP step) doesn't exist, so there's nothing to bypass — a normal login already hands out a full, valid, immediately-usable token. Recommend logging this as "cannot test — blocked by LA-002," not as a separate pass/fail.
+      </div>
+    </article>
+
+    <article class="case partial">
+      <div class="case-head">
+        <div>
+          <p class="case-id">LA-004</p>
+          <p class="case-title">Session Expiry</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Functional</span>
+          <span class="tag">High</span>
+          <span class="chip partial">Partial</span>
+        </div>
+      </div>
+
+      <div class="field"><p class="k">Precondition</p><p class="v">User logged in, inactivity timeout configured (e.g. 15 min)</p></div>
+      <div class="field">
+        <p class="k">Steps</p>
+        <ol class="steps">
+          <li><input type="checkbox" id="la4-1"><label for="la4-1">Log in</label></li>
+          <li><input type="checkbox" id="la4-2"><label for="la4-2">Remain idle beyond the configured timeout</label></li>
+          <li><input type="checkbox" id="la4-3"><label for="la4-3">Attempt an action</label></li>
+        </ol>
+      </div>
+      <div class="field"><p class="k">Expected result</p><p class="v">Session is invalidated; user is redirected to the login screen.</p></div>
+
+      <div class="field">
+        <p class="k">Curl — prove the gap (run right after the UI redirects you to login)</p>
+        <div class="codewrap">
+          <pre><code># 1. Before idling, grab the token from your login response or devtools
+# 2. After the UI kicks you to /auth/login, replay that same token directly:
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5000/api/v1/auth/me \
+  -H "Authorization: Bearer &lt;the old token&gt;"
+# A genuinely revoked session would return 401. It will return 200.</code></pre>
+          <button class="copybtn" type="button">Copy</button>
+        </div>
+      </div>
+
+      <div class="reality partial">
+        <strong>Reality</strong>
+        A real per-role inactivity timer exists client-side (System Admin / Security Officer: 15 min; other roles vary) and will redirect you to the login screen — that part should genuinely pass in the browser. But it only clears local browser state; it never calls the logout endpoint, so the underlying token stays valid server-side until its fixed 15-minute lifetime runs out on its own. A captured token can still be replayed after the UI "logs you out."
+      </div>
+    </article>
+
+    <article class="case partial">
+      <div class="case-head">
+        <div>
+          <p class="case-id">LA-005</p>
+          <p class="case-title">Forgot Password</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Functional</span>
+          <span class="tag">High</span>
+          <span class="chip partial">Partial</span>
+        </div>
+      </div>
+
+      <div class="field"><p class="k">Precondition</p><p class="v">User has a registered email/phone</p></div>
+      <div class="field">
+        <p class="k">Steps</p>
+        <ol class="steps">
+          <li><input type="checkbox" id="la5-1"><label for="la5-1">Tap "Forgot Password"</label></li>
+          <li><input type="checkbox" id="la5-2"><label for="la5-2">Enter registered email/phone</label></li>
+          <li><input type="checkbox" id="la5-3"><label for="la5-3">Open the reset link</label></li>
+          <li><input type="checkbox" id="la5-4"><label for="la5-4">Set a new password</label></li>
+        </ol>
+      </div>
+      <div class="field"><p class="k">Expected result</p><p class="v">Reset link is single-use, expires after a set time, and the new password logs the user in successfully.</p></div>
+
+      <div class="field">
+        <p class="k">Curl — request + reset + replay</p>
+        <div class="codewrap">
+          <pre><code>curl -s -X POST http://localhost:5000/api/v1/auth/forgot/password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"guardian@sims.edu.lk"}'
+# find the reset link/hash wherever this dev environment delivers mail
+curl -s -X POST http://localhost:5000/api/v1/auth/reset/password \
+  -H "Content-Type: application/json" \
+  -d '{"hash":"&lt;hash from the link&gt;","password":"NewPass123!"}'
+# now replay the SAME hash again — a truly single-use link would reject this
+curl -s -X POST http://localhost:5000/api/v1/auth/reset/password \
+  -H "Content-Type: application/json" \
+  -d '{"hash":"&lt;same hash&gt;","password":"AnotherPass456!"}'</code></pre>
+          <button class="copybtn" type="button">Copy</button>
+        </div>
+      </div>
+
+      <div class="reality partial">
+        <strong>Reality</strong>
+        The endpoints are real and the link genuinely expires after 30 minutes. Two things won't match the spec: the same link can be replayed more than once inside that window (not single-use), and resetting does not log you in — you have to log in again afterward with the new password (it also force-logs-out every other active session on that account, which is good practice but not "auto-login").
+      </div>
+    </article>
+
+    <article class="case pass">
+      <div class="case-head">
+        <div>
+          <p class="case-id">LA-006</p>
+          <p class="case-title">Role-Based Dashboard Routing</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Functional</span>
+          <span class="tag">Critical</span>
+          <span class="chip pass">Pass (incl. today's fix)</span>
+        </div>
+      </div>
+
+      <div class="field"><p class="k">Precondition</p><p class="v">Accounts exist for each of the 12 roles</p></div>
+      <div class="field">
+        <p class="k">Steps</p>
+        <ol class="steps">
+          <li><input type="checkbox" id="la6-1"><label for="la6-1">Log in as each role in turn</label></li>
+        </ol>
+      </div>
+      <div class="field"><p class="k">Expected result</p><p class="v">Each role lands on its own correct dashboard with only its permitted modules visible.</p></div>
+
+      <div class="field">
+        <p class="k">Real seeded accounts, one per role</p>
+        <table class="accounts">
+          <thead><tr><th>Role</th><th>Email</th><th>Expected landing path</th></tr></thead>
+          <tbody>
+            <tr><td>Admin</td><td class="mono">admin@sims.edu.lk</td><td class="mono">/admin</td></tr>
+            <tr><td>Principal</td><td class="mono">principal@sims.edu.lk</td><td class="mono">/principal</td></tr>
+            <tr><td>Section Head</td><td class="mono">sectionhead@sims.edu.lk</td><td class="mono">/section-head</td></tr>
+            <tr><td>Teacher</td><td class="mono">teacher2@gmail.com</td><td class="mono">/teacher</td></tr>
+            <tr><td>Student</td><td class="mono">student@sims.edu.lk</td><td class="mono">/student</td></tr>
+            <tr><td>Guardian</td><td class="mono">guardian@sims.edu.lk</td><td class="mono">/guardian</td></tr>
+            <tr><td>Counselor</td><td class="mono">counselor@sims.edu.lk</td><td class="mono">/counselor</td></tr>
+            <tr><td>Security Officer</td><td class="mono">security@sims.edu.lk</td><td class="mono">/security</td></tr>
+            <tr><td>Librarian</td><td class="mono">librarian@sims.edu.lk</td><td class="mono">/library</td></tr>
+            <tr><td>Accountant</td><td class="mono">accountant@sims.edu.lk</td><td class="mono">/accounts</td></tr>
+            <tr><td>School Psychologist</td><td class="mono">psychologist@sims.edu.lk</td><td class="mono">/school-psychologist</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="reality pass">
+        <strong>Reality</strong>
+        The mechanism is real (route middleware + per-page guard + per-menu-item role list). One role — School Psychologist — was silently landing on <code>/student</code> instead of <code>/school-psychologist</code> due to a missing entry in a role-ID lookup map; that's fixed as of this session. Please specifically re-test that one account to confirm. Note: <code>teacher@sims.edu.lk</code> exists but has no staff record linked, so use <code>teacher2@gmail.com</code> for anything that touches staff-scoped data.
+      </div>
+    </article>
+
+    <article class="case partial">
+      <div class="case-head">
+        <div>
+          <p class="case-id">LA-007</p>
+          <p class="case-title">Invalid Credentials</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Negative</span>
+          <span class="tag">Medium</span>
+          <span class="chip partial">Partial</span>
+        </div>
+      </div>
+
+      <div class="field"><p class="k">Precondition</p><p class="v">N/A</p></div>
+      <div class="field">
+        <p class="k">Steps</p>
+        <ol class="steps">
+          <li><input type="checkbox" id="la7-1"><label for="la7-1">Enter an incorrect password 3+ times</label></li>
+        </ol>
+      </div>
+      <div class="field"><p class="k">Expected result</p><p class="v">A generic error is shown (no hint whether the email exists); account lockout/backoff triggers per policy.</p></div>
+
+      <div class="field">
+        <p class="k">Curl — confirm no lockout ever triggers</p>
+        <div class="codewrap">
+          <pre><code>for i in 1 2 3 4 5 6; do
+  curl -s -o /dev/null -w "attempt $i -> %{http_code}\n" \
+    -X POST http://localhost:5000/api/v1/auth/email/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@sims.edu.lk","password":"wrong-password"}'
+done</code></pre>
+          <button class="copybtn" type="button">Copy</button>
+        </div>
+      </div>
+
+      <div class="reality partial">
+        <strong>Reality</strong>
+        The error message is close to generic but technically distinguishes "no such account" from "wrong password" under the hood — worth a note if you're being strict about enumeration. More importantly: there is no lockout or backoff of any kind anywhere in the backend. Every attempt above will return the same status code with no increasing delay and no eventual block. Given this case is flagged Critical in your test doc, recommend prioritizing this one on the backlog.
+      </div>
+    </article>
+
+    <article class="case pass">
+      <div class="case-head">
+        <div>
+          <p class="case-id">LA-008 / LA-009</p>
+          <p class="case-title">Cross-Role Privilege Escalation</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Security</span>
+          <span class="tag">Critical</span>
+          <span class="chip pass">Pass</span>
+        </div>
+      </div>
+
+      <div class="field"><p class="k">Precondition</p><p class="v">Logged in as a low-privilege role (e.g. Student)</p></div>
+      <div class="field">
+        <p class="k">Steps</p>
+        <ol class="steps">
+          <li><input type="checkbox" id="la8-1"><label for="la8-1">Attempt to directly call an admin-only API endpoint</label></li>
+          <li><input type="checkbox" id="la8-2"><label for="la8-2">Attempt to navigate to a Principal-only URL</label></li>
+        </ol>
+      </div>
+      <div class="field"><p class="k">Expected result</p><p class="v">Request is rejected with 403/redirect; no data leaked.</p></div>
+
+      <div class="field">
+        <p class="k">Curl — API layer</p>
+        <div class="codewrap">
+          <pre><code># log in as a non-admin, e.g. teacher2@gmail.com, grab its token, then:
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5000/api/v1/users \
+  -H "Authorization: Bearer &lt;non-admin token&gt;"
+# expect 403 — not 200 with a user list</code></pre>
+          <button class="copybtn" type="button">Copy</button>
+        </div>
+      </div>
+      <div class="field">
+        <p class="k">Browser — URL layer</p>
+        <p class="v">While logged in as anything other than Principal, type <code>/principal</code> directly into the address bar. Expect a redirect to <code>/403</code> or your own home dashboard — the Principal page should never render.</p>
+      </div>
+
+      <div class="reality pass">
+        <strong>Reality</strong>
+        Both layers are real and consistently applied: role-gated API guards on dozens of endpoints (the guard runs before the handler, so nothing leaks even transiently), plus route-level middleware and a page-level guard on the frontend as defense in depth.
+      </div>
+    </article>
+
+  </section>
+
+  <section class="backlog">
+    <h2>Backlog — not fixed this pass</h2>
+    <p class="sub">Reported as findings per your call; these are real features to build, not quick fixes, so they were left alone this round.</p>
+    <ol>
+      <li><strong>MFA / OTP (LA-002, LA-003).</strong> No server-side MFA exists for any role. The frontend UI for it is already built and just needs a real backend counterpart (an OTP secret + verify endpoint + a "pending" token state on login).</li>
+      <li><strong>Login lockout / backoff (LA-007).</strong> No rate-limiting or attempt-counting exists anywhere on the login route. Worth adding given this case is rated Critical.</li>
+      <li><strong>Single-use password reset (LA-005).</strong> The reset token is a stateless signed link with no revocation store — needs either a one-time-use flag or moving off a pure JWT.</li>
+      <li><strong>Auto-login after password reset (LA-005).</strong> Currently the reset endpoint force-logs-out every session and returns nothing; a decision is needed on whether "logs the user in" should override that.</li>
+      <li><strong>Open question, not a bug:</strong> the backend has a bare <code>user</code> role (id 2) with no matching frontend dashboard and no seeded account. Worth confirming whether that role is ever meant to reach the login screen at all, or is purely an internal/system default.</li>
+    </ol>
+  </section>
+
+  <footer class="note">
+    Generated from a direct read of the auth source (not the test doc's assumptions) — every "Reality" note above cites real files: <code>auth.controller.ts</code>, <code>auth.service.ts</code>, <code>roles.guard.ts</code>, <code>middleware.ts</code>, <code>lib/auth/roles.ts</code>, <code>features/auth/hooks/useSignIn.ts</code>, <code>app/(other)/api/auth/[...nextauth]/options.ts</code>.
+  </footer>
+
+</div>
+
+<script>
+  document.querySelectorAll('.steps input[type="checkbox"]').forEach(function (box) {
+    var key = 'la-qa-' + box.id;
+    box.checked = localStorage.getItem(key) === '1';
+    if (box.checked) box.closest('li').classList.add('done');
+    box.addEventListener('change', function () {
+      localStorage.setItem(key, box.checked ? '1' : '0');
+      box.closest('li').classList.toggle('done', box.checked);
+    });
+  });
+
+  document.querySelectorAll('.copybtn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var code = btn.previousElementSibling.innerText;
+      navigator.clipboard.writeText(code).then(function () {
+        var original = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = original; }, 1400);
+      });
+    });
+  });
+</script>

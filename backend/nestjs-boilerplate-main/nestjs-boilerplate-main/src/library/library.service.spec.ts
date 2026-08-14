@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { DataSource, ObjectLiteral, Repository } from 'typeorm';
 import { LibraryService } from './library.service';
 import { BookEntity, BookStatus } from './entities/book.entity';
@@ -8,6 +8,7 @@ import { BookLoanEntity, LoanStatus } from './entities/book-loan.entity';
 import { DigitalBookEntity } from './entities/digital-book.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { StudentEntity } from '../students/entities/student.entity';
+import { StaffEntity } from '../staff/entities/staff.entity';
 import { FINE_PER_DAY_LKR, LOAN_PERIOD_DAYS } from './library.constants';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -59,12 +60,22 @@ const makeStudent = (overrides: Partial<StudentEntity> = {}): StudentEntity =>
     ...overrides,
   } as unknown as StudentEntity);
 
+const makeStaff = (overrides: Partial<StaffEntity> = {}): StaffEntity =>
+  ({
+    id: 'staff-teacher-1',
+    firstName: 'Nimal',
+    lastName: 'Silva',
+    employeeNumber: 'EMP/2026/00001',
+    ...overrides,
+  } as unknown as StaffEntity);
+
 const makeLoan = (overrides: Partial<BookLoanEntity> = {}): BookLoanEntity => {
   const issuedAt = new Date('2026-06-01');
   return {
     id: 'loan-1',
     bookId: 'book-1',
     studentId: 'student-1',
+    borrowerStaffId: null,
     issuedByStaffId: 'staff-librarian-1',
     returnedByStaffId: null,
     issuedAt,
@@ -75,6 +86,7 @@ const makeLoan = (overrides: Partial<BookLoanEntity> = {}): BookLoanEntity => {
     status: LoanStatus.ACTIVE,
     book: makeBook(),
     student: makeStudent(),
+    borrowerStaff: null,
     ...overrides,
   } as unknown as BookLoanEntity;
 };
@@ -107,6 +119,7 @@ describe('LibraryService', () => {
   let digitalBookRepo: MockRepo<DigitalBookEntity>;
   let fileRepo: MockRepo<FileEntity>;
   let studentRepo: MockRepo<StudentEntity>;
+  let staffRepo: MockRepo<StaffEntity>;
   let transactionManager: { save: jest.Mock; create: jest.Mock };
   let dataSource: { transaction: jest.Mock };
 
@@ -116,6 +129,7 @@ describe('LibraryService', () => {
     digitalBookRepo = repoMock<DigitalBookEntity>();
     fileRepo = repoMock<FileEntity>();
     studentRepo = repoMock<StudentEntity>();
+    staffRepo = repoMock<StaffEntity>();
 
     transactionManager = {
       save: jest.fn((_entityClass: unknown, data: unknown) => Promise.resolve(data)),
@@ -135,6 +149,7 @@ describe('LibraryService', () => {
         { provide: getRepositoryToken(DigitalBookEntity), useValue: digitalBookRepo },
         { provide: getRepositoryToken(FileEntity), useValue: fileRepo },
         { provide: getRepositoryToken(StudentEntity), useValue: studentRepo },
+        { provide: getRepositoryToken(StaffEntity), useValue: staffRepo },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
@@ -253,6 +268,109 @@ describe('LibraryService', () => {
       await expect(
         service.issueBook({ bookId: 'book-1', studentId: 'student-1' }, 'staff-1'),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('throws BadRequestException when neither studentId nor staffId is provided', async () => {
+      await expect(
+        service.issueBook({ bookId: 'book-1' } as never, 'staff-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(bookRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when both studentId and staffId are provided', async () => {
+      await expect(
+        service.issueBook(
+          { bookId: 'book-1', studentId: 'student-1', staffId: 'staff-teacher-1' } as never,
+          'staff-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('issues a book to a staff member (teacher borrower) and decrements availableCopies', async () => {
+      const book = makeBook({ availableCopies: 2 });
+      bookRepo.findOne!.mockResolvedValue(book);
+      staffRepo.findOne!.mockResolvedValue(makeStaff());
+      loanRepo.findOne!.mockResolvedValue(null);
+
+      await service.issueBook({ bookId: 'book-1', staffId: 'staff-teacher-1' }, 'staff-librarian-1');
+
+      expect(studentRepo.findOne).not.toHaveBeenCalled();
+      const savedLoan = transactionManager.save.mock.calls[1][1] as BookLoanEntity;
+      expect(savedLoan.studentId).toBeNull();
+      expect(savedLoan.borrowerStaffId).toBe('staff-teacher-1');
+    });
+
+    it('throws NotFoundException when the staff member does not exist', async () => {
+      bookRepo.findOne!.mockResolvedValue(makeBook());
+      staffRepo.findOne!.mockResolvedValue(null);
+
+      await expect(
+        service.issueBook({ bookId: 'book-1', staffId: 'bad-staff-id' }, 'staff-librarian-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ConflictException when the staff member already has an active loan for this book', async () => {
+      bookRepo.findOne!.mockResolvedValue(makeBook());
+      staffRepo.findOne!.mockResolvedValue(makeStaff());
+      loanRepo.findOne!.mockResolvedValue(
+        makeLoan({ studentId: null, borrowerStaffId: 'staff-teacher-1' }),
+      );
+
+      await expect(
+        service.issueBook({ bookId: 'book-1', staffId: 'staff-teacher-1' }, 'staff-librarian-1'),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  // ─── findMyStaffLoans ──────────────────────────────────────────────────────
+
+  describe('findMyStaffLoans', () => {
+    it('scopes the query to the given staffId via borrowerStaffId', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          makeLoan({ studentId: null, borrowerStaffId: 'staff-teacher-1', student: null, borrowerStaff: makeStaff() }),
+        ]),
+      };
+      loanRepo.createQueryBuilder!.mockReturnValue(qb);
+
+      const result = await service.findMyStaffLoans('staff-teacher-1');
+
+      expect(qb.andWhere).toHaveBeenCalledWith('l.borrowerStaffId = :staffId', { staffId: 'staff-teacher-1' });
+      expect(result).toHaveLength(1);
+      expect(result[0].borrowerType).toBe('staff');
+      expect(result[0].borrowerId).toBe('staff-teacher-1');
+      expect(result[0].borrowerName).toBe('Nimal Silva');
+      expect(result[0].studentId).toBeNull();
+    });
+  });
+
+  // ─── findMyLoans ───────────────────────────────────────────────────────────
+
+  describe('findMyLoans', () => {
+    it('throws NotFoundException when the calling user has no linked student record', async () => {
+      studentRepo.findOne!.mockResolvedValue(null);
+      await expect(service.findMyLoans(999)).rejects.toThrow(NotFoundException);
+    });
+
+    it('resolves the student by userId and returns only that student\'s loans', async () => {
+      studentRepo.findOne!.mockResolvedValue(makeStudent({ id: 'student-1' } as Partial<StudentEntity>));
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([makeLoan()]),
+      };
+      loanRepo.createQueryBuilder!.mockReturnValue(qb);
+
+      const result = await service.findMyLoans(42);
+
+      expect(studentRepo.findOne).toHaveBeenCalledWith({ where: { userId: 42 } });
+      expect(qb.andWhere).toHaveBeenCalledWith('l.studentId = :studentId', { studentId: 'student-1' });
+      expect(result).toHaveLength(1);
+      expect(result[0].studentId).toBe('student-1');
     });
   });
 

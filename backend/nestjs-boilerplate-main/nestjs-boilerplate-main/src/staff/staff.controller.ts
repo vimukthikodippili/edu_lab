@@ -51,7 +51,13 @@ export class StaffController {
   }
 
   @Get()
-  @Roles(RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head, RoleEnum.security_officer)
+  @Roles(
+    RoleEnum.admin,
+    RoleEnum.principal,
+    RoleEnum.section_head,
+    RoleEnum.security_officer,
+    RoleEnum.librarian,
+  )
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List staff with optional search/filter/pagination' })
   findMany(@Query() query: QueryStaffDto) {

@@ -12,6 +12,7 @@ import { MarkEntity, MarkStatus } from '../entities/mark.entity';
 import { MarkTopicScoreEntity } from '../entities/mark-topic-score.entity';
 import { AssessmentEntity, AssessmentType } from '../entities/assessment.entity';
 import { AssessmentTopicAllocationEntity } from '../entities/assessment-topic-allocation.entity';
+import { TermResultEntity } from '../entities/term-result.entity';
 import { StudentEntity, StudentStatus } from '../../students/entities/student.entity';
 import { TeacherSubjectClassRequirementEntity } from '../../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { MarksSubmittedEvent } from '../events/marks-submitted.event';
@@ -92,6 +93,7 @@ describe('MarkService', () => {
   let allocationRepo: MockRepo<AssessmentTopicAllocationEntity>;
   let studentRepo: MockRepo<StudentEntity>;
   let requirementRepo: MockRepo<TeacherSubjectClassRequirementEntity>;
+  let termResultRepo: MockRepo<TermResultEntity>;
   let eventEmitter: { emit: jest.Mock };
   let materialsCheckService: { getStatus: jest.Mock };
   let dataSource: { transaction: jest.Mock };
@@ -103,6 +105,7 @@ describe('MarkService', () => {
     allocationRepo = repoMock<AssessmentTopicAllocationEntity>();
     studentRepo = repoMock<StudentEntity>();
     requirementRepo = repoMock<TeacherSubjectClassRequirementEntity>();
+    termResultRepo = repoMock<TermResultEntity>();
     eventEmitter = { emit: jest.fn() };
     materialsCheckService = { getStatus: jest.fn() };
     dataSource = {
@@ -126,6 +129,7 @@ describe('MarkService', () => {
           provide: getRepositoryToken(TeacherSubjectClassRequirementEntity),
           useValue: requirementRepo,
         },
+        { provide: getRepositoryToken(TermResultEntity), useValue: termResultRepo },
         { provide: EventEmitter2, useValue: eventEmitter },
         { provide: MaterialsCheckService, useValue: materialsCheckService },
         { provide: DataSource, useValue: dataSource },
@@ -479,6 +483,80 @@ describe('MarkService', () => {
 
       await service.bulkUpsert(makeDto({ status: MarkStatus.SUBMITTED }), 'teacher-uuid', false);
 
+      expect(markRepo.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Publication Gate — closes the post-publication direct-edit bypass', () => {
+    it('blocks a privileged actor (section_head) from changing a SUBMITTED mark once the term result is published', async () => {
+      assessmentRepo.findOne!.mockResolvedValue(makeAssessment({ totalMarks: 50, termId: 3 }));
+      markRepo.findBy!.mockResolvedValue([
+        {
+          id: 'mark-1',
+          studentId: 'student-1',
+          assessmentId: 'assessment-uuid',
+          status: MarkStatus.SUBMITTED,
+          score: '40.00',
+        } as MarkEntity,
+      ]);
+      termResultRepo.find!.mockResolvedValue([
+        { studentId: 'student-1', termId: 3, isPublished: true } as TermResultEntity,
+      ]);
+
+      const dto = makeDto({
+        status: MarkStatus.SUBMITTED,
+        entries: [{ studentId: 'student-1', score: 45 }],
+      });
+
+      await expect(
+        service.bulkUpsert(dto, 'section-head-uuid', true),
+      ).rejects.toThrow(ForbiddenException);
+      expect(markRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('allows a privileged actor to change a SUBMITTED mark when the term result is NOT published', async () => {
+      assessmentRepo.findOne!.mockResolvedValue(makeAssessment({ totalMarks: 50, termId: 3 }));
+      markRepo.findBy!.mockResolvedValue([
+        {
+          id: 'mark-1',
+          studentId: 'student-1',
+          assessmentId: 'assessment-uuid',
+          status: MarkStatus.SUBMITTED,
+          score: '40.00',
+        } as MarkEntity,
+      ]);
+      termResultRepo.find!.mockResolvedValue([]);
+
+      const dto = makeDto({
+        status: MarkStatus.SUBMITTED,
+        entries: [{ studentId: 'student-1', score: 45 }],
+      });
+
+      await service.bulkUpsert(dto, 'section-head-uuid', true);
+
+      expect(markRepo.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not consult the publication gate when the submitted score is unchanged', async () => {
+      assessmentRepo.findOne!.mockResolvedValue(makeAssessment({ totalMarks: 50, termId: 3 }));
+      markRepo.findBy!.mockResolvedValue([
+        {
+          id: 'mark-1',
+          studentId: 'student-1',
+          assessmentId: 'assessment-uuid',
+          status: MarkStatus.SUBMITTED,
+          score: '40.00',
+        } as MarkEntity,
+      ]);
+
+      const dto = makeDto({
+        status: MarkStatus.SUBMITTED,
+        entries: [{ studentId: 'student-1', score: 40 }],
+      });
+
+      await service.bulkUpsert(dto, 'section-head-uuid', true);
+
+      expect(termResultRepo.find).not.toHaveBeenCalled();
       expect(markRepo.save).toHaveBeenCalledTimes(1);
     });
   });

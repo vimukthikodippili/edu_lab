@@ -86,6 +86,7 @@ import { VisitorsModule } from './visitors/visitors.module';
 import { PtmModule } from './ptm/ptm.module';
 import { ParentFeedbackModule } from './parent-feedback/parent-feedback.module';
 import { ConsentFormsModule } from './consent-forms/consent-forms.module';
+import { ArtActivitiesModule } from './art-activities/art-activities.module';
 import teacherPerformanceConfig from './teacher-performance/config/teacher-performance.config';
 import wellbeingCaseConfig from './counselor/config/wellbeing-case.config';
 import counselorNoteConfig from './counselor/config/counselor-note.config';
@@ -233,6 +234,7 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     PtmModule,
     ParentFeedbackModule,
     ConsentFormsModule,
+    ArtActivitiesModule,
     AcademicContextModule,
   ],
 })

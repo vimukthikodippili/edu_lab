@@ -40,7 +40,7 @@ export class ClassDiaryController {
   }
 
   @Get('daily')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.section_head)
   async getDailyView(
     @Query() query: QueryClassDiaryDto,
     @Request() req: { user: { id: string } },
@@ -50,7 +50,7 @@ export class ClassDiaryController {
   }
 
   @Put('entry')
-  @Roles(RoleEnum.admin, RoleEnum.teacher)
+  @Roles(RoleEnum.admin, RoleEnum.teacher, RoleEnum.section_head)
   @HttpCode(HttpStatus.OK)
   async upsertEntry(
     @Body() dto: UpsertClassDiaryEntryDto,
