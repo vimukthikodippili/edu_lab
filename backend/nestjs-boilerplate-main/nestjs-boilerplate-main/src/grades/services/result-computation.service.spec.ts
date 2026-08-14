@@ -317,4 +317,112 @@ describe('ResultComputationService', () => {
       expect(staleSaveCall[0].rank).toBeNull();
     });
   });
+
+  describe('recomputeClassRank — class average and percentile', () => {
+    const rowWithPct = (
+      id: string,
+      totalScore: string,
+      percentage: string,
+      overrides: Partial<TermResultEntity> = {},
+    ) =>
+      ({ id, studentId: id, totalScore, percentage, isComplete: true, rank: null, percentile: null, classAveragePercentage: null, ...overrides } as TermResultEntity);
+
+    it('computes classAveragePercentage as the mean of percentage across the 5-student spec example (80,65,52,40,72 -> avg 61.8)', async () => {
+      termResultRepo.find!
+        .mockResolvedValueOnce([
+          rowWithPct('s1', '80', '80'),
+          rowWithPct('s2', '72', '72'),
+          rowWithPct('s3', '65', '65'),
+          rowWithPct('s4', '52', '52'),
+          rowWithPct('s5', '40', '40'),
+        ])
+        .mockResolvedValueOnce([]);
+
+      await service.recomputeClassRank(1, 1);
+      const saved = (termResultRepo.save as jest.Mock).mock.calls[0][0] as TermResultEntity[];
+      expect(saved.every((r) => r.classAveragePercentage === '61.8')).toBe(true);
+      // ranks: 80->1, 72->2, 65->3, 52->4, 40->5 (matches the spec's own worked example)
+      expect(saved.map((r) => r.rank)).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it('assigns percentile 100 to rank 1 and the lowest percentile to last place, in a class of 5', async () => {
+      termResultRepo.find!
+        .mockResolvedValueOnce([
+          rowWithPct('s1', '80', '80'),
+          rowWithPct('s2', '72', '72'),
+          rowWithPct('s3', '65', '65'),
+          rowWithPct('s4', '52', '52'),
+          rowWithPct('s5', '40', '40'),
+        ])
+        .mockResolvedValueOnce([]);
+
+      await service.recomputeClassRank(1, 1);
+      const saved = (termResultRepo.save as jest.Mock).mock.calls[0][0] as TermResultEntity[];
+      expect(saved[0].percentile).toBe('100');
+      expect(saved[4].percentile).toBe('20');
+    });
+
+    it('gives tied students the same percentile', async () => {
+      termResultRepo.find!
+        .mockResolvedValueOnce([rowWithPct('s1', '90', '90'), rowWithPct('s2', '90', '90'), rowWithPct('s3', '85', '85')])
+        .mockResolvedValueOnce([]);
+
+      await service.recomputeClassRank(1, 1);
+      const saved = (termResultRepo.save as jest.Mock).mock.calls[0][0] as TermResultEntity[];
+      expect(saved[0].percentile).toBe(saved[1].percentile);
+    });
+
+    it('clears classAveragePercentage and percentile on a stale incomplete row, same as rank', async () => {
+      termResultRepo.find!
+        .mockResolvedValueOnce([rowWithPct('s1', '90', '90')])
+        .mockResolvedValueOnce([
+          rowWithPct('s2', '0', '0', { isComplete: false, rank: 2, percentile: '50', classAveragePercentage: '70' }),
+        ]);
+
+      await service.recomputeClassRank(1, 1);
+      const staleSaveCall = (termResultRepo.save as jest.Mock).mock.calls[1][0] as TermResultEntity[];
+      expect(staleSaveCall[0].rank).toBeNull();
+      expect(staleSaveCall[0].percentile).toBeNull();
+      expect(staleSaveCall[0].classAveragePercentage).toBeNull();
+    });
+  });
+
+  describe('recomputeSubjectClassRank', () => {
+    const subjRow = (id: string, totalScore: string, percentage: string, overrides: Partial<SubjectResultEntity> = {}) =>
+      ({ id, studentId: id, totalScore, percentage, isComplete: true, subjectRank: null, subjectClassAveragePercentage: null, ...overrides } as SubjectResultEntity);
+
+    it('assigns per-subject rank and average independently of term-level rank', async () => {
+      subjectResultRepo.find!
+        .mockResolvedValueOnce([subjRow('s1', '45', '90'), subjRow('s2', '40', '80'), subjRow('s3', '30', '60')])
+        .mockResolvedValueOnce([]);
+
+      await service.recomputeSubjectClassRank('subject-1', 1, 1);
+      const saved = (subjectResultRepo.save as jest.Mock).mock.calls[0][0] as SubjectResultEntity[];
+      expect(saved.map((r) => r.subjectRank)).toEqual([1, 2, 3]);
+      expect(saved.every((r) => r.subjectClassAveragePercentage === '76.67')).toBe(true);
+    });
+
+    it('handles ties the same way as the term-level rank', async () => {
+      subjectResultRepo.find!
+        .mockResolvedValueOnce([subjRow('s1', '40', '80'), subjRow('s2', '40', '80'), subjRow('s3', '30', '60')])
+        .mockResolvedValueOnce([]);
+
+      await service.recomputeSubjectClassRank('subject-1', 1, 1);
+      const saved = (subjectResultRepo.save as jest.Mock).mock.calls[0][0] as SubjectResultEntity[];
+      expect(saved.map((r) => r.subjectRank)).toEqual([1, 1, 3]);
+    });
+
+    it('clears stale subjectRank/subjectClassAveragePercentage when a result reverts to incomplete', async () => {
+      subjectResultRepo.find!
+        .mockResolvedValueOnce([subjRow('s1', '40', '80')])
+        .mockResolvedValueOnce([
+          subjRow('s2', '0', '0', { isComplete: false, subjectRank: 2, subjectClassAveragePercentage: '70' }),
+        ]);
+
+      await service.recomputeSubjectClassRank('subject-1', 1, 1);
+      const staleSaveCall = (subjectResultRepo.save as jest.Mock).mock.calls[1][0] as SubjectResultEntity[];
+      expect(staleSaveCall[0].subjectRank).toBeNull();
+      expect(staleSaveCall[0].subjectClassAveragePercentage).toBeNull();
+    });
+  });
 });

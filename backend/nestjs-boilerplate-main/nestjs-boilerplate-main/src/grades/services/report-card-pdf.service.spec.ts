@@ -79,6 +79,61 @@ describe('ReportCardPdfService', () => {
       // PDF files start with the %PDF- magic header
       expect(buffer.subarray(0, 5).toString()).toBe('%PDF-');
     }, 15000);
+
+    it('still generates a valid PDF when classAveragePercentage is populated (the new summary line)', async () => {
+      const termResult = {
+        totalScore: '80',
+        totalMaxScore: '100',
+        percentage: '80',
+        rank: 1,
+        classAveragePercentage: '61.8',
+        termId: 1,
+        term: { name: 'Term 1 2026' },
+      } as unknown as TermResultEntity;
+
+      const subjectResults = [
+        {
+          subjectId: 'subj-1',
+          subject: { name: 'Maths' },
+          totalScore: '40',
+          totalMaxScore: '50',
+          percentage: '80',
+          letterGrade: 'A',
+        } as unknown as SubjectResultEntity,
+      ];
+
+      const student = {
+        firstName: 'Jane',
+        lastName: 'Doe',
+        admissionNumber: 'A001',
+      } as unknown as StudentEntity;
+
+      const buffer = await service.generatePdf(termResult, subjectResults, student);
+
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.subarray(0, 5).toString()).toBe('%PDF-');
+    }, 15000);
+
+    it('falls back to an em dash when classAveragePercentage is null, matching the existing Rank fallback', async () => {
+      const termResult = {
+        totalScore: '80',
+        totalMaxScore: '100',
+        percentage: '80',
+        rank: null,
+        classAveragePercentage: null,
+        termId: 1,
+        term: { name: 'Term 1 2026' },
+      } as unknown as TermResultEntity;
+
+      const buffer = await service.generatePdf(termResult, [], {
+        firstName: 'Jane',
+        lastName: 'Doe',
+        admissionNumber: 'A001',
+      } as unknown as StudentEntity);
+
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.subarray(0, 5).toString()).toBe('%PDF-');
+    }, 15000);
   });
 
   describe('persistAsFile', () => {

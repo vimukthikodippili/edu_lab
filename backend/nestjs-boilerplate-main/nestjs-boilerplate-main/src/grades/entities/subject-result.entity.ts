@@ -47,6 +47,12 @@ export class SubjectResultEntity extends EntityRelationalHelper {
   @Column({ type: 'varchar', length: 4, nullable: true })
   letterGrade: string | null;
 
+  @Column({ type: 'int', nullable: true })
+  subjectRank: number | null;
+
+  @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
+  subjectClassAveragePercentage: string | null;
+
   @Column({ type: 'boolean', default: false })
   isComplete: boolean;
 

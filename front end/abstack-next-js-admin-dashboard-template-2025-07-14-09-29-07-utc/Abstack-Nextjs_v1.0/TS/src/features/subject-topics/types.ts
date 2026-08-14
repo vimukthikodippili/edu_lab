@@ -12,6 +12,8 @@ export interface SubjectTopic {
 export interface CreateSubjectTopicPayload {
   subjectId: string
   title: string
+  /** Section Head only — creates the topic under a specific teacher's own list. */
+  teacherId?: string
 }
 
 export interface RenameSubjectTopicPayload {

@@ -170,13 +170,23 @@ export class ResultsController {
     RoleEnum.principal,
   )
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get the ranked class results for a term' })
+  @ApiOperation({ summary: 'Get the ranked class results for a term — pass subjectId for per-subject rank instead of overall term rank' })
   async getClassResults(
     @Query('classSectionId') classSectionId: string,
     @Query('termId') termId: string,
+    @Query('subjectId') subjectId: string | undefined,
     @Request() req: { user: { id: unknown; role?: { id?: number } } },
   ) {
     const staffId = await this.resolveStaffId(req.user.id);
+    if (subjectId) {
+      return this.resultsQueryService.getClassSubjectResults(
+        subjectId,
+        Number(classSectionId),
+        Number(termId),
+        staffId,
+        this.isPrivileged(req),
+      );
+    }
     return this.resultsQueryService.getClassResults(
       Number(classSectionId),
       Number(termId),

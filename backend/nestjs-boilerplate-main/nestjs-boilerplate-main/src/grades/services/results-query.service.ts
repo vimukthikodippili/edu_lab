@@ -16,9 +16,47 @@ export interface ClassRankRow {
   percentage: number | null;
   letterGrade: string | null;
   rank: number | null;
+  classAveragePercentage: number | null;
+  percentile: number | null;
   isComplete: boolean;
   isPublished: boolean;
   reportCardPath: string | null;
+}
+
+export interface ClassSubjectRankRow {
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  admissionNumber: string;
+  totalScore: number;
+  totalMaxScore: number;
+  percentage: number | null;
+  letterGrade: string | null;
+  subjectRank: number | null;
+  subjectClassAveragePercentage: number | null;
+  isComplete: boolean;
+}
+
+export interface ClassResultsSummary {
+  classAveragePercentage: number | null;
+  highestPercentage: number | null;
+  lowestPercentage: number | null;
+  passRate: number | null;
+}
+
+function summarize(percentages: (number | null)[]): ClassResultsSummary {
+  const complete = percentages.filter((p): p is number => p !== null);
+  if (complete.length === 0) {
+    return { classAveragePercentage: null, highestPercentage: null, lowestPercentage: null, passRate: null };
+  }
+  const round2 = (v: number) => Math.round(v * 100) / 100;
+  const passingCount = complete.filter((p) => p >= 50).length;
+  return {
+    classAveragePercentage: round2(complete.reduce((sum, p) => sum + p, 0) / complete.length),
+    highestPercentage: Math.max(...complete),
+    lowestPercentage: Math.min(...complete),
+    passRate: round2((passingCount / complete.length) * 100),
+  };
 }
 
 @Injectable()
@@ -111,7 +149,7 @@ export class ResultsQueryService {
     termId: number,
     staffId: string,
     isPrivileged: boolean,
-  ): Promise<ClassRankRow[]> {
+  ): Promise<{ rows: ClassRankRow[]; summary: ClassResultsSummary }> {
     await this.assertClassAccess(staffId, classSectionId, isPrivileged);
 
     const results = await this.termResultRepo.find({
@@ -137,6 +175,8 @@ export class ResultsQueryService {
           percentage: r.percentage !== null ? Number(r.percentage) : null,
           letterGrade: r.letterGrade ?? null,
           rank: r.rank,
+          classAveragePercentage: r.classAveragePercentage !== null ? Number(r.classAveragePercentage) : null,
+          percentile: r.percentile !== null ? Number(r.percentile) : null,
           isComplete: r.isComplete,
           isPublished: r.isPublished,
           reportCardPath: r.reportCardFile?.path ?? null,
@@ -151,6 +191,56 @@ export class ResultsQueryService {
       return b.totalScore - a.totalScore;
     });
 
-    return rows;
+    const summary = summarize(rows.filter((r) => r.isComplete).map((r) => r.percentage));
+    return { rows, summary };
+  }
+
+  async getClassSubjectResults(
+    subjectId: string,
+    classSectionId: number,
+    termId: number,
+    staffId: string,
+    isPrivileged: boolean,
+  ): Promise<{ rows: ClassSubjectRankRow[]; summary: ClassResultsSummary }> {
+    await this.assertSubjectAccess(staffId, subjectId, classSectionId, isPrivileged);
+
+    const results = await this.subjectResultRepo.find({
+      where: { subjectId, classSectionId, termId },
+    });
+    const students = await this.studentRepo.find({
+      where: { classSectionId },
+    });
+    const studentById = new Map(students.map((s) => [s.id, s]));
+
+    const rows: ClassSubjectRankRow[] = results
+      .filter((r) => studentById.has(r.studentId))
+      .map((r) => {
+        const student = studentById.get(r.studentId)!;
+        return {
+          studentId: r.studentId,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          admissionNumber: student.admissionNumber,
+          totalScore: Number(r.totalScore),
+          totalMaxScore: Number(r.totalMaxScore),
+          percentage: r.percentage !== null ? Number(r.percentage) : null,
+          letterGrade: r.letterGrade ?? null,
+          subjectRank: r.subjectRank,
+          subjectClassAveragePercentage:
+            r.subjectClassAveragePercentage !== null ? Number(r.subjectClassAveragePercentage) : null,
+          isComplete: r.isComplete,
+        };
+      });
+
+    rows.sort((a, b) => {
+      if (a.subjectRank === null && b.subjectRank === null) return b.totalScore - a.totalScore;
+      if (a.subjectRank === null) return 1;
+      if (b.subjectRank === null) return -1;
+      if (a.subjectRank !== b.subjectRank) return a.subjectRank - b.subjectRank;
+      return b.totalScore - a.totalScore;
+    });
+
+    const summary = summarize(rows.filter((r) => r.isComplete).map((r) => r.percentage));
+    return { rows, summary };
   }
 }

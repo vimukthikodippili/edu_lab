@@ -4,13 +4,13 @@ import apiClient from '@/lib/api/axios'
 import { ENDPOINTS } from '@/lib/api/endpoints'
 import type { SubjectTopic } from '../types'
 
-export function useSubjectTopics(subjectId?: string) {
+export function useSubjectTopics(subjectId?: string, teacherId?: string) {
   return useQuery<SubjectTopic[]>({
-    queryKey: ['subject-topics', subjectId],
+    queryKey: ['subject-topics', subjectId, teacherId],
     enabled: Boolean(subjectId),
     queryFn: async () => {
       const { data } = await apiClient.get<SubjectTopic[]>(ENDPOINTS.SUBJECT_TOPICS.LIST, {
-        params: { subjectId },
+        params: { subjectId, teacherId },
       })
       return data
     },

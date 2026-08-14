@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react'
-import { AlertCircle, CheckCircle2, FileText, Save, Send } from 'lucide-react'
+import { AlertCircle, CheckCircle2, FileText, MessageSquareWarning, Save, Send } from 'lucide-react'
 import RoleGuard from '@/components/wrappers/RoleGuard'
 import { ROLES } from '@/lib/auth/roles'
 import { useAcademicTerms } from '@/features/grades/hooks/useAcademicTerms'
@@ -8,14 +8,78 @@ import { useMyAssessments } from '@/features/grades/hooks/useMyAssessments'
 import { useMarksForAssessment } from '@/features/grades/hooks/useMarksForAssessment'
 import { useBulkUpsertMarks } from '@/features/grades/hooks/useBulkUpsertMarks'
 import { useMaterialsCheckStatus } from '@/features/grades/hooks/useMaterialsCheckStatus'
+import { useRequestAssessmentChange } from '@/features/grades/hooks/useRequestAssessmentChange'
 import { MaterialsCheckPanel } from '@/features/grades/components/MaterialsCheckPanel'
 import { RequestCorrectionModal } from '@/features/grades/components/RequestCorrectionModal'
 import { useMyMarkCorrections } from '@/features/grades/hooks/useMyMarkCorrections'
 import { useNotificationContext } from '@/context/useNotificationContext'
 import { usePermission } from '@/hooks/usePermission'
+import { useMyStaff } from '@/features/staff/hooks/useMyStaff'
 import { ASSESSMENT_TYPE_LABELS } from '@/types/sims/grades'
 import type { MarkRosterRow } from '@/types/sims/grades'
 import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
+
+// ─── Request a change panel — shown when someone else (a Section Head) scheduled this
+// assessment on the teacher's behalf ────────────────────────────────────────────────
+
+function RequestChangePanel({ assessmentId, title }: { assessmentId: string; title: string }) {
+  const { showNotification } = useNotificationContext()
+  const [open, setOpen] = useState(false)
+  const [message, setMessage] = useState('')
+  const requestChange = useRequestAssessmentChange(assessmentId)
+
+  const handleSend = () => {
+    if (!message.trim()) return
+    requestChange.mutate(message.trim(), {
+      onSuccess: () => {
+        showNotification({ variant: 'success', message: 'Your Section Head has been notified.' })
+        setMessage('')
+        setOpen(false)
+      },
+      onError: () => showNotification({ variant: 'danger', message: 'Could not send the request. Please try again.' }),
+    })
+  }
+
+  return (
+    <div className="rounded-3 p-3 mb-4" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+      <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+        <span className="small d-flex align-items-center gap-2" style={{ color: '#9a3412' }}>
+          <MessageSquareWarning size={16} className="flex-shrink-0" />
+          <strong>{title}</strong> was scheduled by your Section Head.
+        </span>
+        {!open && (
+          <button type="button" className="btn btn-sm btn-outline-warning" onClick={() => setOpen(true)}>
+            Request a change
+          </button>
+        )}
+      </div>
+      {open && (
+        <div className="mt-2 d-flex gap-2 align-items-start flex-wrap">
+          <textarea
+            className="form-control form-control-sm"
+            style={{ minWidth: 260, flex: 1 }}
+            rows={2}
+            placeholder="e.g. Can we lower the weight on Algebra and add a Statistics topic?"
+            value={message}
+            maxLength={500}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+          <div className="d-flex flex-column gap-1">
+            <button
+              type="button"
+              className="btn btn-sm btn-warning"
+              disabled={!message.trim() || requestChange.isPending}
+              onClick={handleSend}
+            >
+              {requestChange.isPending ? 'Sending…' : 'Send'}
+            </button>
+            <button type="button" className="btn btn-sm btn-light" onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -258,6 +322,7 @@ function MarksEntryContent() {
   const [correctionRow, setCorrectionRow] = useState<MarkRosterRow | null>(null)
 
   const canRequestCorrection = usePermission('grades:correction-workflow')
+  const { data: myStaff } = useMyStaff()
   const { data: myCorrections = [] } = useMyMarkCorrections()
   const pendingCorrectionMarkIds = new Set(
     myCorrections.filter((c) => c.status === 'pending').map((c) => c.markId),
@@ -485,6 +550,11 @@ function MarksEntryContent() {
             </select>
           )}
       </div>
+
+      {/* ── Scheduled-by-Section-Head notice ─────────────────────────── */}
+      {assessment && selectedAssessmentId && myStaff && assessment.createdByTeacherId !== myStaff.id && (
+        <RequestChangePanel assessmentId={selectedAssessmentId} title={assessment.title} />
+      )}
 
       {/* ── Instructions ───────────────────────────────────────────── */}
       {assessment?.instructions && (

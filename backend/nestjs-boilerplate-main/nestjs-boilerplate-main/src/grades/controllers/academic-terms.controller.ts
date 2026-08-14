@@ -40,6 +40,8 @@ export class AcademicTermsController {
     RoleEnum.section_head,
     RoleEnum.teacher,
     RoleEnum.accountant,
+    RoleEnum.student,
+    RoleEnum.guardian,
   )
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List all academic terms' })

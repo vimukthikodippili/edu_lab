@@ -1,17 +1,30 @@
 'use client'
-import React, { useEffect, useState } from 'react'
-import { AlertCircle, Download, Send, Trophy } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
+import { AlertCircle, Award, BarChart3, Download, Send, TrendingDown, TrendingUp, Trophy, Users } from 'lucide-react'
 import { useAcademicTerms } from '../hooks/useAcademicTerms'
 import { useClassResults } from '../hooks/useClassResults'
 import { usePublishResults } from '../hooks/usePublishResults'
 import { useClassSections } from '@/features/teacher-subject-requirements/hooks/useClassSections'
+import { useSubjects } from '@/features/subjects/hooks/useSubjects'
 import { useAuthStore } from '@/stores/authStore'
 import { ROLES } from '@/lib/auth/roles'
 import { useNotificationContext } from '@/context/useNotificationContext'
-import type { ClassRankRow } from '@/types/sims/grades'
+import type { ClassRankRow, ClassSubjectRankRow } from '@/types/sims/grades'
 
-function PercentageCell({ row }: { row: ClassRankRow }) {
-  if (!row.isComplete) {
+// ApexCharts touches `window` — must never render during SSR.
+const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
+
+const DISTRIBUTION_BUCKETS = [
+  { label: '0-20', min: 0, max: 20 },
+  { label: '21-40', min: 21, max: 40 },
+  { label: '41-60', min: 41, max: 60 },
+  { label: '61-80', min: 61, max: 80 },
+  { label: '81-100', min: 81, max: 100 },
+]
+
+function PercentageCell({ isComplete, percentage }: { isComplete: boolean; percentage: number | null }) {
+  if (!isComplete) {
     return (
       <span
         className="badge rounded-pill px-2 py-1 fw-bold"
@@ -23,8 +36,51 @@ function PercentageCell({ row }: { row: ClassRankRow }) {
   }
   return (
     <span className="text-muted small">
-      {row.percentage !== null ? `${row.percentage.toFixed(2)}%` : '—'}
+      {percentage !== null ? `${percentage.toFixed(2)}%` : '—'}
     </span>
+  )
+}
+
+function RankBadge({ rank }: { rank: number | null }) {
+  if (rank === null) return <span className="text-muted small">—</span>
+  return (
+    <span
+      className="badge rounded-pill fw-bold px-3 py-2"
+      style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', fontSize: '0.85rem' }}
+    >
+      {rank}
+    </span>
+  )
+}
+
+function SummaryCard({
+  icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  accent: string
+}) {
+  return (
+    <div className="col-6 col-lg-3">
+      <div className="card border-0 shadow-sm rounded-4 h-100">
+        <div className="card-body d-flex align-items-center gap-3 py-3">
+          <div
+            className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+            style={{ width: 44, height: 44, background: `${accent}1a` }}
+          >
+            {icon}
+          </div>
+          <div>
+            <div className="fw-bold fs-5" style={{ color: accent, lineHeight: 1.15 }}>{value}</div>
+            <div className="text-muted small">{label}</div>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -35,14 +91,21 @@ export function ClassResultsContent() {
 
   const [selectedTermId, setSelectedTermId] = useState<number | null>(null)
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<number | null>(null)
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('')
 
   const { data: terms = [], isLoading: termsLoading } = useAcademicTerms()
   const { data: classSections = [], isLoading: sectionsLoading } = useClassSections()
-  const { data: rows = [], isLoading: rowsLoading } = useClassResults(
+  const { data: subjects } = useSubjects({ limit: 100 })
+  const { data: classResults, isLoading: rowsLoading } = useClassResults(
     selectedClassSectionId,
     selectedTermId,
+    selectedSubjectId || null,
   )
   const publishMutation = usePublishResults()
+
+  const isSubjectView = !!selectedSubjectId
+  const rows = classResults?.rows ?? []
+  const summary = classResults?.summary
 
   const handlePublish = () => {
     if (!selectedClassSectionId || !selectedTermId) return
@@ -56,10 +119,10 @@ export function ClassResultsContent() {
     publishMutation.mutate(
       { classSectionId: selectedClassSectionId, termId: selectedTermId },
       {
-        onSuccess: (summary) => {
+        onSuccess: (summaryResult) => {
           showNotification({
             variant: 'success',
-            message: `Published ${summary.publishedCount} result(s). ${summary.skippedIncompleteCount} incomplete result(s) skipped, ${summary.alreadyPublishedCount} already published.`,
+            message: `Published ${summaryResult.publishedCount} result(s). ${summaryResult.skippedIncompleteCount} incomplete result(s) skipped, ${summaryResult.alreadyPublishedCount} already published.`,
           })
         },
         onError: (err: Error & { response?: { data?: { message?: string } } }) => {
@@ -82,8 +145,16 @@ export function ClassResultsContent() {
     }
   }, [classSections, selectedClassSectionId])
 
+  const distribution = useMemo(() => {
+    const complete = rows.filter((r) => r.isComplete && r.percentage !== null)
+    return DISTRIBUTION_BUCKETS.map((bucket) => ({
+      ...bucket,
+      count: complete.filter((r) => r.percentage! >= bucket.min && r.percentage! <= bucket.max).length,
+    }))
+  }, [rows])
+
   return (
-    <div className="container-fluid px-4 py-4">
+    <div className="container-fluid px-4 py-4 edulab-page">
       {/* Header */}
       <div className="d-flex align-items-center justify-content-between gap-3 mb-4 flex-wrap">
         <div className="d-flex align-items-center gap-3">
@@ -95,7 +166,7 @@ export function ClassResultsContent() {
           </div>
           <div>
             <h4 className="mb-0 fw-bold">Class Results</h4>
-            <p className="mb-0 text-muted small">Ranked results for a class section and term</p>
+            <p className="mb-0 text-muted small">Ranked results, class average, and distribution for a class section and term</p>
           </div>
         </div>
 
@@ -159,9 +230,83 @@ export function ClassResultsContent() {
                 </select>
               )}
             </div>
+            <div className="col-md-4">
+              <label className="form-label fw-semibold small mb-1">
+                Subject <span className="text-muted fw-normal">(optional — per-subject rank)</span>
+              </label>
+              <select
+                className="form-select"
+                value={selectedSubjectId}
+                onChange={(e) => setSelectedSubjectId(e.target.value)}
+              >
+                <option value="">All Subjects (overall term rank)</option>
+                {(subjects?.data ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>
+
+      {selectedTermId && selectedClassSectionId && !rowsLoading && rows.length > 0 && summary && (
+        <>
+          {/* Summary stats */}
+          <div className="row g-3 mb-3">
+            <SummaryCard
+              icon={<BarChart3 size={20} color="#6366f1" />}
+              label={isSubjectView ? 'Subject Average' : 'Class Average'}
+              value={summary.classAveragePercentage !== null ? `${summary.classAveragePercentage.toFixed(1)}%` : '—'}
+              accent="#6366f1"
+            />
+            <SummaryCard
+              icon={<TrendingUp size={20} color="#16a34a" />}
+              label="Highest"
+              value={summary.highestPercentage !== null ? `${summary.highestPercentage.toFixed(1)}%` : '—'}
+              accent="#16a34a"
+            />
+            <SummaryCard
+              icon={<TrendingDown size={20} color="#dc2626" />}
+              label="Lowest"
+              value={summary.lowestPercentage !== null ? `${summary.lowestPercentage.toFixed(1)}%` : '—'}
+              accent="#dc2626"
+            />
+            <SummaryCard
+              icon={<Award size={20} color="#d97706" />}
+              label="Pass Rate (≥50%)"
+              value={summary.passRate !== null ? `${summary.passRate.toFixed(1)}%` : '—'}
+              accent="#d97706"
+            />
+          </div>
+
+          {/* Distribution chart */}
+          <div className="card border-0 shadow-sm rounded-4 mb-4">
+            <div
+              className="card-header border-0 py-3 px-4 rounded-top-4 d-flex align-items-center gap-2"
+              style={{ background: 'linear-gradient(135deg, var(--edulab-nav-bg) 0%, var(--edulab-nav-bg-2) 100%)' }}
+            >
+              <Users size={16} color="white" />
+              <span className="fw-bold text-white">Mark Distribution</span>
+            </div>
+            <div className="card-body">
+              <Chart
+                type="bar"
+                height={240}
+                series={[{ name: 'Students', data: distribution.map((b) => b.count) }]}
+                options={{
+                  chart: { toolbar: { show: false } },
+                  plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
+                  xaxis: { categories: distribution.map((b) => b.label), title: { text: 'Percentage range' } },
+                  yaxis: { title: { text: 'Students' }, forceNiceScale: true, min: 0 },
+                  colors: ['#6366f1'],
+                  dataLabels: { enabled: true },
+                  legend: { show: false },
+                }}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Results table */}
       <div className="card border-0 shadow-sm rounded-4">
@@ -191,91 +336,86 @@ export function ClassResultsContent() {
                 <thead style={{ background: '#f8fafc' }}>
                   <tr>
                     <th className="px-4 py-3 text-muted small fw-semibold border-0">#</th>
-                    <th className="py-3 text-muted small fw-semibold border-0">Rank</th>
+                    <th className="py-3 text-muted small fw-semibold border-0">{isSubjectView ? 'Subj. Rank' : 'Rank'}</th>
                     <th className="py-3 text-muted small fw-semibold border-0">Student</th>
                     <th className="py-3 text-muted small fw-semibold border-0">Total / Max</th>
                     <th className="py-3 text-muted small fw-semibold border-0">Percentage</th>
-                    <th className="py-3 text-muted small fw-semibold border-0">Status</th>
-                    <th className="py-3 text-muted small fw-semibold border-0">Report Card</th>
+                    {!isSubjectView && <th className="py-3 text-muted small fw-semibold border-0">Status</th>}
+                    {!isSubjectView && <th className="py-3 text-muted small fw-semibold border-0">Report Card</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, idx) => (
-                    <tr key={row.studentId}>
-                      <td className="px-4 text-muted small">{idx + 1}</td>
-                      <td>
-                        {row.rank !== null ? (
-                          <span
-                            className="badge rounded-pill fw-bold px-3 py-2"
-                            style={{
-                              background: 'linear-gradient(135deg,#667eea,#764ba2)',
-                              color: 'white',
-                              fontSize: '0.85rem',
-                            }}
-                          >
-                            {row.rank}
-                          </span>
-                        ) : (
-                          <span className="text-muted small">—</span>
+                  {rows.map((row, idx) => {
+                    const termRow = row as ClassRankRow
+                    const subjectRow = row as ClassSubjectRankRow
+                    return (
+                      <tr key={row.studentId}>
+                        <td className="px-4 text-muted small">{idx + 1}</td>
+                        <td>
+                          <RankBadge rank={isSubjectView ? subjectRow.subjectRank : termRow.rank} />
+                        </td>
+                        <td>
+                          <div className="fw-semibold small">
+                            {row.lastName}, {row.firstName}
+                          </div>
+                          <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+                            {row.admissionNumber}
+                          </div>
+                        </td>
+                        <td className="small">
+                          {row.totalScore} / {row.totalMaxScore}
+                        </td>
+                        <td>
+                          <PercentageCell isComplete={row.isComplete} percentage={row.percentage} />
+                        </td>
+                        {!isSubjectView && (
+                          <td>
+                            <div className="d-flex flex-column gap-1 align-items-start">
+                              {termRow.isComplete ? (
+                                <span
+                                  className="badge rounded-pill px-2 py-1 fw-bold"
+                                  style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.7rem' }}
+                                >
+                                  Complete
+                                </span>
+                              ) : (
+                                <span
+                                  className="badge rounded-pill px-2 py-1 fw-bold"
+                                  style={{ background: '#fef9c3', color: '#92400e', fontSize: '0.7rem' }}
+                                >
+                                  In progress
+                                </span>
+                              )}
+                              {termRow.isPublished && (
+                                <span
+                                  className="badge rounded-pill px-2 py-1 fw-bold"
+                                  style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: '0.7rem' }}
+                                >
+                                  Published
+                                </span>
+                              )}
+                            </div>
+                          </td>
                         )}
-                      </td>
-                      <td>
-                        <div className="fw-semibold small">
-                          {row.lastName}, {row.firstName}
-                        </div>
-                        <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-                          {row.admissionNumber}
-                        </div>
-                      </td>
-                      <td className="small">
-                        {row.totalScore} / {row.totalMaxScore}
-                      </td>
-                      <td>
-                        <PercentageCell row={row} />
-                      </td>
-                      <td>
-                        <div className="d-flex flex-column gap-1 align-items-start">
-                          {row.isComplete ? (
-                            <span
-                              className="badge rounded-pill px-2 py-1 fw-bold"
-                              style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.7rem' }}
-                            >
-                              Complete
-                            </span>
-                          ) : (
-                            <span
-                              className="badge rounded-pill px-2 py-1 fw-bold"
-                              style={{ background: '#fef9c3', color: '#92400e', fontSize: '0.7rem' }}
-                            >
-                              In progress
-                            </span>
-                          )}
-                          {row.isPublished && (
-                            <span
-                              className="badge rounded-pill px-2 py-1 fw-bold"
-                              style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: '0.7rem' }}
-                            >
-                              Published
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        {row.reportCardPath ? (
-                          <a
-                            href={`${process.env.NEXT_PUBLIC_API_URL}/api/v1${row.reportCardPath}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-link btn-sm p-0 d-flex align-items-center gap-1 text-primary"
-                          >
-                            <Download size={14} /> Download
-                          </a>
-                        ) : (
-                          <span className="text-muted small">—</span>
+                        {!isSubjectView && (
+                          <td>
+                            {termRow.reportCardPath ? (
+                              <a
+                                href={`${process.env.NEXT_PUBLIC_API_URL}/api/v1${termRow.reportCardPath}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="btn btn-link btn-sm p-0 d-flex align-items-center gap-1 text-primary"
+                              >
+                                <Download size={14} /> Download
+                              </a>
+                            ) : (
+                              <span className="text-muted small">—</span>
+                            )}
+                          </td>
                         )}
-                      </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

@@ -27,7 +27,7 @@ import { RenameSubjectTopicDto } from './dto/rename-subject-topic.dto';
 import { ReorderSubjectTopicsDto } from './dto/reorder-subject-topics.dto';
 import { QuerySubjectTopicsDto } from './dto/query-subject-topics.dto';
 
-const PRIVILEGED_ROLES = new Set<number>([RoleEnum.admin, RoleEnum.principal]);
+const PRIVILEGED_ROLES = new Set<number>([RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head]);
 
 @ApiTags('Subject Topics')
 @ApiBearerAuth()
@@ -56,35 +56,39 @@ export class SubjectTopicsController {
   }
 
   @Get()
-  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.principal)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'List active topics for a subject, self-scoped to the caller' })
+  @ApiOperation({ summary: 'List active topics for a subject, self-scoped to the caller (or, for a privileged caller, an explicit teacherId)' })
   async findActive(
     @Query() query: QuerySubjectTopicsDto,
     @Request() req: { user: { id: unknown; role?: { id?: number } } },
   ) {
     const staffId = await this.resolveStaffId(req.user.id);
+    const isPrivileged = this.isPrivileged(req);
+    const effectiveTeacherId = isPrivileged && query.teacherId ? query.teacherId : staffId;
     return this.subjectTopicsService.findActiveForSubject(
       query.subjectId,
-      staffId,
-      this.isPrivileged(req),
+      effectiveTeacherId,
+      isPrivileged,
     );
   }
 
   @Post()
-  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.principal)
+  @Roles(RoleEnum.teacher, RoleEnum.admin, RoleEnum.principal, RoleEnum.section_head)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new topic for a subject' })
+  @ApiOperation({ summary: 'Create a new topic for a subject (or, for a privileged caller, on an explicit teacherId\'s behalf)' })
   async create(
     @Body() dto: CreateSubjectTopicDto,
     @Request() req: { user: { id: unknown; role?: { id?: number } } },
   ) {
     const staffId = await this.resolveStaffId(req.user.id);
+    const isPrivileged = this.isPrivileged(req);
+    const effectiveTeacherId = isPrivileged && dto.teacherId ? dto.teacherId : staffId;
     return this.subjectTopicsService.create(
       dto.subjectId,
-      staffId,
+      effectiveTeacherId,
       dto.title,
-      this.isPrivileged(req),
+      isPrivileged,
     );
   }
 

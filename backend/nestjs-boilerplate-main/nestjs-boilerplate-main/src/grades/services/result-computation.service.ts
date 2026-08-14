@@ -13,6 +13,41 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+interface RankOutcome {
+  rank: number;
+  percentile: number;
+}
+
+/** Dense/competition rank from a set of totals already sorted DESC — ties share a rank, and the
+ * next distinct score's rank skips ahead to reflect how many rows are already ranked above it.
+ * Percentile is "scored at or above this fraction of the class" (rank 1 of N → 100, last → lowest). */
+function assignRanksAndPercentiles(totalScoresDesc: string[]): RankOutcome[] {
+  const n = totalScoresDesc.length;
+  const outcomes: RankOutcome[] = [];
+  let currentRank = 0;
+  let previousScore: string | null = null;
+  let rowsSeenSoFar = 0;
+
+  for (const score of totalScoresDesc) {
+    rowsSeenSoFar += 1;
+    if (previousScore === null || score !== previousScore) {
+      currentRank = rowsSeenSoFar;
+      previousScore = score;
+    }
+    outcomes.push({
+      rank: currentRank,
+      percentile: Math.round(100 - ((currentRank - 1) / n) * 100),
+    });
+  }
+  return outcomes;
+}
+
+function average(values: (string | null | undefined)[]): number | null {
+  const nums = values.filter((v): v is string => typeof v === 'string').map(Number);
+  if (nums.length === 0) return null;
+  return round2(nums.reduce((sum, v) => sum + v, 0) / nums.length);
+}
+
 @Injectable()
 export class ResultComputationService {
   constructor(
@@ -185,18 +220,17 @@ export class ResultComputationService {
       order: { totalScore: 'DESC' },
     });
 
-    let currentRank = 0;
-    let previousScore: string | null = null;
-    let rowsSeenSoFar = 0;
+    const ranking = assignRanksAndPercentiles(
+      completeRows.map((r) => r.totalScore),
+    );
+    const classAverage = average(completeRows.map((r) => r.percentage));
+    const classAverageStr = classAverage !== null ? String(classAverage) : null;
 
-    for (const row of completeRows) {
-      rowsSeenSoFar += 1;
-      if (previousScore === null || row.totalScore !== previousScore) {
-        currentRank = rowsSeenSoFar;
-        previousScore = row.totalScore;
-      }
-      row.rank = currentRank;
-    }
+    completeRows.forEach((row, i) => {
+      row.rank = ranking[i].rank;
+      row.percentile = String(ranking[i].percentile);
+      row.classAveragePercentage = classAverageStr;
+    });
 
     if (completeRows.length > 0) {
       await this.termResultRepo.save(completeRows);
@@ -205,12 +239,59 @@ export class ResultComputationService {
     const staleRows = await this.termResultRepo.find({
       where: { classSectionId, termId, isComplete: false },
     });
-    const staleRanked = staleRows.filter((r) => r.rank !== null);
-    if (staleRanked.length > 0) {
-      staleRanked.forEach((r) => {
+    const staleNeedingClear = staleRows.filter(
+      (r) => r.rank !== null || r.percentile !== null || r.classAveragePercentage !== null,
+    );
+    if (staleNeedingClear.length > 0) {
+      staleNeedingClear.forEach((r) => {
         r.rank = null;
+        r.percentile = null;
+        r.classAveragePercentage = null;
       });
-      await this.termResultRepo.save(staleRanked);
+      await this.termResultRepo.save(staleNeedingClear);
+    }
+  }
+
+  /** Mirrors recomputeClassRank() exactly but scoped to a single subject within the class+term
+   * (SubjectResultEntity), so a student's standing within one subject can be shown separately
+   * from their overall term rank. */
+  async recomputeSubjectClassRank(
+    subjectId: string,
+    classSectionId: number,
+    termId: number,
+  ): Promise<void> {
+    const completeRows = await this.subjectResultRepo.find({
+      where: { subjectId, classSectionId, termId, isComplete: true },
+      order: { totalScore: 'DESC' },
+    });
+
+    const ranking = assignRanksAndPercentiles(
+      completeRows.map((r) => r.totalScore),
+    );
+    const subjectAverage = average(completeRows.map((r) => r.percentage));
+    const subjectAverageStr = subjectAverage !== null ? String(subjectAverage) : null;
+
+    completeRows.forEach((row, i) => {
+      row.subjectRank = ranking[i].rank;
+      row.subjectClassAveragePercentage = subjectAverageStr;
+    });
+
+    if (completeRows.length > 0) {
+      await this.subjectResultRepo.save(completeRows);
+    }
+
+    const staleRows = await this.subjectResultRepo.find({
+      where: { subjectId, classSectionId, termId, isComplete: false },
+    });
+    const staleNeedingClear = staleRows.filter(
+      (r) => r.subjectRank !== null || r.subjectClassAveragePercentage !== null,
+    );
+    if (staleNeedingClear.length > 0) {
+      staleNeedingClear.forEach((r) => {
+        r.subjectRank = null;
+        r.subjectClassAveragePercentage = null;
+      });
+      await this.subjectResultRepo.save(staleNeedingClear);
     }
   }
 }

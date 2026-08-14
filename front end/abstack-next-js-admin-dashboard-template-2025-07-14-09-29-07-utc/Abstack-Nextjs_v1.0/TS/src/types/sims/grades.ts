@@ -177,6 +177,8 @@ export interface SubjectResult {
   totalMaxScore: number
   percentage: number | null
   letterGrade: string | null
+  subjectRank: number | null
+  subjectClassAveragePercentage: number | null
   isComplete: boolean
 }
 
@@ -218,6 +220,8 @@ export interface TermResult {
   totalMaxScore: number
   percentage: number | null
   rank: number | null
+  classAveragePercentage: number | null
+  percentile: number | null
   isComplete: boolean
   isPublished: boolean
   reportCardPath: string | null
@@ -232,9 +236,32 @@ export interface ClassRankRow {
   totalMaxScore: number
   percentage: number | null
   rank: number | null
+  classAveragePercentage: number | null
+  percentile: number | null
   isComplete: boolean
   isPublished: boolean
   reportCardPath: string | null
+}
+
+export interface ClassSubjectRankRow {
+  studentId: string
+  firstName: string
+  lastName: string
+  admissionNumber: string
+  totalScore: number
+  totalMaxScore: number
+  percentage: number | null
+  letterGrade: string | null
+  subjectRank: number | null
+  subjectClassAveragePercentage: number | null
+  isComplete: boolean
+}
+
+export interface ClassResultsSummary {
+  classAveragePercentage: number | null
+  highestPercentage: number | null
+  lowestPercentage: number | null
+  passRate: number | null
 }
 
 export interface PublishResultsSummary {

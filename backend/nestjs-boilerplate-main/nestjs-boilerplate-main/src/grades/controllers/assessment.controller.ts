@@ -5,6 +5,8 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Request,
@@ -18,8 +20,15 @@ import { RoleEnum } from '../../roles/roles.enum';
 import { RolesGuard } from '../../roles/roles.guard';
 import { AssessmentService } from '../services/assessment.service';
 import { CreateAssessmentDto } from '../dto/create-assessment.dto';
+import { RequestAssessmentChangeDto } from '../dto/request-assessment-change.dto';
 import { UsersService } from '../../users/users.service';
 import { StaffService } from '../../staff/staff.service';
+
+const PRIVILEGED_ROLES = new Set<number>([
+  RoleEnum.section_head,
+  RoleEnum.admin,
+  RoleEnum.principal,
+]);
 
 @ApiTags('Grades — Assessments')
 @ApiBearerAuth()
@@ -41,6 +50,11 @@ export class AssessmentController {
         'No staff record linked to your account.',
       );
     return staff.id;
+  }
+
+  private isPrivileged(req: { user: { role?: { id?: number } } }): boolean {
+    const roleId = req.user.role?.id;
+    return roleId !== undefined && PRIVILEGED_ROLES.has(roleId);
   }
 
   @Post()
@@ -74,5 +88,19 @@ export class AssessmentController {
       subjectId,
       createdByTeacherId,
     );
+  }
+
+  @Post(':id/request-change')
+  @Roles(RoleEnum.teacher, RoleEnum.section_head, RoleEnum.admin, RoleEnum.principal)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Ask the assessment creator to reconsider its topic/mark allocation' })
+  async requestChange(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: RequestAssessmentChangeDto,
+    @Request() req: { user: { id: unknown; role?: { id?: number } } },
+  ) {
+    const staffId = await this.resolveStaffId(req.user.id);
+    await this.assessmentService.requestChange(id, dto, staffId, this.isPrivileged(req));
+    return { success: true };
   }
 }

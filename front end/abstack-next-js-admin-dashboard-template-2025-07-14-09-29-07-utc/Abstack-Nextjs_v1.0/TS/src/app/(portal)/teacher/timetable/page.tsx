@@ -1,15 +1,12 @@
 'use client'
 import React, { useState } from 'react'
 import { Metadata } from 'next'
-import { CalendarCheck, Bell, BellOff, CheckCircle } from 'lucide-react'
+import { CalendarCheck, CheckCircle } from 'lucide-react'
 import RoleGuard from '@/components/wrappers/RoleGuard'
 import { ROLES } from '@/lib/auth/roles'
 import { useMyStaff } from '@/features/staff/hooks/useMyStaff'
 import { useTeacherTimetable } from '@/features/timetable/hooks/useTeacherTimetable'
 import { useTimetableRecord } from '@/features/timetable/hooks/useTimetableRecord'
-import { useNotifications } from '@/features/notifications/hooks/useNotifications'
-import { useUnreadCount } from '@/features/notifications/hooks/useUnreadCount'
-import { useMarkRead } from '@/features/notifications/hooks/useMarkRead'
 import { TimetableGrid } from '@/features/timetable/components/TimetableGrid'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
@@ -60,77 +57,6 @@ function FinalizationBanner({ academicYear }: { academicYear: string }) {
 }
 
 // ─── Notification panel ───────────────────────────────────────────────────────
-
-function NotificationsPanel({ staffId }: { staffId: string }) {
-  const [open, setOpen] = useState(false)
-  const { data: unreadData } = useUnreadCount(staffId)
-  const { data: notifications = [] } = useNotifications(open ? staffId : null)
-  const markRead = useMarkRead(staffId)
-  const count = unreadData?.count ?? 0
-
-  return (
-    <div className="position-relative">
-      <button
-        type="button"
-        className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2"
-        onClick={() => setOpen((o) => !o)}
-      >
-        {count > 0 ? <Bell size={15} /> : <BellOff size={15} />}
-        Notifications
-        {count > 0 && (
-          <span className="badge rounded-pill ms-1" style={{ background: '#ef4444', fontSize: '0.65rem' }}>
-            {count}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div
-          className="position-absolute end-0 mt-1 card shadow-lg border-0 rounded-3"
-          style={{ width: 380, maxWidth: 'calc(100vw - 2rem)', zIndex: 1050, maxHeight: 400, overflowY: 'auto' }}
-        >
-          <div className="card-header py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
-            <span className="fw-semibold small">Notifications</span>
-            <button type="button" className="btn-close btn-close-sm" onClick={() => setOpen(false)} />
-          </div>
-          {notifications.length === 0 ? (
-            <div className="p-4 text-center text-muted small">No notifications yet.</div>
-          ) : (
-            <div className="list-group list-group-flush">
-              {notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className="list-group-item list-group-item-action px-3 py-2"
-                  style={{ background: n.isRead ? undefined : '#f0f9ff' }}
-                >
-                  <div className="d-flex align-items-start justify-content-between gap-2">
-                    <div>
-                      <div className="small fw-semibold">{n.title}</div>
-                      <div className="small text-muted">{n.message}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
-                        {new Date(n.createdAt).toLocaleString('en-GB')}
-                      </div>
-                    </div>
-                    {!n.isRead && (
-                      <button
-                        type="button"
-                        className="btn btn-link btn-sm p-0 text-nowrap"
-                        style={{ fontSize: '0.72rem' }}
-                        onClick={() => markRead.mutate(n.id)}
-                      >
-                        Mark read
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -197,7 +123,6 @@ function TeacherTimetablePage() {
               onChange={(e) => setAcademicYear(e.target.value)}
             />
           </div>
-          <NotificationsPanel staffId={myStaff.id} />
         </div>
       </div>
 

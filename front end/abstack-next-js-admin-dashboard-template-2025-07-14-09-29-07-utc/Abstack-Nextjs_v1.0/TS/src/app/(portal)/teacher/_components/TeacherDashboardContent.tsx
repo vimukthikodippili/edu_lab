@@ -5,6 +5,7 @@ import { ROLES } from '@/lib/auth/roles'
 import PrincipalPageHeader from '@/components/principal/PrincipalPageHeader'
 import FreePeriodWidget from './FreePeriodWidget'
 import ClassCheckInWidget from './ClassCheckInWidget'
+import PendingNotificationsWidget from './PendingNotificationsWidget'
 import ClassSummaryPanel from '@/features/class-check-in/components/ClassSummaryPanel'
 
 export default function TeacherDashboardContent() {
@@ -16,6 +17,7 @@ export default function TeacherDashboardContent() {
           title="Teacher Dashboard"
           subtitle="Attendance, marks entry, timetable, and class diary."
         />
+        <PendingNotificationsWidget />
         <ClassCheckInWidget />
         <ClassSummaryPanel />
         <FreePeriodWidget />

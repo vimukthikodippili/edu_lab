@@ -43,6 +43,12 @@ export class TermResultEntity extends EntityRelationalHelper {
   @Column({ type: 'int', nullable: true })
   rank: number | null;
 
+  @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
+  classAveragePercentage: string | null;
+
+  @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
+  percentile: string | null;
+
   @Column({ type: 'boolean', default: false })
   isComplete: boolean;
 

@@ -36,6 +36,11 @@ export class ResultComputationListener {
         event.classSectionId,
         event.termId,
       );
+      await this.resultComputationService.recomputeSubjectClassRank(
+        event.subjectId,
+        event.classSectionId,
+        event.termId,
+      );
     } catch (err) {
       this.logger.error(
         `Unexpected error processing marks.submitted event ${JSON.stringify(event)}: ${err}`,

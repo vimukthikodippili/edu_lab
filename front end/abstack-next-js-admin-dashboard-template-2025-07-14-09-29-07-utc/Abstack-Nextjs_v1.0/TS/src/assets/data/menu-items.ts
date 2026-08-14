@@ -566,6 +566,13 @@ export const MENU_ITEMS: MenuItemType[] = [
         allowedRoles: [ROLES.SECTION_HEAD],
       },
       {
+        key: 'sh-schedule-assessment',
+        label: 'Schedule Assessment',
+        url: '/section-head/schedule-assessment',
+        parentKey: 'sh-grades',
+        allowedRoles: [ROLES.SECTION_HEAD],
+      },
+      {
         key: 'sh-class-results',
         label: 'Class Results',
         url: '/section-head/class-results',

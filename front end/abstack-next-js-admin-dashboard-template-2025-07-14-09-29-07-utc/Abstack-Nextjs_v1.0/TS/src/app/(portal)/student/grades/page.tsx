@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { BarChart2, ChevronDown, ChevronRight, GraduationCap } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { BarChart2, ChevronDown, ChevronRight, GraduationCap, Trophy } from 'lucide-react'
 import RoleGuard from '@/components/wrappers/RoleGuard'
 import { ROLES } from '@/lib/auth/roles'
 import { useMyStudent } from '@/features/students/hooks/useMyStudent'
@@ -10,7 +11,76 @@ import { usePublishedSubjectResults } from '@/features/grades/hooks/usePublished
 import { usePublishedAssessmentResults } from '@/features/grades/hooks/usePublishedAssessmentResults'
 import { useSubjects } from '@/features/subjects/hooks/useSubjects'
 import { TopicScoreChips } from '@/features/grades/components/TopicScoreChips'
-import type { SubjectResult } from '@/types/sims/grades'
+import type { SubjectResult, TermResult } from '@/types/sims/grades'
+
+// ApexCharts touches `window` — must never render during SSR.
+const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
+
+// ─── Per-subject percentage chart with a class-average reference line ─────────
+
+function SubjectPercentageChart({
+  subjectResults,
+  subjectNameById,
+  classAveragePercentage,
+}: {
+  subjectResults: SubjectResult[]
+  subjectNameById: Map<string, string>
+  classAveragePercentage: number | null
+}) {
+  // Numeric Postgres columns come back over the wire as strings — coerce defensively
+  // regardless of what the TS type claims, since arithmetic (.toFixed) needs a real number.
+  const complete = subjectResults.filter((sr) => sr.isComplete && sr.percentage !== null)
+  const classAvg = classAveragePercentage !== null ? Number(classAveragePercentage) : null
+  if (complete.length === 0) return null
+
+  return (
+    <div className="card border-0 shadow-sm mb-4">
+      <div
+        className="card-header border-0 py-3 px-4 rounded-top-3"
+        style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+      >
+        <span className="fw-bold text-white">Score by Subject</span>
+      </div>
+      <div className="card-body">
+        <Chart
+          type="bar"
+          height={Math.max(220, complete.length * 46)}
+          series={[{ name: 'Your score %', data: complete.map((sr) => Number(sr.percentage)) }]}
+          options={{
+            chart: { toolbar: { show: false } },
+            plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '55%' } },
+            xaxis: {
+              categories: complete.map((sr) => subjectNameById.get(sr.subjectId) ?? sr.subjectId),
+              min: 0,
+              max: 100,
+              title: { text: 'Percentage' },
+            },
+            colors: ['#6366f1'],
+            dataLabels: { enabled: true, formatter: (v: number) => `${v}%` },
+            legend: { show: false },
+            annotations:
+              classAvg !== null
+                ? {
+                    xaxis: [
+                      {
+                        x: classAvg,
+                        borderColor: '#dc2626',
+                        strokeDashArray: 6,
+                        label: {
+                          text: `Class avg ${classAvg.toFixed(1)}%`,
+                          orientation: 'horizontal',
+                          style: { background: '#dc2626', color: '#fff', fontSize: '11px' },
+                        },
+                      },
+                    ],
+                  }
+                : undefined,
+          }}
+        />
+      </div>
+    </div>
+  )
+}
 
 function GradeBadge({ letter }: { letter: string | null }) {
   if (!letter) return <span className="text-muted">—</span>
@@ -52,10 +122,11 @@ function SubjectResultRow({
         <td className="small text-center">{sr.totalScore} / {sr.totalMaxScore}</td>
         <td className="small text-center">{sr.percentage != null ? `${sr.percentage}%` : '—'}</td>
         <td className="text-center"><GradeBadge letter={sr.letterGrade} /></td>
+        <td className="small text-center">{sr.subjectRank ?? '—'}</td>
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={4} className="p-0">
+          <td colSpan={5} className="p-0">
             <div className="p-3" style={{ background: '#f8fafc' }}>
               {isLoading ? (
                 <div className="text-muted small">Loading…</div>
@@ -186,8 +257,31 @@ function StudentGradesContent() {
                 <div className="text-muted small">Class Rank</div>
                 <div className="fs-5 fw-bold">{termResult.rank ?? '—'}</div>
               </div>
+              <div>
+                <div className="text-muted small">Class Average</div>
+                <div className="fs-5 fw-bold">
+                  {termResult.classAveragePercentage != null ? `${termResult.classAveragePercentage}%` : '—'}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted small">Percentile</div>
+                <div className="fs-5 fw-bold d-flex align-items-center gap-1">
+                  {termResult.percentile != null ? (
+                    <>
+                      <Trophy size={16} className="text-warning" />
+                      Better than {Math.round(Number(termResult.percentile))}%
+                    </>
+                  ) : '—'}
+                </div>
+              </div>
             </div>
           </div>
+
+          <SubjectPercentageChart
+            subjectResults={subjectResults}
+            subjectNameById={subjectNameById}
+            classAveragePercentage={termResult.classAveragePercentage}
+          />
 
           <div className="card border-0 shadow-sm">
             <div
@@ -204,6 +298,7 @@ function StudentGradesContent() {
                     <th className="small text-muted text-center">Score</th>
                     <th className="small text-muted text-center">%</th>
                     <th className="small text-muted text-center">Grade</th>
+                    <th className="small text-muted text-center">Subj. Rank</th>
                   </tr>
                 </thead>
                 <tbody>

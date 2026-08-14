@@ -18,6 +18,9 @@ interface TopicAllocationEditorProps {
   /** Only assessments (exam-style papers) track a per-topic question format — assignment/
    * homework allocation reuses this same editor without it. */
   showQuestionType?: boolean
+  /** Section Head only — views/manages a specific teacher's own topic list instead of the
+   * caller's own, e.g. when scheduling an assessment on that teacher's behalf. */
+  teacherId?: string
 }
 
 /** Shared by the assessment and assignment creation forms — lists the subject's active topics,
@@ -29,8 +32,9 @@ export default function TopicAllocationEditor({
   subjectId,
   onAllocationsChange,
   showQuestionType = false,
+  teacherId,
 }: TopicAllocationEditorProps) {
-  const { data: topics, isLoading } = useSubjectTopics(subjectId || undefined)
+  const { data: topics, isLoading } = useSubjectTopics(subjectId || undefined, teacherId)
   const [marksByTopicId, setMarksByTopicId] = useState<Record<string, number>>({})
   const [typeByTopicId, setTypeByTopicId] = useState<Record<string, QuestionType>>({})
 
@@ -61,7 +65,7 @@ export default function TopicAllocationEditor({
     const title = addTitle.trim()
     if (!title) return
     createMutation.mutate(
-      { subjectId, title },
+      { subjectId, title, ...(teacherId ? { teacherId } : {}) },
       {
         onSuccess: () => {
           setAddTitle('')
