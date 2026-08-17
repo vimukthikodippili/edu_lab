@@ -130,6 +130,18 @@ export class GradeTrendService {
     return false;
   }
 
+  /** Exact mirror of isDecliningTrend() — two consecutive rises each exceeding the same
+   * threshold magnitude, rather than a separate/asymmetric "improving" definition. */
+  isImprovingTrend(rollingAverages: number[], riseThreshold: number): boolean {
+    if (rollingAverages.length < 3) return false;
+    for (let i = 0; i <= rollingAverages.length - 3; i++) {
+      const rise1 = rollingAverages[i + 1] - rollingAverages[i];
+      const rise2 = rollingAverages[i + 2] - rollingAverages[i + 1];
+      if (rise1 > riseThreshold && rise2 > riseThreshold) return true;
+    }
+    return false;
+  }
+
   private async getTermIdsForYear(academicYear: string): Promise<number[]> {
     const terms = await this.termRepo.find({ where: { academicYear } });
     return terms.map((t) => t.id);
@@ -163,7 +175,9 @@ export class GradeTrendService {
         return {
           assessmentId: assessment.id,
           assessmentTitle: assessment.title,
-          scheduledDate: assessment.scheduledDate,
+          // 'date'-typed Postgres columns arrive over the wire as raw strings, not parsed Date
+          // objects — coerce here so every downstream .getTime() call is safe.
+          scheduledDate: new Date(assessment.scheduledDate),
           percentScore: (Number(mark.score) / assessment.totalMarks) * 100,
         };
       })
@@ -327,7 +341,9 @@ export class GradeTrendService {
       group.points.push({
         assessmentId: assessment.id,
         assessmentTitle: assessment.title,
-        scheduledDate: assessment.scheduledDate,
+        // 'date'-typed Postgres columns arrive over the wire as raw strings, not parsed Date
+        // objects — coerce here so every downstream .getTime() call is safe.
+        scheduledDate: new Date(assessment.scheduledDate),
         percentScore: (Number(mark.score) / assessment.totalMarks) * 100,
       });
       groups.set(key, group);
@@ -362,6 +378,7 @@ export class GradeTrendService {
 
       const rollingAverages = this.computeRollingAverages(sortedScores, windowSize);
       const declining = this.isDecliningTrend(rollingAverages, dropThreshold);
+      const improving = this.isImprovingTrend(rollingAverages, dropThreshold);
 
       let row = await this.trendRepo.findOne({
         where: { studentId: group.studentId, subjectId: group.subjectId },
@@ -373,6 +390,7 @@ export class GradeTrendService {
         });
       }
       row.decliningTrend = declining;
+      row.improvingTrend = improving;
       row.lastComputedAt = new Date();
       rowsToSave.push(row);
       computedCount++;

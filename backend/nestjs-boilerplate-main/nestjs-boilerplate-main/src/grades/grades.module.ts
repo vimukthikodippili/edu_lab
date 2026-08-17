@@ -39,6 +39,7 @@ import { ResultPublishingService } from './services/result-publishing.service';
 import { ReportCardPdfService } from './services/report-card-pdf.service';
 import { GradeTrendService } from './services/grade-trend.service';
 import { TopicWeaknessService } from './services/topic-weakness.service';
+import { StudentSummaryService } from './services/student-summary.service';
 import { ResultComputationListener } from './listeners/result-computation.listener';
 import { ReportCardGenerationListener } from './listeners/report-card-generation.listener';
 import { AcademicTermsController } from './controllers/academic-terms.controller';
@@ -52,6 +53,7 @@ import { GradingBandController } from './controllers/grading-band.controller';
 import { ResultsController } from './controllers/results.controller';
 import { GradeTrendController } from './controllers/grade-trend.controller';
 import { TopicWeaknessController } from './controllers/topic-weakness.controller';
+import { StudentSummaryController } from './controllers/student-summary.controller';
 import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
 import { NotificationModule } from '../notification/notification.module';
@@ -108,6 +110,7 @@ import { AuditModule } from '../audit/audit.module';
     ReportCardPdfService,
     GradeTrendService,
     TopicWeaknessService,
+    StudentSummaryService,
     ResultComputationListener,
     ReportCardGenerationListener,
   ],
@@ -123,6 +126,7 @@ import { AuditModule } from '../audit/audit.module';
     ResultsController,
     GradeTrendController,
     TopicWeaknessController,
+    StudentSummaryController,
   ],
   exports: [
     AcademicTermsService,

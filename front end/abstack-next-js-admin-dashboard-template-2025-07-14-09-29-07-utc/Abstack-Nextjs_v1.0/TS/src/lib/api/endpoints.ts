@@ -87,6 +87,7 @@ export const ENDPOINTS = {
     MY_CORRECTIONS: '/grades/marks/correction-requests/mine',
     CORRECTION_APPROVE: (id: string) => `/grades/marks/correction-requests/${id}/approve`,
     CORRECTION_REJECT: (id: string) => `/grades/marks/correction-requests/${id}/reject`,
+    STUDENT_ACADEMIC_SUMMARY: (studentId: string) => `/grades/students/${studentId}/summary`,
   },
   FEES: {
     STRUCTURE: '/fees/structure',

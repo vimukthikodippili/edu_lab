@@ -16,6 +16,9 @@ export class StudentGradeTrendEntity extends EntityRelationalHelper {
   @Column({ type: 'boolean', default: false })
   decliningTrend: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  improvingTrend: boolean;
+
   @Column({ type: 'timestamp with time zone', nullable: true })
   lastComputedAt: Date | null;
 }

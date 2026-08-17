@@ -325,3 +325,74 @@ export interface GradeTrendStudentRow {
   attendanceGradeFlag: AttendanceGradeFlag | null
   effortOutcomeMismatchFlag: AttendanceGradeFlag | null
 }
+
+export type RecentTrend = 'improving' | 'stable' | 'declining'
+
+export interface AssessmentHistoryEntry {
+  assessmentId: string
+  assessmentName: string
+  date: string
+  studentMark: number
+  total: number
+  percentage: number
+  classRank: number
+  classAverage: number | null
+}
+
+export interface TopicSummaryRow {
+  topicName: string
+  averageScore: number
+  maxPossible: number
+  isWeak: boolean
+}
+
+export interface SubjectSummaryRow {
+  subjectId: string
+  subjectName: string
+  teacherName: string | null
+  thisTermAverage: number | null
+  allTimeAverage: number | null
+  assessmentCount: number
+  recentTrend: RecentTrend
+  classRankLatest: number | null
+  classSize: number | null
+  topicSummaries: TopicSummaryRow[]
+  assessmentHistory: AssessmentHistoryEntry[]
+}
+
+export interface AttendanceMonthPoint {
+  month: string
+  rate: number
+}
+
+export interface AttendanceSummaryRow {
+  overallRate: number
+  thisTermRate: number
+  monthlyBreakdown: AttendanceMonthPoint[]
+}
+
+export interface AcademicFlagRow {
+  type: string
+  description: string
+  subjectName: string
+  flaggedAt: string
+}
+
+export interface StudentAcademicSummary {
+  student: {
+    id: string
+    fullName: string
+    admissionNumber: string
+    grade: string
+    classSection: string
+    photoPath: string | null
+    stream: string | null
+  }
+  termId: number
+  termName: string
+  attendanceSummary: AttendanceSummaryRow
+  subjectSummaries: SubjectSummaryRow[]
+  academicFlags: AcademicFlagRow[]
+  overallRank: number | null
+  overallAverage: number | null
+}

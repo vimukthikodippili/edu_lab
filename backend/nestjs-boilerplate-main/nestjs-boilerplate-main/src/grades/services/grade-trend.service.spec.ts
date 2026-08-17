@@ -138,6 +138,35 @@ describe('GradeTrendService', () => {
     });
   });
 
+  describe('isImprovingTrend — exact mirror of isDecliningTrend', () => {
+    it('returns true for two consecutive rises each beyond the threshold', () => {
+      // rolling averages: 60 -> 70 (rise 10) -> 80 (rise 10), threshold 5
+      expect(service.isImprovingTrend([60, 70, 80], 5)).toBe(true);
+    });
+
+    it('returns false for a stable/declining sequence', () => {
+      expect(service.isImprovingTrend([80, 75, 70], 5)).toBe(false);
+    });
+
+    it('returns false for a single rise (one rise, then a drop back)', () => {
+      // 60 -> 85 (rise 25) -> 70 (drop) — only one rise, not a trend
+      expect(service.isImprovingTrend([60, 85, 70], 5)).toBe(false);
+    });
+
+    it('returns false when fewer than 3 rolling-average points exist', () => {
+      expect(service.isImprovingTrend([60, 80], 5)).toBe(false);
+    });
+
+    it('never reports both declining and improving true for the same sequence', () => {
+      // declining and improving are mirror-image detectors — a monotonic sequence should
+      // trip exactly one of them, never both.
+      expect(service.isDecliningTrend([90, 80, 70], 5)).toBe(true);
+      expect(service.isImprovingTrend([90, 80, 70], 5)).toBe(false);
+      expect(service.isDecliningTrend([60, 70, 80], 5)).toBe(false);
+      expect(service.isImprovingTrend([60, 70, 80], 5)).toBe(true);
+    });
+  });
+
   describe('getClassSubjectTrends', () => {
     it('throws ForbiddenException when the teacher has no matching requirement and is not privileged', async () => {
       requirementRepo.findOne.mockResolvedValue(null);
@@ -274,6 +303,36 @@ describe('GradeTrendService', () => {
 
       expect(patternFlagRepo.remove).toHaveBeenCalledWith(existingFlag);
       expect(patternFlagRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('persists improvingTrend=true/decliningTrend=false for a rising score sequence', async () => {
+      assessmentRepo.find.mockResolvedValue(makeAssessments(stableScores));
+      markRepo.find.mockResolvedValue(makeMarks(stableScores));
+      attendanceRepo.find.mockResolvedValue(improvingAttendance);
+      patternFlagRepo.findOne.mockResolvedValue(null);
+
+      await service.computeAllTrends();
+
+      expect(trendRepo.save).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ studentId, subjectId, decliningTrend: false, improvingTrend: true }),
+        ]),
+      );
+    });
+
+    it('persists decliningTrend=true/improvingTrend=false for a falling score sequence', async () => {
+      assessmentRepo.find.mockResolvedValue(makeAssessments(decliningScores));
+      markRepo.find.mockResolvedValue(makeMarks(decliningScores));
+      attendanceRepo.find.mockResolvedValue(decliningAttendance);
+      patternFlagRepo.findOne.mockResolvedValue(null);
+
+      await service.computeAllTrends();
+
+      expect(trendRepo.save).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ studentId, subjectId, decliningTrend: true, improvingTrend: false }),
+        ]),
+      );
     });
   });
 

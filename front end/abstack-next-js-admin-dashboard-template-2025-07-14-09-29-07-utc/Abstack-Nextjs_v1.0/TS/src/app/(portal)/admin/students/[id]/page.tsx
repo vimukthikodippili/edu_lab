@@ -8,6 +8,7 @@ import { ROLES } from '@/lib/auth/roles'
 import { useStudent } from '@/features/students/hooks/useStudent'
 import { GuardianList } from '@/features/students/components/GuardianList'
 import { SubjectEnrollmentSection } from '@/features/enrollments/components/SubjectEnrollmentSection'
+import { AcademicSummarySection } from '@/features/grades/components/AcademicSummarySection'
 import { useStudentYearEndNotes } from '@/features/student-notes/hooks/useStudentYearEndNotes'
 import { useMarkAsLeaving } from '@/features/students/hooks/useMarkAsLeaving'
 import { useStudentDocumentsReview } from '@/features/students/hooks/useStudentDocumentsReview'
@@ -542,6 +543,12 @@ export default function StudentDetailPage({ params }: Props) {
         <div className="mt-4">
           <SubjectEnrollmentSection student={student} />
         </div>
+
+        {/* Academic summary (marks, attendance, trends, flags) — admin/principal only, matching
+            this feature's own scope decision (Section Head is already excluded from this page). */}
+        <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>
+          <AcademicSummarySection studentId={student.id} />
+        </RoleGuard>
 
         {/* Linked portal login account — admin/principal only */}
         <RoleGuard allowedRoles={[ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL]}>
