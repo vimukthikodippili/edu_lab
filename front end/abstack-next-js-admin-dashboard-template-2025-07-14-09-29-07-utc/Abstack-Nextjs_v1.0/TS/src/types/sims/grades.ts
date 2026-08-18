@@ -396,3 +396,105 @@ export interface StudentAcademicSummary {
   overallRank: number | null
   overallAverage: number | null
 }
+
+export type PerformanceTrendDirection = 'improving' | 'stable' | 'declining'
+
+export interface TopicBreakdownRow {
+  subjectTopicId: string
+  topicName: string
+  studentAverage: number
+  classAverage: number
+  isWeak: boolean
+}
+
+export interface TermTrendPoint {
+  termId: number
+  termNumber: number
+  termLabel: string
+  studentAverage: number | null
+  classAverage: number | null
+  classRank: number | null
+  classSize: number
+  trend: PerformanceTrendDirection
+  topicBreakdown: TopicBreakdownRow[]
+}
+
+export interface YearlyTrendPoint {
+  academicYear: string
+  yearLabel: string
+  termTrends: TermTrendPoint[]
+  yearAverage: number | null
+  yearClassRank: number | null
+}
+
+export interface TopicOverallTrend {
+  subjectTopicId: string
+  topicName: string
+  trend: PerformanceTrendDirection
+  firstTermAverage: number
+  latestTermAverage: number
+}
+
+export interface WeakTopicRow {
+  subjectTopicId: string
+  topicName: string
+  currentAverage: number
+  recommendation: string
+}
+
+export interface SubjectTrend {
+  subjectId: string
+  subjectName: string
+  yearlyTrends: YearlyTrendPoint[]
+  overallTrend: PerformanceTrendDirection
+  topicTrends: TopicOverallTrend[]
+  personalBestTerm: { termLabel: string; average: number } | null
+  weakTopicsCurrently: WeakTopicRow[]
+}
+
+export interface PerformanceTrendResponse {
+  student: { id: string; fullName: string; grade: string }
+  subjects: SubjectTrend[]
+}
+
+export interface ClassTrendCell {
+  termId: number
+  termLabel: string
+  average: number | null
+  classAverage: number | null
+}
+
+export interface ClassTrendStudentRow {
+  studentId: string
+  firstName: string
+  lastName: string
+  admissionNumber: string
+  cells: ClassTrendCell[]
+  consistentlyWeak: boolean
+}
+
+export interface ClassSubjectTrendGrid {
+  classSectionId: number
+  subjectId: string
+  subjectName: string
+  terms: { termId: number; termLabel: string }[]
+  rows: ClassTrendStudentRow[]
+}
+
+export interface SchoolSubjectYearPoint {
+  academicYear: string
+  schoolAverage: number
+}
+
+export interface SchoolSubjectYearTrend {
+  subjectId: string
+  subjectName: string
+  yearlyAverages: SchoolSubjectYearPoint[]
+  yearOverYearDelta: number | null
+  consistentlyWeakStudentCount: number
+}
+
+export interface SchoolSubjectYearTrendsResponse {
+  subjects: SchoolSubjectYearTrend[]
+  mostConsistentlyWeakSubject: { subjectId: string; subjectName: string; weakStudentCount: number } | null
+}

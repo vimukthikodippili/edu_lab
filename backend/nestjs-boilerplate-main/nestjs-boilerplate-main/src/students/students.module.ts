@@ -5,6 +5,7 @@ import { StudentDocumentsController } from './student-documents.controller';
 import { GradeStageController } from './grade-stage.controller';
 import { StudentsService } from './students.service';
 import { StudentPromotionService } from './services/student-promotion.service';
+import { PromotionRecommendationService } from './services/promotion-recommendation.service';
 import { StudentDocumentsService } from './services/student-documents.service';
 import { StudentDocumentPdfService } from './services/student-document-pdf.service';
 import { GradeStageService } from './grade-stage.service';
@@ -15,6 +16,7 @@ import { GradeEntity } from './entities/grade.entity';
 import { GradeStageEntity } from './entities/grade-stage.entity';
 import { ClassSectionEntity } from './entities/class-section.entity';
 import { StudentEnrollmentHistoryEntity } from './entities/student-enrollment-history.entity';
+import { PromotionRecommendationEntity } from './entities/promotion-recommendation.entity';
 import { StudentDocumentEntity } from './entities/student-document.entity';
 import { FileEntity } from '../files/infrastructure/persistence/relational/entities/file.entity';
 import { StaffEntity } from '../staff/entities/staff.entity';
@@ -32,6 +34,7 @@ import { StudentNotesModule } from '../student-notes/student-notes.module';
       GradeStageEntity,
       ClassSectionEntity,
       StudentEnrollmentHistoryEntity,
+      PromotionRecommendationEntity,
       StudentDocumentEntity,
       FileEntity,
       StaffEntity,
@@ -44,10 +47,11 @@ import { StudentNotesModule } from '../student-notes/student-notes.module';
   providers: [
     StudentsService,
     StudentPromotionService,
+    PromotionRecommendationService,
     StudentDocumentsService,
     StudentDocumentPdfService,
     GradeStageService,
   ],
-  exports: [StudentsService, StudentPromotionService, GradeStageService],
+  exports: [StudentsService, StudentPromotionService, PromotionRecommendationService, GradeStageService],
 })
 export class StudentsModule {}

@@ -8,8 +8,17 @@ import { useMyClassTeacherSections } from '@/features/teacher-subject-requiremen
 import { useStudents } from '@/features/students/hooks/useStudents'
 import { useStudentYearEndNotes } from '@/features/student-notes/hooks/useStudentYearEndNotes'
 import { useUpsertStudentYearEndNote } from '@/features/student-notes/hooks/useUpsertStudentYearEndNote'
+import { useMyPromotionRecommendations } from '@/features/students/hooks/useMyPromotionRecommendations'
+import { useSubmitPromotionRecommendation } from '@/features/students/hooks/useSubmitPromotionRecommendation'
+import type { PromotionRecommendation, PromotionRecommendationOutcome } from '@/features/students/types-promotion'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
+
+const RECOMMENDATION_LABELS: Record<PromotionRecommendationOutcome, string> = {
+  promote: 'Promote',
+  repeat: 'Repeat this grade',
+  graduate: 'Graduate',
+}
 
 type ApiError = { response?: { data?: { message?: string } } }
 
@@ -18,7 +27,83 @@ function extractErrorMessage(err: unknown, fallback: string): string {
   return message ?? fallback
 }
 
-function StudentNoteRow({ studentId, studentName }: { studentId: string; studentName: string }) {
+function PromotionRecommendationForm({
+  studentId,
+  studentName,
+  existing,
+}: {
+  studentId: string
+  studentName: string
+  existing: PromotionRecommendation | null
+}) {
+  const { showNotification } = useNotificationContext()
+  const submit = useSubmitPromotionRecommendation()
+  const [outcome, setOutcome] = useState<PromotionRecommendationOutcome>(existing?.outcome ?? 'promote')
+  const [comment, setComment] = useState(existing?.comment ?? '')
+
+  const handleSave = () => {
+    submit.mutate(
+      { studentId, academicYear: CURRENT_YEAR, outcome, comment: comment.trim() || undefined },
+      {
+        onSuccess: () => showNotification({ variant: 'success', message: `Recommendation saved for ${studentName}.` }),
+        onError: (err) => showNotification({ variant: 'danger', message: extractErrorMessage(err, 'Could not save recommendation.') }),
+      },
+    )
+  }
+
+  return (
+    <div className="border-top pt-2 mt-2">
+      <div className="d-flex align-items-center gap-2 mb-2">
+        <span className="fw-semibold small">Year-End Recommendation</span>
+        {existing && (
+          <span className="badge bg-primary-subtle text-primary border border-primary-subtle" style={{ fontSize: 11 }}>
+            {RECOMMENDATION_LABELS[existing.outcome]} on file
+          </span>
+        )}
+      </div>
+      <div className="d-flex flex-column gap-2">
+        <select
+          className="form-select form-select-sm"
+          style={{ maxWidth: 220 }}
+          value={outcome}
+          onChange={(e) => setOutcome(e.target.value as PromotionRecommendationOutcome)}
+        >
+          <option value="promote">Promote</option>
+          <option value="repeat">Repeat this grade</option>
+          <option value="graduate">Graduate</option>
+        </select>
+        <textarea
+          className="form-control form-control-sm"
+          rows={2}
+          placeholder="Optional comment for admin"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+        />
+        <div>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-primary d-flex align-items-center gap-2"
+            onClick={handleSave}
+            disabled={submit.isPending}
+          >
+            {submit.isPending && <span className="spinner-border spinner-border-sm" />}
+            Save Recommendation
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StudentNoteRow({
+  studentId,
+  studentName,
+  recommendation,
+}: {
+  studentId: string
+  studentName: string
+  recommendation: PromotionRecommendation | null
+}) {
   const { showNotification } = useNotificationContext()
   const [expanded, setExpanded] = useState(false)
   const { data: notes, isLoading } = useStudentYearEndNotes(studentId)
@@ -66,6 +151,15 @@ function StudentNoteRow({ studentId, studentName }: { studentId: string; student
           {existingNote && (
             <span className="badge bg-success-subtle text-success border border-success-subtle" style={{ fontSize: 11 }}>
               {CURRENT_YEAR} note saved
+            </span>
+          )}
+          {recommendation ? (
+            <span className="badge bg-primary-subtle text-primary border border-primary-subtle" style={{ fontSize: 11 }}>
+              {RECOMMENDATION_LABELS[recommendation.outcome]} recommended
+            </span>
+          ) : (
+            <span className="badge bg-light text-muted border" style={{ fontSize: 11 }}>
+              No recommendation yet
             </span>
           )}
         </span>
@@ -119,6 +213,7 @@ function StudentNoteRow({ studentId, studentName }: { studentId: string; student
                   Save Note
                 </button>
               </div>
+              <PromotionRecommendationForm studentId={studentId} studentName={studentName} existing={recommendation} />
             </div>
           )}
         </div>
@@ -135,6 +230,8 @@ function ClassTeacherContent() {
   const { data: roster, isLoading: rosterLoading } = useStudents(
     activeSectionId ? { classSectionId: activeSectionId, limit: 100 } : {},
   )
+  const { data: recommendations } = useMyPromotionRecommendations(CURRENT_YEAR)
+  const recommendationsByStudent = new Map((recommendations ?? []).map((r) => [r.studentId, r]))
 
   if (sectionsLoading) {
     return <div className="text-muted">Loading…</div>
@@ -177,6 +274,7 @@ function ClassTeacherContent() {
             key={student.id}
             studentId={student.id}
             studentName={`${student.firstName} ${student.lastName}`}
+            recommendation={recommendationsByStudent.get(student.id) ?? null}
           />
         ))
       )}
@@ -191,9 +289,10 @@ export default function ClassTeacherPage() {
         <div className="d-flex align-items-center gap-3 mb-4">
           <Users size={24} className="text-primary" />
           <div>
-            <h4 className="mb-0">My Class — Year-End Notes</h4>
+            <h4 className="mb-0">My Class — Year-End Notes &amp; Recommendations</h4>
             <p className="text-muted small mb-0">
-              Add a note for each student — activities, positions of responsibility, and general conduct.
+              Add a note for each student, and recommend whether they should promote, repeat, or graduate.
+              Admin sees your recommendation but makes the final call when committing promotions.
             </p>
           </div>
         </div>

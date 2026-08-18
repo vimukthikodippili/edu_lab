@@ -7,6 +7,7 @@ import { StudentEntity } from '../students/entities/student.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { LeaveRequestEntity } from '../leave/entities/leave-request.entity';
+import { StaffEntity } from '../staff/entities/staff.entity';
 import { SchoolCalendarConfigModule } from '../school-calendar-config/school-calendar-config.module';
 import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
@@ -24,6 +25,7 @@ import { AttendanceController } from './attendance.controller';
       ClassSectionEntity,
       TeacherSubjectClassRequirementEntity,
       LeaveRequestEntity,
+      StaffEntity,
     ]),
     SchoolCalendarConfigModule,
     UsersModule,

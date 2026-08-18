@@ -180,8 +180,19 @@ export class LibraryController {
   }
 
   @Post('digital-books')
+  @Roles(
+    RoleEnum.admin,
+    RoleEnum.principal,
+    RoleEnum.section_head,
+    RoleEnum.teacher,
+    RoleEnum.counselor,
+    RoleEnum.security_officer,
+    RoleEnum.librarian,
+    RoleEnum.accountant,
+    RoleEnum.school_psychologist,
+  )
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Upload a PDF to the online library (all authenticated roles)' })
+  @ApiOperation({ summary: 'Upload a PDF to the online library (any staff role, not students)' })
   async createDigitalBook(
     @Body() dto: CreateDigitalBookDto,
     @Request() req: { user: { id: unknown; role?: { id: number } } },

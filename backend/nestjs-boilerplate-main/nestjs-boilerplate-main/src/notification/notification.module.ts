@@ -11,6 +11,9 @@ import { SmsService } from './sms/sms.service';
 import { PushService } from './push/push.service';
 import { StudentEntity } from '../students/entities/student.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
+import { GuardianEntity } from '../students/entities/guardian.entity';
+import { UsersModule } from '../users/users.module';
+import { StaffModule } from '../staff/staff.module';
 
 @Module({
   imports: [
@@ -20,7 +23,10 @@ import { ClassSectionEntity } from '../students/entities/class-section.entity';
       StudentNotificationEntity,
       StudentEntity,
       ClassSectionEntity,
+      GuardianEntity,
     ]),
+    UsersModule,
+    StaffModule,
   ],
   providers: [
     NotificationService,

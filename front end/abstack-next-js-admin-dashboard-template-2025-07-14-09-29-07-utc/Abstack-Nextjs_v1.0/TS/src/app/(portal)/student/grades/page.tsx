@@ -11,6 +11,7 @@ import { usePublishedSubjectResults } from '@/features/grades/hooks/usePublished
 import { usePublishedAssessmentResults } from '@/features/grades/hooks/usePublishedAssessmentResults'
 import { useSubjects } from '@/features/subjects/hooks/useSubjects'
 import { TopicScoreChips } from '@/features/grades/components/TopicScoreChips'
+import { MyProgressSection } from '@/features/grades/components/MyProgressSection'
 import type { SubjectResult, TermResult } from '@/types/sims/grades'
 
 // ApexCharts touches `window` — must never render during SSR.
@@ -316,6 +317,8 @@ function StudentGradesContent() {
           </div>
         </>
       )}
+
+      <MyProgressSection studentId={myStudent.id} />
     </div>
   )
 }

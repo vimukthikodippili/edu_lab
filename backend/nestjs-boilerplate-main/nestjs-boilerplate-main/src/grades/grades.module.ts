@@ -15,6 +15,7 @@ import { AcademicPatternFlagEntity } from './entities/academic-pattern-flag.enti
 import { AssessmentMaterialsCheckEntity } from './entities/assessment-materials-check.entity';
 import { AssessmentTopicAllocationEntity } from './entities/assessment-topic-allocation.entity';
 import { TopicWeaknessFlagEntity } from './entities/topic-weakness-flag.entity';
+import { TopicTermSnapshotEntity } from './entities/topic-term-snapshot.entity';
 import { SubjectEntity } from '../subjects/entities/subject.entity';
 import { AttendanceRecordEntity } from '../attendance/entities/attendance-record.entity';
 import { StaffEntity } from '../staff/entities/staff.entity';
@@ -40,8 +41,10 @@ import { ReportCardPdfService } from './services/report-card-pdf.service';
 import { GradeTrendService } from './services/grade-trend.service';
 import { TopicWeaknessService } from './services/topic-weakness.service';
 import { StudentSummaryService } from './services/student-summary.service';
+import { PerformanceTrendService } from './services/performance-trend.service';
 import { ResultComputationListener } from './listeners/result-computation.listener';
 import { ReportCardGenerationListener } from './listeners/report-card-generation.listener';
+import { TopicSnapshotListener } from './listeners/topic-snapshot.listener';
 import { AcademicTermsController } from './controllers/academic-terms.controller';
 import { AcademicYearsController } from './controllers/academic-years.controller';
 import { TermAssessmentPlanController } from './controllers/term-assessment-plan.controller';
@@ -54,6 +57,7 @@ import { ResultsController } from './controllers/results.controller';
 import { GradeTrendController } from './controllers/grade-trend.controller';
 import { TopicWeaknessController } from './controllers/topic-weakness.controller';
 import { StudentSummaryController } from './controllers/student-summary.controller';
+import { PerformanceTrendController } from './controllers/performance-trend.controller';
 import { UsersModule } from '../users/users.module';
 import { StaffModule } from '../staff/staff.module';
 import { NotificationModule } from '../notification/notification.module';
@@ -86,6 +90,7 @@ import { AuditModule } from '../audit/audit.module';
       AssessmentMaterialsCheckEntity,
       AssessmentTopicAllocationEntity,
       TopicWeaknessFlagEntity,
+      TopicTermSnapshotEntity,
       AttendanceRecordEntity,
       FileEntity,
     ]),
@@ -111,8 +116,10 @@ import { AuditModule } from '../audit/audit.module';
     GradeTrendService,
     TopicWeaknessService,
     StudentSummaryService,
+    PerformanceTrendService,
     ResultComputationListener,
     ReportCardGenerationListener,
+    TopicSnapshotListener,
   ],
   controllers: [
     AcademicTermsController,
@@ -127,6 +134,7 @@ import { AuditModule } from '../audit/audit.module';
     GradeTrendController,
     TopicWeaknessController,
     StudentSummaryController,
+    PerformanceTrendController,
   ],
   exports: [
     AcademicTermsService,

@@ -78,6 +78,7 @@ import { MhaSessionModule } from './mha-session/mha-session.module';
 import { DomainResultModule } from './domain-result/domain-result.module';
 import { SafetyNotificationModule } from './safety-notification/safety-notification.module';
 import { MhaParentNotificationModule } from './mha-parent-notification/mha-parent-notification.module';
+import { SearchModule } from './search/search.module';
 import { AcademicContextModule } from './academic-context/academic-context.module';
 import { StudentTimelineModule } from './student-timeline/student-timeline.module';
 import { EventModule } from './events/event.module';
@@ -236,6 +237,7 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     ConsentFormsModule,
     ArtActivitiesModule,
     AcademicContextModule,
+    SearchModule,
   ],
 })
 export class AppModule {}

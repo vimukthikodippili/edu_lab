@@ -5,7 +5,9 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  Param,
   Post,
+  Put,
   Query,
   Request,
   Res,
@@ -22,8 +24,11 @@ import { AttendanceService } from './attendance.service';
 import { AttendanceReportService } from './attendance-report.service';
 import { BulkMarkAttendanceDto } from './dto/bulk-mark-attendance.dto';
 import { GetDayAttendanceDto } from './dto/get-day-attendance.dto';
+import { GetStaffDayAttendanceDto } from './dto/get-staff-day-attendance.dto';
 import { GetAttendanceReportDto } from './dto/get-attendance-report.dto';
 import { ExportAttendanceReportDto } from './dto/export-attendance-report.dto';
+import { MarkStaffAttendanceDto } from './dto/mark-staff-attendance.dto';
+import { GetStaffAttendanceTrendDto } from './dto/get-staff-attendance-trend.dto';
 import { UsersService } from '../users/users.service';
 import { StaffService } from '../staff/staff.service';
 
@@ -58,6 +63,89 @@ export class AttendanceController {
   async myClassSections(@Request() req: { user: { id: unknown } }) {
     const teacherId = await this.resolveTeacherId(req.user.id);
     return this.attendanceService.getMyClassSections(teacherId);
+  }
+
+  @Get('staff/me/today')
+  @Roles(
+    RoleEnum.admin,
+    RoleEnum.principal,
+    RoleEnum.section_head,
+    RoleEnum.teacher,
+    RoleEnum.counselor,
+    RoleEnum.security_officer,
+    RoleEnum.librarian,
+    RoleEnum.accountant,
+    RoleEnum.school_psychologist,
+  )
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Get the caller's own staff attendance status for today" })
+  async myAttendanceToday(@Request() req: { user: { id: unknown } }) {
+    const staffId = await this.resolveTeacherId(req.user.id);
+    const record = await this.attendanceService.getMyAttendanceToday(staffId);
+    return { markedToday: !!record, record };
+  }
+
+  @Post('staff/check-in')
+  @Roles(
+    RoleEnum.admin,
+    RoleEnum.principal,
+    RoleEnum.section_head,
+    RoleEnum.teacher,
+    RoleEnum.counselor,
+    RoleEnum.security_officer,
+    RoleEnum.librarian,
+    RoleEnum.accountant,
+    RoleEnum.school_psychologist,
+  )
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: "Self-mark the caller's own attendance as present for today" })
+  async checkInSelf(@Request() req: { user: { id: unknown } }) {
+    const staffId = await this.resolveTeacherId(req.user.id);
+    return this.attendanceService.markMyAttendance(staffId);
+  }
+
+  @Get('staff/audit')
+  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Every active staff member cross-referenced against their attendance status for a given date (admin/principal only)' })
+  async staffAttendanceAudit(@Query() query: GetStaffDayAttendanceDto) {
+    const date = query.date ?? new Date().toISOString().split('T')[0];
+    return this.attendanceService.getStaffDayAttendance(date);
+  }
+
+  @Put('staff/:staffId')
+  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Set or correct a staff member's attendance status for a given date (admin/principal only)" })
+  async markStaffAttendance(
+    @Param('staffId') staffId: string,
+    @Body() dto: MarkStaffAttendanceDto,
+    @Request() req: { user: { id: unknown } },
+  ) {
+    let markedById: string | null = null;
+    try {
+      markedById = await this.resolveTeacherId(req.user.id);
+    } catch {
+      markedById = null;
+    }
+    return this.attendanceService.markStaffAttendance(
+      staffId,
+      dto.date,
+      dto.status,
+      markedById,
+    );
+  }
+
+  @Get('staff/trend')
+  @Roles(RoleEnum.admin, RoleEnum.principal)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Whole-school staff attendance rate trend bucketed by day, month, or year (admin/principal only)' })
+  async staffAttendanceTrend(@Query() query: GetStaffAttendanceTrendDto) {
+    return this.attendanceService.getStaffAttendanceTrend(
+      query.granularity,
+      query.from,
+      query.to,
+    );
   }
 
   @Get('class-sections')

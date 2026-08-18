@@ -40,10 +40,13 @@ import { MarkAsLeavingDto } from './dto/mark-as-leaving.dto';
 import { LinkUserAccountDto } from './dto/link-user-account.dto';
 import { PreviewPromotionQueryDto } from './dto/preview-promotion.dto';
 import { CommitPromotionDto } from './dto/commit-promotion.dto';
+import { SubmitPromotionRecommendationDto } from './dto/submit-promotion-recommendation.dto';
+import { QueryPromotionRecommendationsDto } from './dto/query-promotion-recommendations.dto';
 import { StudentEntity } from './entities/student.entity';
 import { GradeEntity } from './entities/grade.entity';
 import { ClassSectionEntity } from './entities/class-section.entity';
 import { StudentPromotionService } from './services/student-promotion.service';
+import { PromotionRecommendationService } from './services/promotion-recommendation.service';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -55,6 +58,7 @@ export class StudentsController {
     private readonly usersService: UsersService,
     private readonly staffService: StaffService,
     private readonly studentPromotionService: StudentPromotionService,
+    private readonly promotionRecommendationService: PromotionRecommendationService,
   ) {}
 
   private async resolveStaffId(userId: string): Promise<string> {
@@ -184,6 +188,33 @@ export class StudentsController {
   @ApiOperation({ summary: 'Commit an (admin-reviewed) promotion outcome for a batch of students' })
   commitPromotion(@Body() dto: CommitPromotionDto) {
     return this.studentPromotionService.commit(dto);
+  }
+
+  @Post('promote-year/recommendations')
+  @Roles(RoleEnum.teacher)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Submit or update the caller's year-end promote/repeat/graduate recommendation for a student in a section they head (advisory only)",
+  })
+  async submitPromotionRecommendation(
+    @Body() dto: SubmitPromotionRecommendationDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    const staffId = await this.resolveStaffId(req.user.id);
+    return this.promotionRecommendationService.submit(staffId, dto);
+  }
+
+  @Get('promote-year/recommendations/mine')
+  @Roles(RoleEnum.teacher)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "List the caller's own submitted promotion recommendations for a year" })
+  async myPromotionRecommendations(
+    @Query() query: QueryPromotionRecommendationsDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    const staffId = await this.resolveStaffId(req.user.id);
+    return this.promotionRecommendationService.findMine(staffId, query.academicYear);
   }
 
   @Patch(':id/transfer-section')

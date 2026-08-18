@@ -281,6 +281,13 @@ export const MENU_ITEMS: MenuItemType[] = [
         parentKey: 'attendance-menu',
         allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
       },
+      {
+        key: 'attendance-staff-audit',
+        label: 'Staff Attendance',
+        url: '/admin/attendance/staff',
+        parentKey: 'attendance-menu',
+        allowedRoles: [ROLES.SYSTEM_ADMIN, ROLES.PRINCIPAL],
+      },
     ],
   },
 
@@ -520,6 +527,14 @@ export const MENU_ITEMS: MenuItemType[] = [
         parentKey: 'principal-performance-group',
         allowedRoles: [ROLES.PRINCIPAL, ROLES.SYSTEM_ADMIN],
       },
+      {
+        key: 'principal-analytics',
+        label: 'Subject Trends',
+        icon: BarChart2,
+        url: '/principal/analytics',
+        parentKey: 'principal-performance-group',
+        allowedRoles: [ROLES.PRINCIPAL, ROLES.SECTION_HEAD],
+      },
     ],
   },
 
@@ -626,6 +641,13 @@ export const MENU_ITEMS: MenuItemType[] = [
     allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
   },
   {
+    key: 'teacher-class-trends',
+    label: 'Class Trends',
+    icon: BarChart2,
+    url: '/teacher/class-trends',
+    allowedRoles: [ROLES.TEACHER, ROLES.SECTION_HEAD],
+  },
+  {
     key: 'teacher-performance',
     label: 'My Performance',
     icon: Activity,
@@ -697,7 +719,7 @@ export const MENU_ITEMS: MenuItemType[] = [
   },
   {
     key: 'teacher-class-teacher',
-    label: 'My Class (Year-End Notes)',
+    label: 'My Class — Notes & Promotion',
     icon: Award,
     url: '/teacher/class-teacher',
     allowedRoles: [ROLES.TEACHER],
@@ -903,7 +925,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: GraduationCap,
     url: '/guardian/children',
     allowedRoles: [ROLES.GUARDIAN],
-    isDisabled: true,
   },
   {
     key: 'guardian-ptm',

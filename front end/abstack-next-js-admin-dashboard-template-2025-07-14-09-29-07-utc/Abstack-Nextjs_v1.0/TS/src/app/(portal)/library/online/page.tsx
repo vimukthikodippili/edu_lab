@@ -90,6 +90,9 @@ export default function OnlineLibraryPage() {
   const { showNotification } = useNotificationContext()
   const { user } = useAuthStore()
   const isLibrarianOrAdmin = user?.role === ROLES.LIBRARIAN || user?.role === ROLES.SYSTEM_ADMIN
+  // Self-service upload (pending librarian approval) is open to any staff role, but not to
+  // students — browsing/reading approved PDFs is the only student-facing capability here.
+  const canUpload = user?.role !== ROLES.STUDENT
 
   // Upload form state
   const [title, setTitle] = useState('')
@@ -171,63 +174,67 @@ export default function OnlineLibraryPage() {
         </div>
         <div>
           <h4 className="mb-0 fw-bold">Online PDF Library</h4>
-          <p className="mb-0 text-muted small">Upload and share educational PDFs with the school community</p>
+          <p className="mb-0 text-muted small">
+            {canUpload ? 'Upload and share educational PDFs with the school community' : 'Browse and read approved educational PDFs'}
+          </p>
         </div>
       </div>
 
-      {/* Upload Form */}
-      <div className="card border-0 shadow-sm rounded-4 mb-5">
-        <div className="card-header border-0 py-2 px-4 rounded-top-4 d-flex align-items-center gap-2" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
-          <Upload size={15} color="white" />
-          <span className="fw-bold text-white small">Share a PDF Book</span>
-        </div>
-        <div className="card-body p-4">
-          <div className="row g-3">
-            <div className="col-md-4">
-              <label className="form-label small fw-semibold">Title *</label>
-              <input className="form-control form-control-sm" placeholder="Book title…" value={title} onChange={e => setTitle(e.target.value)} />
+      {/* Upload Form — staff only, not students */}
+      {canUpload && (
+        <div className="card border-0 shadow-sm rounded-4 mb-5">
+          <div className="card-header border-0 py-2 px-4 rounded-top-4 d-flex align-items-center gap-2" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
+            <Upload size={15} color="white" />
+            <span className="fw-bold text-white small">Share a PDF Book</span>
+          </div>
+          <div className="card-body p-4">
+            <div className="row g-3">
+              <div className="col-md-4">
+                <label className="form-label small fw-semibold">Title *</label>
+                <input className="form-control form-control-sm" placeholder="Book title…" value={title} onChange={e => setTitle(e.target.value)} />
+              </div>
+              <div className="col-md-4">
+                <label className="form-label small fw-semibold">Author *</label>
+                <input className="form-control form-control-sm" placeholder="Author name…" value={author} onChange={e => setAuthor(e.target.value)} />
+              </div>
+              <div className="col-md-4">
+                <label className="form-label small fw-semibold">Subject</label>
+                <input className="form-control form-control-sm" placeholder="e.g. Mathematics, Science…" value={subject} onChange={e => setSubject(e.target.value)} />
+              </div>
+              <div className="col-md-8">
+                <label className="form-label small fw-semibold">Description</label>
+                <input className="form-control form-control-sm" placeholder="Brief description (optional)…" value={description} onChange={e => setDescription(e.target.value)} />
+              </div>
+              <div className="col-md-4">
+                <label className="form-label small fw-semibold">PDF File *</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  className="form-control form-control-sm"
+                  onChange={e => setPdfFile(e.target.files?.[0] ?? null)}
+                />
+                {pdfFile && <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>{pdfFile.name} ({(pdfFile.size / 1024 / 1024).toFixed(1)} MB)</div>}
+              </div>
             </div>
-            <div className="col-md-4">
-              <label className="form-label small fw-semibold">Author *</label>
-              <input className="form-control form-control-sm" placeholder="Author name…" value={author} onChange={e => setAuthor(e.target.value)} />
-            </div>
-            <div className="col-md-4">
-              <label className="form-label small fw-semibold">Subject</label>
-              <input className="form-control form-control-sm" placeholder="e.g. Mathematics, Science…" value={subject} onChange={e => setSubject(e.target.value)} />
-            </div>
-            <div className="col-md-8">
-              <label className="form-label small fw-semibold">Description</label>
-              <input className="form-control form-control-sm" placeholder="Brief description (optional)…" value={description} onChange={e => setDescription(e.target.value)} />
-            </div>
-            <div className="col-md-4">
-              <label className="form-label small fw-semibold">PDF File *</label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,application/pdf"
-                className="form-control form-control-sm"
-                onChange={e => setPdfFile(e.target.files?.[0] ?? null)}
-              />
-              {pdfFile && <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>{pdfFile.name} ({(pdfFile.size / 1024 / 1024).toFixed(1)} MB)</div>}
+            <div className="d-flex align-items-center gap-3 mt-3">
+              <button
+                className="btn btn-sm fw-semibold text-white d-flex align-items-center gap-2"
+                style={{ background: uploading ? '#94a3b8' : 'linear-gradient(135deg,#10b981,#059669)', border: 'none' }}
+                onClick={handleUpload}
+                disabled={uploading}
+              >
+                <Upload size={13} /> {uploading ? 'Uploading…' : 'Upload PDF'}
+              </button>
+              {!isLibrarianOrAdmin && (
+                <span className="text-muted d-flex align-items-center gap-1" style={{ fontSize: '0.75rem' }}>
+                  <Clock size={12} /> Uploads require librarian approval before appearing in the library.
+                </span>
+              )}
             </div>
           </div>
-          <div className="d-flex align-items-center gap-3 mt-3">
-            <button
-              className="btn btn-sm fw-semibold text-white d-flex align-items-center gap-2"
-              style={{ background: uploading ? '#94a3b8' : 'linear-gradient(135deg,#10b981,#059669)', border: 'none' }}
-              onClick={handleUpload}
-              disabled={uploading}
-            >
-              <Upload size={13} /> {uploading ? 'Uploading…' : 'Upload PDF'}
-            </button>
-            {!isLibrarianOrAdmin && (
-              <span className="text-muted d-flex align-items-center gap-1" style={{ fontSize: '0.75rem' }}>
-                <Clock size={12} /> Uploads require librarian approval before appearing in the library.
-              </span>
-            )}
-          </div>
         </div>
-      </div>
+      )}
 
       {/* Pending Approvals — librarian / admin only */}
       {isLibrarianOrAdmin && pendingBooks.length > 0 && (
@@ -278,7 +285,7 @@ export default function OnlineLibraryPage() {
           <div className="text-center py-5 text-muted">
             <BookOpen size={42} className="mb-3 opacity-30" />
             <p className="fw-semibold mb-1">No books yet</p>
-            <p className="small">Be the first to upload an educational PDF above.</p>
+            <p className="small">{canUpload ? 'Be the first to upload an educational PDF above.' : 'Check back soon — approved PDFs will appear here.'}</p>
           </div>
         )}
 

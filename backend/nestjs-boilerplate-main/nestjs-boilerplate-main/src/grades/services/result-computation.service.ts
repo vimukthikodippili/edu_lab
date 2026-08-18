@@ -13,15 +13,17 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-interface RankOutcome {
+export interface RankOutcome {
   rank: number;
   percentile: number;
 }
 
 /** Dense/competition rank from a set of totals already sorted DESC — ties share a rank, and the
  * next distinct score's rank skips ahead to reflect how many rows are already ranked above it.
- * Percentile is "scored at or above this fraction of the class" (rank 1 of N → 100, last → lowest). */
-function assignRanksAndPercentiles(totalScoresDesc: string[]): RankOutcome[] {
+ * Percentile is "scored at or above this fraction of the class" (rank 1 of N → 100, last → lowest).
+ * Exported so other services needing the identical ranking convention (e.g. an in-memory
+ * year-level rank in PerformanceTrendService) reuse this instead of re-implementing it. */
+export function assignRanksAndPercentiles(totalScoresDesc: string[]): RankOutcome[] {
   const n = totalScoresDesc.length;
   const outcomes: RankOutcome[] = [];
   let currentRank = 0;

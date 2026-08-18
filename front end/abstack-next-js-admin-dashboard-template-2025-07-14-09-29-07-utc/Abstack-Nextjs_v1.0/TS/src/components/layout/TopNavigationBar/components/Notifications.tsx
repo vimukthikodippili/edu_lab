@@ -2,31 +2,51 @@
 import { Bell, CheckCheck, Inbox } from 'lucide-react'
 import { Dropdown, DropdownMenu, DropdownToggle } from 'react-bootstrap'
 import { useMyStaff } from '@/features/staff/hooks/useMyStaff'
+import { useMyStudent } from '@/features/students/hooks/useMyStudent'
+import { useMyGuardianProfile } from '@/features/students/hooks/useMyGuardianProfile'
 import { useNotifications } from '@/features/notifications/hooks/useNotifications'
 import { useUnreadCount } from '@/features/notifications/hooks/useUnreadCount'
 import { useMarkRead } from '@/features/notifications/hooks/useMarkRead'
-
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  const minutes = Math.floor(diffMs / 60_000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
+import { useStudentNotifications } from '@/features/notifications/hooks/useStudentNotifications'
+import { useStudentUnreadCount } from '@/features/notifications/hooks/useStudentUnreadCount'
+import { useMarkStudentRead } from '@/features/notifications/hooks/useMarkStudentRead'
+import { useGuardianNotifications } from '@/features/notifications/hooks/useGuardianNotifications'
+import { useGuardianUnreadCount } from '@/features/notifications/hooks/useGuardianUnreadCount'
+import { useMarkGuardianNotificationRead } from '@/features/notifications/hooks/useMarkGuardianNotificationRead'
+import { iconForNotificationType, notificationTimeAgo } from '@/features/notifications/utils/notificationTypeIcon'
 
 const Notifications = () => {
-  const { data: myStaff } = useMyStaff()
+  const { data: myStaff, isError: staffError } = useMyStaff()
   const staffId = myStaff?.id ?? null
 
-  const { data: unreadData } = useUnreadCount(staffId)
-  const { data: notifications = [] } = useNotifications(staffId)
-  const markRead = useMarkRead(staffId)
-  const count = unreadData?.count ?? 0
+  // A student account has no staff record — useMyStaff errors out (retry:false), so only
+  // then do we try the student identity, and only after that fails do we try guardian.
+  const { data: myStudent, isError: studentError } = useMyStudent()
+  const isStudent = staffError && !!myStudent
 
-  if (!staffId) return null
+  const { data: myGuardian } = useMyGuardianProfile()
+  const isGuardian = staffError && studentError && !!myGuardian
+
+  const { data: staffUnread } = useUnreadCount(staffId)
+  const { data: staffNotifications = [] } = useNotifications(staffId)
+  const markStaffRead = useMarkRead(staffId)
+
+  const { data: studentUnread } = useStudentUnreadCount(isStudent)
+  const { data: studentNotifications = [] } = useStudentNotifications(isStudent)
+  const markStudentRead = useMarkStudentRead()
+
+  const { data: guardianUnread } = useGuardianUnreadCount()
+  const { data: guardianNotifications = [] } = useGuardianNotifications()
+  const markGuardianRead = useMarkGuardianNotificationRead()
+
+  const allNotifications = isStudent ? studentNotifications : isGuardian ? guardianNotifications : staffNotifications
+  // Once read, a notification drops out of this list entirely rather than lingering dimmed —
+  // the bell is a "what's new" queue, not a permanent log.
+  const notifications = allNotifications.filter((n) => !n.isRead)
+  const count = (isStudent ? studentUnread?.count : isGuardian ? guardianUnread?.count : staffUnread?.count) ?? 0
+  const markRead = isStudent ? markStudentRead : isGuardian ? markGuardianRead : markStaffRead
+
+  if (!staffId && !isStudent && !isGuardian) return null
 
   return (
     <div className="topbar-item">
@@ -60,7 +80,7 @@ const Notifications = () => {
             </span>
           )}
         </DropdownToggle>
-        <DropdownMenu className="p-0 dropdown-menu-end rounded-4 border-0 shadow-lg overflow-hidden" style={{ width: 360 }}>
+        <DropdownMenu className="p-0 dropdown-menu-end rounded-4 border-0 shadow-lg overflow-hidden" style={{ width: 380 }}>
           <div
             className="d-flex align-items-center justify-content-between px-3 py-3"
             style={{ background: 'linear-gradient(135deg, var(--edulab-nav-bg) 0%, var(--edulab-nav-bg-2) 100%)' }}
@@ -71,29 +91,31 @@ const Notifications = () => {
             )}
           </div>
 
-          <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+          <div style={{ maxHeight: 420, overflowY: 'auto' }}>
             {notifications.length === 0 ? (
               <div className="text-center text-muted py-5">
                 <Inbox size={32} className="mb-2 opacity-25" />
                 <p className="mb-0 small">You&apos;re all caught up.</p>
               </div>
             ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className="d-flex align-items-start gap-2 px-3 py-2 border-bottom"
-                  style={{ background: n.isRead ? 'transparent' : '#f5f3ff' }}
-                >
-                  <span
-                    className="rounded-circle flex-shrink-0 mt-2"
-                    style={{ width: 8, height: 8, background: n.isRead ? 'transparent' : 'var(--edulab-accent)' }}
-                  />
-                  <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                    <div className="small fw-semibold">{n.title}</div>
-                    <div className="text-muted small" style={{ wordBreak: 'break-word' }}>{n.message}</div>
-                    <div className="text-muted" style={{ fontSize: '0.7rem' }}>{timeAgo(n.createdAt)}</div>
-                  </div>
-                  {!n.isRead && (
+              notifications.map((n) => {
+                const { icon: Icon, color } = iconForNotificationType(n.type)
+                return (
+                  <div
+                    key={n.id}
+                    className="d-flex align-items-start gap-3 px-3 py-3 border-bottom notification-row"
+                  >
+                    <div
+                      className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                      style={{ width: 34, height: 34, background: `${color}1a` }}
+                    >
+                      <Icon size={16} color={color} />
+                    </div>
+                    <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                      <div className="small fw-semibold">{n.title}</div>
+                      <div className="text-muted small" style={{ wordBreak: 'break-word' }}>{n.message}</div>
+                      <div className="text-muted" style={{ fontSize: '0.7rem' }}>{notificationTimeAgo(n.createdAt)}</div>
+                    </div>
                     <button
                       type="button"
                       className="btn btn-link btn-sm p-0 flex-shrink-0"
@@ -102,13 +124,22 @@ const Notifications = () => {
                     >
                       <CheckCheck size={15} style={{ color: 'var(--edulab-accent)' }} />
                     </button>
-                  )}
-                </div>
-              ))
+                  </div>
+                )
+              })
             )}
           </div>
         </DropdownMenu>
       </Dropdown>
+
+      <style jsx>{`
+        .notification-row {
+          transition: background-color 0.12s;
+        }
+        .notification-row:hover {
+          background-color: #f8fafc;
+        }
+      `}</style>
     </div>
   )
 }

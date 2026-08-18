@@ -11,6 +11,7 @@ import { usePublishedSubjectResults } from '@/features/grades/hooks/usePublished
 import { usePublishedAssessmentResults } from '@/features/grades/hooks/usePublishedAssessmentResults'
 import { useSubjects } from '@/features/subjects/hooks/useSubjects'
 import { TopicScoreChips } from '@/features/grades/components/TopicScoreChips'
+import { MyProgressSection } from '@/features/grades/components/MyProgressSection'
 import type { SubjectResult } from '@/types/sims/grades'
 
 // ApexCharts touches `window` — must never render during SSR.
@@ -338,6 +339,13 @@ function GuardianGradesContent() {
             </div>
           </div>
         </>
+      )}
+
+      {studentId && (
+        <MyProgressSection
+          studentId={studentId}
+          title={selectedStudent ? `${selectedStudent.firstName}'s Progress` : 'Progress'}
+        />
       )}
     </div>
   )

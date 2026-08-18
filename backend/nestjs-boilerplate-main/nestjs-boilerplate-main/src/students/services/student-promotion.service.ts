@@ -1,6 +1,6 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { StudentEntity, StudentStatus } from '../entities/student.entity';
 import { GradeEntity } from '../entities/grade.entity';
 import { ClassSectionEntity } from '../entities/class-section.entity';
@@ -8,8 +8,17 @@ import {
   EnrollmentOutcome,
   StudentEnrollmentHistoryEntity,
 } from '../entities/student-enrollment-history.entity';
+import { PromotionRecommendationEntity } from '../entities/promotion-recommendation.entity';
+import { StaffEntity } from '../../staff/entities/staff.entity';
 import { PreviewPromotionQueryDto } from '../dto/preview-promotion.dto';
 import { CommitPromotionDto, CommitPromotionEntryDto } from '../dto/commit-promotion.dto';
+
+export interface TeacherRecommendationSummary {
+  outcome: string;
+  comment: string | null;
+  recommendedByName: string;
+  updatedAt: Date;
+}
 
 export interface PromotionPreviewRow {
   studentId: string;
@@ -24,6 +33,9 @@ export interface PromotionPreviewRow {
   targetGradeId: number | null;
   targetGradeName: string | null;
   targetClassSectionId: number | null;
+  // Advisory only — reflects what the student's class teacher recommended, if anything.
+  // Never blocks or overrides what admin chooses to commit.
+  teacherRecommendation: TeacherRecommendationSummary | null;
 }
 
 @Injectable()
@@ -41,6 +53,12 @@ export class StudentPromotionService {
     @InjectRepository(StudentEnrollmentHistoryEntity)
     private readonly historyRepo: Repository<StudentEnrollmentHistoryEntity>,
 
+    @InjectRepository(PromotionRecommendationEntity)
+    private readonly recommendationRepo: Repository<PromotionRecommendationEntity>,
+
+    @InjectRepository(StaffEntity)
+    private readonly staffRepo: Repository<StaffEntity>,
+
     private readonly dataSource: DataSource,
   ) {}
 
@@ -56,6 +74,28 @@ export class StudentPromotionService {
     const targetSections = await this.classSectionRepo.find({
       where: { academicYear: query.targetAcademicYear },
     });
+
+    const recommendations = await this.recommendationRepo.find({
+      where: { academicYear: query.sourceAcademicYear },
+    });
+    const recommendationsByStudent = new Map(recommendations.map((r) => [r.studentId, r]));
+    const recommenders = recommendations.length
+      ? await this.staffRepo.find({
+          where: { id: In(recommendations.map((r) => r.recommendedById)) },
+        })
+      : [];
+    const recommenderNames = new Map(recommenders.map((s) => [s.id, `${s.firstName} ${s.lastName}`]));
+
+    const toRecommendationSummary = (studentId: string): TeacherRecommendationSummary | null => {
+      const rec = recommendationsByStudent.get(studentId);
+      if (!rec) return null;
+      return {
+        outcome: rec.outcome,
+        comment: rec.comment,
+        recommendedByName: recommenderNames.get(rec.recommendedById) ?? 'Unknown teacher',
+        updatedAt: rec.updatedAt,
+      };
+    };
 
     return students.map((student) => {
       const nextGrade = gradesByLevel.get(student.grade.level + 1);
@@ -74,6 +114,7 @@ export class StudentPromotionService {
           targetGradeId: null,
           targetGradeName: null,
           targetClassSectionId: null,
+          teacherRecommendation: toRecommendationSummary(student.id),
         };
       }
 
@@ -94,6 +135,7 @@ export class StudentPromotionService {
         targetGradeId: nextGrade.id,
         targetGradeName: nextGrade.name,
         targetClassSectionId: matchingSection?.id ?? null,
+        teacherRecommendation: toRecommendationSummary(student.id),
       };
     });
   }

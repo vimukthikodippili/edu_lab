@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -9,13 +10,22 @@ import { In, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AttendanceRecordEntity, AttendanceStatus } from './entities/attendance-record.entity';
 import { SchoolHolidayEntity } from './entities/school-holiday.entity';
+import { StaffAttendanceEntity, StaffAttendanceStatus } from './entities/staff-attendance.entity';
 import { StudentEntity, StudentStatus } from '../students/entities/student.entity';
 import { ClassSectionEntity } from '../students/entities/class-section.entity';
 import { TeacherSubjectClassRequirementEntity } from '../teacher-subject-requirements/entities/teacher-subject-class-requirement.entity';
 import { LeaveRequestEntity, LeaveStatus } from '../leave/entities/leave-request.entity';
+import { StaffEntity, StaffStatus } from '../staff/entities/staff.entity';
 import { SchoolCalendarConfigService } from '../school-calendar-config/school-calendar-config.service';
 import { BulkMarkAttendanceDto } from './dto/bulk-mark-attendance.dto';
+import { AttendanceTrendGranularity } from './dto/get-staff-attendance-trend.dto';
 import { AbsenceMarkedEvent } from './events/absence-marked.event';
+
+const PRESENT_LIKE_STATUSES = [
+  StaffAttendanceStatus.PRESENT,
+  StaffAttendanceStatus.LATE,
+  StaffAttendanceStatus.HALF_DAY,
+];
 
 export interface DayAttendanceRow {
   studentId: string;
@@ -25,6 +35,24 @@ export interface DayAttendanceRow {
   attendanceId: string | null;
   status: string | null;
   note: string | null;
+}
+
+export interface StaffDayAttendanceRow {
+  staffId: string;
+  firstName: string;
+  lastName: string;
+  employeeNumber: string;
+  designation: string;
+  department: string;
+  status: StaffAttendanceStatus | null;
+  markedAt: string | null;
+}
+
+export interface StaffAttendanceTrendBucket {
+  bucket: string;
+  presentLikeCount: number;
+  totalCount: number;
+  rate: number;
 }
 
 @Injectable()
@@ -48,10 +76,141 @@ export class AttendanceService {
     @InjectRepository(LeaveRequestEntity)
     private readonly leaveRepo: Repository<LeaveRequestEntity>,
 
+    @InjectRepository(StaffAttendanceEntity)
+    private readonly staffAttendanceRepo: Repository<StaffAttendanceEntity>,
+
+    @InjectRepository(StaffEntity)
+    private readonly staffRepo: Repository<StaffEntity>,
+
     private readonly calendarConfigService: SchoolCalendarConfigService,
 
     private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  private today(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  async getMyAttendanceToday(staffId: string): Promise<StaffAttendanceEntity | null> {
+    return this.staffAttendanceRepo.findOne({
+      where: { staffId, date: this.today() as unknown as Date },
+    });
+  }
+
+  async markMyAttendance(staffId: string): Promise<StaffAttendanceEntity> {
+    const today = this.today();
+    const existing = await this.staffAttendanceRepo.findOne({
+      where: { staffId, date: today as unknown as Date },
+    });
+    if (existing) {
+      throw new ConflictException('You have already marked your attendance for today.');
+    }
+    return this.staffAttendanceRepo.save(
+      this.staffAttendanceRepo.create({
+        staffId,
+        date: today as unknown as Date,
+        status: StaffAttendanceStatus.PRESENT,
+        markedById: staffId,
+      }),
+    );
+  }
+
+  async getStaffDayAttendance(date: string): Promise<StaffDayAttendanceRow[]> {
+    const staff = await this.staffRepo.find({
+      where: { status: StaffStatus.ACTIVE },
+      order: { lastName: 'ASC', firstName: 'ASC' },
+    });
+
+    const records = await this.staffAttendanceRepo.findBy({
+      date: date as unknown as Date,
+    });
+    const recordMap = new Map(records.map((r) => [r.staffId, r]));
+
+    return staff.map((s) => {
+      const record = recordMap.get(s.id);
+      return {
+        staffId: s.id,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        employeeNumber: s.employeeNumber,
+        designation: s.designation,
+        department: s.department,
+        status: record?.status ?? null,
+        markedAt: record?.updatedAt?.toISOString() ?? null,
+      };
+    });
+  }
+
+  async markStaffAttendance(
+    staffId: string,
+    date: string,
+    status: StaffAttendanceStatus,
+    markedById: string | null,
+  ): Promise<StaffAttendanceEntity> {
+    const staff = await this.staffRepo.findOne({ where: { id: staffId } });
+    if (!staff) {
+      throw new NotFoundException('Staff member not found.');
+    }
+
+    const existing = await this.staffAttendanceRepo.findOne({
+      where: { staffId, date: date as unknown as Date },
+    });
+
+    if (existing) {
+      existing.status = status;
+      existing.markedById = markedById;
+      return this.staffAttendanceRepo.save(existing);
+    }
+
+    return this.staffAttendanceRepo.save(
+      this.staffAttendanceRepo.create({
+        staffId,
+        date: date as unknown as Date,
+        status,
+        markedById,
+      }),
+    );
+  }
+
+  async getStaffAttendanceTrend(
+    granularity: AttendanceTrendGranularity,
+    from: string,
+    to: string,
+  ): Promise<StaffAttendanceTrendBucket[]> {
+    const truncUnit = granularity === AttendanceTrendGranularity.DAY ? 'day' : granularity;
+
+    const rows = await this.staffAttendanceRepo
+      .createQueryBuilder('sa')
+      .select(`date_trunc('${truncUnit}', sa.date)`, 'bucket')
+      .addSelect(
+        `COUNT(*) FILTER (WHERE sa.status IN (:...presentLike))`,
+        'presentLikeCount',
+      )
+      .addSelect('COUNT(*)', 'totalCount')
+      .where('sa.date BETWEEN :from AND :to', { from, to })
+      .setParameter('presentLike', PRESENT_LIKE_STATUSES)
+      .groupBy('bucket')
+      .orderBy('bucket', 'ASC')
+      .getRawMany<{ bucket: Date; presentLikeCount: string; totalCount: string }>();
+
+    return rows.map((r) => {
+      const total = parseInt(r.totalCount, 10);
+      const presentLike = parseInt(r.presentLikeCount, 10);
+      return {
+        bucket: this.formatBucket(r.bucket, granularity),
+        presentLikeCount: presentLike,
+        totalCount: total,
+        rate: total > 0 ? Math.round((presentLike / total) * 1000) / 10 : 0,
+      };
+    });
+  }
+
+  private formatBucket(bucket: Date, granularity: AttendanceTrendGranularity): string {
+    const iso = new Date(bucket).toISOString();
+    if (granularity === AttendanceTrendGranularity.YEAR) return iso.slice(0, 4);
+    if (granularity === AttendanceTrendGranularity.MONTH) return iso.slice(0, 7);
+    return iso.slice(0, 10);
+  }
 
   async getMyClassSections(teacherId: string): Promise<ClassSectionEntity[]> {
     const requirements = await this.requirementRepo.find({

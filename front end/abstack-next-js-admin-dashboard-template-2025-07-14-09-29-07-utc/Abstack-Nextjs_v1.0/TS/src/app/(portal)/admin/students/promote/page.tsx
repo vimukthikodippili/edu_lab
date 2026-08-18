@@ -8,9 +8,20 @@ import { useGrades } from '@/features/students/hooks/useGrades'
 import { useClassSections } from '@/features/students/hooks/useClassSections'
 import { usePromotionPreview } from '@/features/students/hooks/usePromotionPreview'
 import { useCommitPromotion } from '@/features/students/hooks/useCommitPromotion'
-import type { CommitOutcome, PromotionPreviewRow } from '@/features/students/types-promotion'
+import type { CommitOutcome, PromotionPreviewRow, PromotionRecommendationOutcome } from '@/features/students/types-promotion'
 
 const CURRENT_YEAR = String(new Date().getFullYear())
+
+const RECOMMENDATION_BADGE: Record<PromotionRecommendationOutcome, string> = {
+  promote: 'bg-success-subtle text-success border-success-subtle',
+  repeat: 'bg-warning-subtle text-warning border-warning-subtle',
+  graduate: 'bg-primary-subtle text-primary border-primary-subtle',
+}
+const RECOMMENDATION_LABEL: Record<PromotionRecommendationOutcome, string> = {
+  promote: 'Promote',
+  repeat: 'Repeat',
+  graduate: 'Graduate',
+}
 
 type ApiError = { response?: { data?: { message?: string } } }
 function extractErrorMessage(err: unknown, fallback: string): string {
@@ -196,6 +207,7 @@ function PromotionContent() {
                 <tr className="table-light">
                   <th className="small text-muted">Student</th>
                   <th className="small text-muted">Current</th>
+                  <th className="small text-muted">Teacher recommended</th>
                   <th className="small text-muted">Outcome</th>
                   <th className="small text-muted">Target</th>
                 </tr>
@@ -211,6 +223,24 @@ function PromotionContent() {
                         <div className="text-muted" style={{ fontSize: 11 }}>{row.admissionNumber}</div>
                       </td>
                       <td className="small">{row.currentGradeName} · {row.currentClassSectionName}</td>
+                      <td>
+                        {row.teacherRecommendation ? (
+                          <div>
+                            <span
+                              className={`badge border ${RECOMMENDATION_BADGE[row.teacherRecommendation.outcome]}`}
+                              style={{ fontSize: 11 }}
+                              title={row.teacherRecommendation.comment ?? undefined}
+                            >
+                              {RECOMMENDATION_LABEL[row.teacherRecommendation.outcome]}
+                            </span>
+                            <div className="text-muted" style={{ fontSize: 10.5 }}>
+                              by {row.teacherRecommendation.recommendedByName}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted small">—</span>
+                        )}
+                      </td>
                       <td>
                         <select
                           className="form-select form-select-sm"

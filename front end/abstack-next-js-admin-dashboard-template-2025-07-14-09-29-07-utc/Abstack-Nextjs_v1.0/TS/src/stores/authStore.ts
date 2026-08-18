@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Role } from '@/lib/auth/roles'
 import type { Permission } from '@/lib/auth/permissions'
 import { getUserPermissions } from '@/lib/auth/permissions'
+import { queryClient } from '@/lib/api/queryClient'
 
 export interface AuthUser {
   id: string
@@ -47,16 +48,22 @@ export const useAuthStore = create<AuthState>()(
       lastActivityAt: Date.now(),
       loginMethod: null,
 
-      setUser: (user) =>
+      setUser: (user) => {
+        // A stale cache from a *previous* account in this tab (identity, notifications, grades,
+        // etc.) must never bleed into a newly-logged-in account — clear before the new identity
+        // is set so no in-flight render can read the old user's data even for one frame.
+        queryClient.clear()
         set({
           user,
           permissions: getUserPermissions(user.role),
           isAuthenticated: true,
           mfaPending: false,
           lastActivityAt: Date.now(),
-        }),
+        })
+      },
 
-      clearUser: () =>
+      clearUser: () => {
+        queryClient.clear()
         set({
           user: null,
           permissions: [],
@@ -65,7 +72,8 @@ export const useAuthStore = create<AuthState>()(
           mfaVerified: false,
           pendingLoginToken: null,
           loginMethod: null,
-        }),
+        })
+      },
 
       hasPermission: (permission) => get().permissions.includes(permission),
 

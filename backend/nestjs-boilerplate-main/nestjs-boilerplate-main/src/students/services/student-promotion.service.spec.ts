@@ -11,6 +11,11 @@ import {
   EnrollmentOutcome,
   StudentEnrollmentHistoryEntity,
 } from '../entities/student-enrollment-history.entity';
+import {
+  PromotionRecommendationEntity,
+  PromotionRecommendationOutcome,
+} from '../entities/promotion-recommendation.entity';
+import { StaffEntity } from '../../staff/entities/staff.entity';
 
 const grade6 = { id: 6, level: 6, name: 'Grade 6' } as GradeEntity;
 const grade7 = { id: 7, level: 7, name: 'Grade 7' } as GradeEntity;
@@ -40,6 +45,8 @@ describe('StudentPromotionService', () => {
   let gradeRepo: { find: jest.Mock };
   let classSectionRepo: { find: jest.Mock };
   let historyRepo: Record<string, unknown>;
+  let recommendationRepo: { find: jest.Mock };
+  let staffRepo: { find: jest.Mock };
   let dataSource: { transaction: jest.Mock };
 
   beforeEach(async () => {
@@ -47,6 +54,8 @@ describe('StudentPromotionService', () => {
     gradeRepo = { find: jest.fn() };
     classSectionRepo = { find: jest.fn() };
     historyRepo = {};
+    recommendationRepo = { find: jest.fn().mockResolvedValue([]) };
+    staffRepo = { find: jest.fn().mockResolvedValue([]) };
     dataSource = { transaction: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -56,6 +65,8 @@ describe('StudentPromotionService', () => {
         { provide: getRepositoryToken(GradeEntity), useValue: gradeRepo },
         { provide: getRepositoryToken(ClassSectionEntity), useValue: classSectionRepo },
         { provide: getRepositoryToken(StudentEnrollmentHistoryEntity), useValue: historyRepo },
+        { provide: getRepositoryToken(PromotionRecommendationEntity), useValue: recommendationRepo },
+        { provide: getRepositoryToken(StaffEntity), useValue: staffRepo },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
@@ -93,6 +104,46 @@ describe('StudentPromotionService', () => {
       expect(result[0].outcome).toBe('promoted');
       expect(result[0].targetGradeId).toBe(7);
       expect(result[0].targetClassSectionId).toBe(2);
+    });
+
+    it("includes the student's teacher recommendation when one was submitted for the source year, without changing outcome", async () => {
+      studentRepo.find.mockResolvedValue([makeStudent()]);
+      gradeRepo.find.mockResolvedValue([grade6, grade7]);
+      classSectionRepo.find.mockResolvedValue([sectionA7]);
+      recommendationRepo.find.mockResolvedValue([
+        {
+          studentId: 'student-uuid-1',
+          outcome: PromotionRecommendationOutcome.REPEAT,
+          comment: 'Struggled with maths this year.',
+          recommendedById: 'staff-1',
+          updatedAt: new Date('2026-06-01'),
+        } as PromotionRecommendationEntity,
+      ]);
+      staffRepo.find.mockResolvedValue([
+        { id: 'staff-1', firstName: 'Nimal', lastName: 'Perera' } as StaffEntity,
+      ]);
+
+      const result = await service.preview({ sourceAcademicYear: '2026', targetAcademicYear: '2027' });
+
+      // Advisory only — the mechanical outcome is untouched by the recommendation.
+      expect(result[0].outcome).toBe('promoted');
+      expect(result[0].teacherRecommendation).toEqual(
+        expect.objectContaining({
+          outcome: PromotionRecommendationOutcome.REPEAT,
+          comment: 'Struggled with maths this year.',
+          recommendedByName: 'Nimal Perera',
+        }),
+      );
+    });
+
+    it('returns a null teacherRecommendation when no recommendation was submitted', async () => {
+      studentRepo.find.mockResolvedValue([makeStudent()]);
+      gradeRepo.find.mockResolvedValue([grade6, grade7]);
+      classSectionRepo.find.mockResolvedValue([sectionA7]);
+
+      const result = await service.preview({ sourceAcademicYear: '2026', targetAcademicYear: '2027' });
+
+      expect(result[0].teacherRecommendation).toBeNull();
     });
 
     it('flags needs_manual_section when the next grade has no matching-name section yet', async () => {
